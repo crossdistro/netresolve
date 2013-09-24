@@ -1,0 +1,47 @@
+#ifndef NETRESOLVE_H
+#define NETRESOLVE_H
+
+#include <stdbool.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#include <netresolve-common.h>
+
+typedef struct netresolve_resolver *netresolve_t;
+
+/* Open/close resolver instance */
+netresolve_t netresolve_open();
+void netresolve_close(netresolve_t resolver);
+
+/* Configuration API */
+void netresolve_set_log_level(netresolve_t resolver, int level);
+void netresolve_set_backend_string(netresolve_t resolver, const char *string);
+void netresolve_set_flag(netresolve_t resolver, netresolve_flag_t flag);
+void netresolve_unset_flag(netresolve_t resolver, netresolve_flag_t flag);
+
+/* Callback API */
+typedef void (*netresolve_callback_t)(netresolve_t resolver, void *user_data);
+void netresolve_callback_set_callbacks(netresolve_t resolver,
+		netresolve_callback_t on_success,
+		netresolve_callback_t on_failure,
+		void *user_data);
+typedef void (*netresolve_fd_callback_t)(netresolve_t resolver, int fd, int events, void *user_data);
+void netresolve_callback_set_watch_fd(netresolve_t resolver,
+		netresolve_fd_callback_t watch_fd,
+		void *user_data);
+
+/* Request API */
+int netresolve_resolve(netresolve_t resolver,
+		const char *node, const char *service, int family, int socktype, int protocol);
+int netresolve_dispatch(netresolve_t resolver, int fd, int events);
+
+/* Response API */
+size_t netresolve_get_path_count(const netresolve_t resolver);
+const void *netresolve_get_path(const netresolve_t resolver, size_t idx,
+		int *family, int *ifindex, int *socktype, int *protocol, int *port);
+const char *netresolve_get_canonical_name(const netresolve_t resolver);
+/* Convenient API for use with BSD socket API */
+const struct sockaddr *netresolve_get_path_sockaddr(const netresolve_t resolver, size_t n,
+		int *socktype, int *protocol, socklen_t *salen);
+
+#endif /* NETRESOLVE_H */

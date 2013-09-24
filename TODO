@@ -1,0 +1,64 @@
+# TODO list
+
+## Core
+
+ * Redesign the response data model
+    - make sure all plugins and tools are updated
+ * Reorder returned items
+    - http://tools.ietf.org/html/rfc6724
+ * Add DNSSEC validation information
+    - what about non-DNS protocols?
+ * Add callback-based API for bind/connect
+    - as a replacement or in addition to the current utility functions
+    - `netresolve_callback_set_connect()`
+    - `netresolve_callback_set_bind()`
+ * Consider support for non-IP address families
+    - `AF_UNIX` sockets (host starting with `/`)
+ * Support non-epoll platforms
+    - by passing multiple file descriptors via watch_fd
+    - emulate timerfd file descriptors
+ * Make the whole thing distributable and installable
+    - `make distcheck`,  `configure.ac`, `Makefile.am`
+    - see whether installed version works properly
+
+## Tools, testing and compatibility
+
+ * Turn `libnetresolve-getaddrinfo.so` to something more generic
+    - rename
+    - support other glibc resolver functions
+ * Use long options instead of arguments or environment variables for netresolve
+    - `--host` and `--service`
+    - `--family`, `--socktype` and `--protocol`
+    - `--backends`
+ * Name service switch backend on top of netresolve
+    - environment variables and/or configuration file for defaults
+
+## Backends
+
+ * Improve the DNS backend
+    - validation information
+    - SRV and MX support
+    - `ai_addrconfig`-like functionality
+ * Implement a multicast DNS backend
+    - non-blocking
+ * Improve `nss` plugin
+    - support `gethostbyname4`
+    - support non-gethostbyname functions
+ * Improve `exec` plugin
+    - make sure it send all request attribues and accepts all response attributes
+    - add tests
+
+## Wrappers
+
+ * Implement a *glib* wrapper (as an example for wrapper writers)
+ * Implement a *python* wrapper
+ * Find other notable asynchronous libraries
+
+## Documentation
+
+ * manpages
+
+## Development side effects
+
+ * Provide fixes for glibc resolver
+ * notes and errata on IETF standards

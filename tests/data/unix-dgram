@@ -1,0 +1,3 @@
+response netresolve 0.0.1
+unix /path/to/socket dgram
+
