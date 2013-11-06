@@ -5,45 +5,44 @@
 /* A timeout starting when the first successful answer has been received. */
 static int partial_timeout = 5;
 
-typedef struct {
-	netresolve_backend_t resolver;
+struct priv {
 	ares_channel channel;
 	fd_set rfds;
 	fd_set wfds;
 	int nfds;
 	int ptfd;
-} Data;
+};
 
 void
-register_fds(Data *data)
+register_fds(netresolve_backend_t resolver)
 {
-	netresolve_backend_t resolver = data->resolver;
+	struct priv *priv = netresolve_backend_get_priv(resolver);
 	fd_set rfds;
 	fd_set wfds;
 	int nfds, fd;
 
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
-	nfds = ares_fds(data->channel, &rfds, &wfds);
+	nfds = ares_fds(priv->channel, &rfds, &wfds);
 
-	for (fd = 0; fd < nfds || fd < data->nfds; fd++) {
-		if (!FD_ISSET(fd, &rfds) && FD_ISSET(fd, &data->rfds)) {
-			FD_CLR(fd, &data->rfds);
+	for (fd = 0; fd < nfds || fd < priv->nfds; fd++) {
+		if (!FD_ISSET(fd, &rfds) && FD_ISSET(fd, &priv->rfds)) {
+			FD_CLR(fd, &priv->rfds);
 			netresolve_backend_watch_fd(resolver, fd, 0);
-		} else if (FD_ISSET(fd, &rfds) && !FD_ISSET(fd, &data->rfds)) {
-			FD_SET(fd, &data->rfds);
+		} else if (FD_ISSET(fd, &rfds) && !FD_ISSET(fd, &priv->rfds)) {
+			FD_SET(fd, &priv->rfds);
 			netresolve_backend_watch_fd(resolver, fd, POLLIN);
 		}
-		if (!FD_ISSET(fd, &wfds) && FD_ISSET(fd, &data->wfds)) {
-			FD_CLR(fd, &data->wfds);
+		if (!FD_ISSET(fd, &wfds) && FD_ISSET(fd, &priv->wfds)) {
+			FD_CLR(fd, &priv->wfds);
 			netresolve_backend_watch_fd(resolver, fd, 0);
-		} else if (FD_ISSET(fd, &wfds) && !FD_ISSET(fd, &data->wfds)) {
-			FD_SET(fd, &data->wfds);
+		} else if (FD_ISSET(fd, &wfds) && !FD_ISSET(fd, &priv->wfds)) {
+			FD_SET(fd, &priv->wfds);
 			netresolve_backend_watch_fd(resolver, fd, POLLOUT);
 		}
 	}
 
-	data->nfds = nfds;
+	priv->nfds = nfds;
 
 	if (!nfds)
 		netresolve_backend_finished(resolver);
@@ -52,15 +51,15 @@ register_fds(Data *data)
 void
 host_callback(void *arg, int status, int timeouts, struct hostent *he)
 {
-	Data *data = arg;
-	netresolve_backend_t resolver = data->resolver;
+	netresolve_backend_t resolver = arg;
+	struct priv *priv = netresolve_backend_get_priv(resolver);
 
 	switch (status) {
 	case ARES_EDESTRUCTION:
 		break;
 	case ARES_SUCCESS:
-		data->ptfd = netresolve_backend_watch_timeout(resolver, partial_timeout, 0);
-		if (data->ptfd == -1)
+		priv->ptfd = netresolve_backend_watch_timeout(resolver, partial_timeout, 0);
+		if (priv->ptfd == -1)
 			error("timer: %s", strerror(errno));
 		netresolve_backend_apply_hostent(resolver, he, false);
 		break;
@@ -72,32 +71,31 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 void
 start(netresolve_backend_t resolver, char **settings)
 {
-	Data *data = netresolve_backend_new_data(resolver, sizeof *data);
+	struct priv *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
 	const char *node = netresolve_backend_get_node(resolver);
 	int family = netresolve_backend_get_family(resolver);
 	int status;
 
-	if (!data)
+	if (!priv)
 		goto fail;
 
-	data->resolver = resolver;
-	data->ptfd = -1;
+	priv->ptfd = -1;
 
-	FD_ZERO(&data->rfds);
-	FD_ZERO(&data->wfds);
+	FD_ZERO(&priv->rfds);
+	FD_ZERO(&priv->wfds);
 
 	status = ares_library_init(ARES_LIB_INIT_ALL);
 	if (status != ARES_SUCCESS)
 		goto fail_ares;
-	status = ares_init(&data->channel);
+	status = ares_init(&priv->channel);
 	if (status != ARES_SUCCESS)
 		goto fail_ares;
 
 	if (family == AF_INET || family == AF_UNSPEC)
-		ares_gethostbyname(data->channel, node, AF_INET, host_callback, data);
+		ares_gethostbyname(priv->channel, node, AF_INET, host_callback, resolver);
 	if (family == AF_INET6 || family == AF_UNSPEC)
-		ares_gethostbyname(data->channel, node, AF_INET6, host_callback, data);
-	register_fds(data);
+		ares_gethostbyname(priv->channel, node, AF_INET6, host_callback, resolver);
+	register_fds(resolver);
 
 	return;
 
@@ -110,37 +108,37 @@ fail:
 void
 dispatch(netresolve_backend_t resolver, int fd, int events)
 {
-	Data *data = netresolve_backend_get_data(resolver);
+	struct priv *priv = netresolve_backend_get_priv(resolver);
 
 	int rfd = events & POLLIN ? fd : ARES_SOCKET_BAD;
 	int wfd = events & POLLOUT ? fd : ARES_SOCKET_BAD;
 
-	if (fd == data->ptfd) {
+	if (fd == priv->ptfd) {
 		error("partial response used due to a timeout\n");
 		netresolve_backend_finished(resolver);
 		return;
 	}
 
-	ares_process_fd(data->channel, rfd, wfd);
-	register_fds(data);
+	ares_process_fd(priv->channel, rfd, wfd);
+	register_fds(resolver);
 }
 
 void
 cleanup(netresolve_backend_t resolver)
 {
-	Data *data = netresolve_backend_get_data(resolver);
+	struct priv *priv = netresolve_backend_get_priv(resolver);
 	int fd;
 
-	for (fd = 0; fd < data->nfds; fd++) {
-		if (FD_ISSET(fd, &data->rfds) || FD_ISSET(fd, &data->wfds)) {
-			FD_CLR(fd, &data->rfds);
+	for (fd = 0; fd < priv->nfds; fd++) {
+		if (FD_ISSET(fd, &priv->rfds) || FD_ISSET(fd, &priv->wfds)) {
+			FD_CLR(fd, &priv->rfds);
 			netresolve_backend_watch_fd(resolver, fd, 0);
 		}
 	}
 
-	if (data->ptfd != -1)
-		netresolve_backend_drop_timeout(resolver, data->ptfd);
+	if (priv->ptfd != -1)
+		netresolve_backend_drop_timeout(resolver, priv->ptfd);
 
-	ares_destroy(data->channel);
+	ares_destroy(priv->channel);
 	//ares_library_cleanup();
 }

@@ -6,19 +6,19 @@
 #include <netresolve-backend.h>
 #include <netresolve-string.h>
 
-typedef struct {
+struct buffer {
 	char *buffer;
 	char *start;
 	char *end;
-} Buffer;
+};
 
-typedef struct {
+struct priv {
 	int pid;
-	Buffer inbuf;
+	struct buffer inbuf;
 	int infd;
-	Buffer outbuf;
+	struct buffer outbuf;
 	int outfd;
-} Data;
+};
 
 static bool
 start_subprocess(char *const command[], int *pid, int *infd, int *outfd)
@@ -63,32 +63,32 @@ err_pipe1:
 }
 
 static void
-send_stdin(netresolve_backend_t resolver, Data *data)
+send_stdin(netresolve_backend_t resolver, struct priv *priv)
 {
 	ssize_t size;
 
-	if (data->inbuf.start == data->inbuf.end) {
-		netresolve_backend_watch_fd(resolver, data->infd, 0);
+	if (priv->inbuf.start == priv->inbuf.end) {
+		netresolve_backend_watch_fd(resolver, priv->infd, 0);
 		return;
 	}
-	size = write(data->infd, data->inbuf.start, data->inbuf.end - data->inbuf.start);
+	size = write(priv->infd, priv->inbuf.start, priv->inbuf.end - priv->inbuf.start);
 	if (size <= 0) {
 		abort();
 		debug("write failed: %s", strerror(errno));
 		netresolve_backend_failed(resolver);
 		return;
 	}
-	data->inbuf.start += size;
+	priv->inbuf.start += size;
 	return;
 }
 
 static bool
-received_line(netresolve_backend_t resolver, Data *data, const char *line)
+received_line(netresolve_backend_t resolver, struct priv *priv, const char *line)
 {
 	char addrprefix[] = "address ";
 	int addrprefixlen = strlen(addrprefix);
 
-	debug("received: %s\n", data->outbuf.buffer);
+	debug("received: %s\n", priv->outbuf.buffer);
 
 	if (!*line)
 		return true;
@@ -106,22 +106,22 @@ received_line(netresolve_backend_t resolver, Data *data, const char *line)
 }
 
 static void
-pickup_stdout(netresolve_backend_t resolver, Data *data)
+pickup_stdout(netresolve_backend_t resolver, struct priv *priv)
 {
 	char *nl;
 	int size;
 
-	if (!data->outbuf.buffer) {
-		data->outbuf.buffer = data->outbuf.start = malloc(1024);
-		if (data->outbuf.buffer)
-			data->outbuf.end = data->outbuf.start + 1024;
+	if (!priv->outbuf.buffer) {
+		priv->outbuf.buffer = priv->outbuf.start = malloc(1024);
+		if (priv->outbuf.buffer)
+			priv->outbuf.end = priv->outbuf.start + 1024;
 	}
-	if (!data->outbuf.buffer) {
+	if (!priv->outbuf.buffer) {
 		netresolve_backend_failed(resolver);
 		return;
 	}
 
-	size = read(data->outfd, data->outbuf.start, data->outbuf.end - data->outbuf.start);
+	size = read(priv->outfd, priv->outbuf.start, priv->outbuf.end - priv->outbuf.start);
 	if (size <= 0) {
 		abort();
 		if (size < 0)
@@ -129,50 +129,50 @@ pickup_stdout(netresolve_backend_t resolver, Data *data)
 		netresolve_backend_failed(resolver);
 		return;
 	}
-	debug("read: %*s\n", size, data->outbuf.start);
-	data->outbuf.start += size;
+	debug("read: %*s\n", size, priv->outbuf.start);
+	priv->outbuf.start += size;
 
-	while ((nl = memchr(data->outbuf.buffer, '\n', data->outbuf.start - data->outbuf.buffer))) {
+	while ((nl = memchr(priv->outbuf.buffer, '\n', priv->outbuf.start - priv->outbuf.buffer))) {
 		*nl++ = '\0';
-		if (received_line(resolver, data, data->outbuf.buffer)) {
+		if (received_line(resolver, priv, priv->outbuf.buffer)) {
 			netresolve_backend_finished(resolver);
 			return;
 		}
-		memmove(data->outbuf.buffer, nl, data->outbuf.end - data->outbuf.start);
-		data->outbuf.start = data->outbuf.buffer + (data->outbuf.start - nl);
+		memmove(priv->outbuf.buffer, nl, priv->outbuf.end - priv->outbuf.start);
+		priv->outbuf.start = priv->outbuf.buffer + (priv->outbuf.start - nl);
 	}
 }
 
 void
 start(netresolve_backend_t resolver, char **settings)
 {
-	Data *data = netresolve_backend_new_data(resolver, sizeof *data);
+	struct priv *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
 
-	if (!data || !start_subprocess(settings, &data->pid, &data->infd, &data->outfd)) {
+	if (!priv || !start_subprocess(settings, &priv->pid, &priv->infd, &priv->outfd)) {
 		netresolve_backend_failed(resolver);
 		return;
 	}
 
-	data->inbuf.buffer = strdup(netresolve_get_request_string(resolver));
-	data->inbuf.start = data->inbuf.buffer;
-	data->inbuf.end = data->inbuf.buffer + strlen(data->inbuf.buffer);
+	priv->inbuf.buffer = strdup(netresolve_get_request_string(resolver));
+	priv->inbuf.start = priv->inbuf.buffer;
+	priv->inbuf.end = priv->inbuf.buffer + strlen(priv->inbuf.buffer);
 
-	netresolve_backend_watch_fd(resolver, data->infd, POLLOUT);
-	netresolve_backend_watch_fd(resolver, data->outfd, POLLIN);
+	netresolve_backend_watch_fd(resolver, priv->infd, POLLOUT);
+	netresolve_backend_watch_fd(resolver, priv->outfd, POLLIN);
 }
 
 void
 dispatch(netresolve_backend_t resolver, int fd, int events)
 {
-	Data *data = netresolve_backend_get_data(resolver);
+	struct priv *priv = netresolve_backend_get_priv(resolver);
 
 	debug("events %d on fd %d\n", events, fd);
 
-	if (fd == data->infd && events & POLLOUT)
-		send_stdin(resolver, data);
-	else if (fd == data->outfd && events & POLLIN) {
-		pickup_stdout(resolver, data);
-	} else if (fd == data->outfd && events & POLLHUP) {
+	if (fd == priv->infd && events & POLLOUT)
+		send_stdin(resolver, priv);
+	else if (fd == priv->outfd && events & POLLIN) {
+		pickup_stdout(resolver, priv);
+	} else if (fd == priv->outfd && events & POLLHUP) {
 		error("incomplete request\n");
 		netresolve_backend_failed(resolver);
 	} else {
@@ -184,14 +184,14 @@ dispatch(netresolve_backend_t resolver, int fd, int events)
 void
 cleanup(netresolve_backend_t resolver)
 {
-	Data *data = netresolve_backend_get_data(resolver);
+	struct priv *priv = netresolve_backend_get_priv(resolver);
 
-	netresolve_backend_watch_fd(resolver, data->infd, 0);
-	netresolve_backend_watch_fd(resolver, data->outfd, 0);
-	close(data->infd);
-	close(data->outfd);
+	netresolve_backend_watch_fd(resolver, priv->infd, 0);
+	netresolve_backend_watch_fd(resolver, priv->outfd, 0);
+	close(priv->infd);
+	close(priv->outfd);
 	/* TODO: Implement proper child handling. */
-	kill(data->pid, SIGKILL);
-	free(data->inbuf.buffer);
-	free(data->outbuf.buffer);
+	kill(priv->pid, SIGKILL);
+	free(priv->inbuf.buffer);
+	free(priv->outbuf.buffer);
 }

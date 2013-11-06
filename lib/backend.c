@@ -118,7 +118,7 @@ netresolve_backend_set_canonical_name(netresolve_t resolver, const char *canonic
 }
 
 void *
-netresolve_backend_new_data(netresolve_backend_t resolver, size_t size)
+netresolve_backend_new_priv(netresolve_backend_t resolver, size_t size)
 {
 	if ((*resolver->backend)->data) {
 		error("Backend data already present.");
@@ -133,7 +133,7 @@ netresolve_backend_new_data(netresolve_backend_t resolver, size_t size)
 }
 
 void *
-netresolve_backend_get_data(netresolve_backend_t resolver)
+netresolve_backend_get_priv(netresolve_backend_t resolver)
 {
 	return (*resolver->backend)->data;
 }

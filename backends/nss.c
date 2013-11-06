@@ -7,7 +7,7 @@
 
 #define SIZE (128*1024)
 
-typedef struct {
+struct priv {
 	char *name;
 	char filename[1024];
 	char *api;
@@ -47,7 +47,7 @@ typedef struct {
 		struct gaih_addrtuple **pat,
 		char *buffer, size_t buflen, int *errnop,
 		int *h_errnop, int32_t *ttlp);
-} Data;
+};
 
 static int
 combine_statuses(int s4, int s6)
@@ -70,18 +70,18 @@ combine_statuses(int s4, int s6)
 }
 
 static void
-try_symbol_pattern(netresolve_backend_t resolver, Data *data, void **f, const char *pattern, const char *api)
+try_symbol_pattern(netresolve_backend_t resolver, struct priv *priv, void **f, const char *pattern, const char *api)
 {
 	char symbol[1024];
 
-	if (data->api && strcmp(data->api, api)) {
+	if (priv->api && strcmp(priv->api, api)) {
 		debug("%s API ignored: environment setting\n", api);
 		return;
 	}
 
-	snprintf(symbol, sizeof symbol, pattern, data->name);
+	snprintf(symbol, sizeof symbol, pattern, priv->name);
 
-	*f = dlsym(data->dl_handle, symbol);
+	*f = dlsym(priv->dl_handle, symbol);
 
 	if (!*f) {
 		debug("%s API not loaded: %s\n", api, dlerror());
@@ -91,56 +91,56 @@ try_symbol_pattern(netresolve_backend_t resolver, Data *data, void **f, const ch
 void
 start(netresolve_backend_t resolver, char **settings)
 {
-	Data data;
+	struct priv *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
 	const char *node = netresolve_backend_get_node(resolver);
 	int family = netresolve_backend_get_family(resolver);
 	int status = NSS_STATUS_UNAVAIL;
 
-	if (!settings || !*settings) {
+	if (!priv || !settings || !*settings) {
 		netresolve_backend_failed(resolver);
 		return;
 	}
 
 	/* Load nsswitch backend: */
-	memset(&data, 0, sizeof data);
-	data.name = strdup(*settings);
-	data.api = getenv("NETRESOLVE_NSS_API");
-	snprintf(data.filename, sizeof data.filename, "libnss_%s.so.2", data.name);
-	data.dl_handle = dlopen(data.filename, RTLD_LAZY);
-	if (!data.dl_handle) {
+	memset(priv, 0, sizeof priv);
+	priv->name = strdup(*settings);
+	priv->api = getenv("NETRESOLVE_NSS_API");
+	snprintf(priv->filename, sizeof priv->filename, "libnss_%s.so.2", priv->name);
+	priv->dl_handle = dlopen(priv->filename, RTLD_LAZY);
+	if (!priv->dl_handle) {
 		error("%s\n", dlerror());
 		netresolve_backend_failed(resolver);
 		return;
 	}
-	try_symbol_pattern(resolver, &data, (void *) &data.gethostbyname_r, "_nss_%s_gethostbyname_r", "gethostbyname");
-	try_symbol_pattern(resolver, &data, (void *) &data.gethostbyname2_r, "_nss_%s_gethostbyname2_r", "gethostbyname2");
-	try_symbol_pattern(resolver, &data, (void *) &data.gethostbyname3_r, "_nss_%s_gethostbyname3_r", "gethostbyname3");
-	try_symbol_pattern(resolver, &data, (void *) &data.gethostbyname4_r, "_nss_%s_gethostbyname4_r", "gethostbyname4");
+	try_symbol_pattern(resolver, priv, (void *) priv->gethostbyname_r, "_nss_%s_gethostbyname_r", "gethostbyname");
+	try_symbol_pattern(resolver, priv, (void *) priv->gethostbyname2_r, "_nss_%s_gethostbyname2_r", "gethostbyname2");
+	try_symbol_pattern(resolver, priv, (void *) priv->gethostbyname3_r, "_nss_%s_gethostbyname3_r", "gethostbyname3");
+	try_symbol_pattern(resolver, priv, (void *) priv->gethostbyname4_r, "_nss_%s_gethostbyname4_r", "gethostbyname4");
 
-	/*if (data.gethostbyname4_r) {
+	/*if (priv->gethostbyname4_r) {
 		TODO
-	} else*/ if (node && (data.gethostbyname3_r || data.gethostbyname2_r)) {
+	} else*/ if (node && (priv->gethostbyname3_r || priv->gethostbyname2_r)) {
 		char buffer4[SIZE], buffer6[SIZE];
 		int status4 = NSS_STATUS_NOTFOUND, status6 = NSS_STATUS_NOTFOUND;
 		struct hostent he4, he6;
 		int errnop, h_errnop;
 
-		if (data.gethostbyname3_r) {
+		if (priv->gethostbyname3_r) {
 			int32_t ttl;
 			char *canonname = NULL;
 
 			if (family == AF_INET || family == AF_UNSPEC)
-				status4 = DL_CALL_FCT(data.gethostbyname3_r, (node, AF_INET,
+				status4 = DL_CALL_FCT(priv->gethostbyname3_r, (node, AF_INET,
 					&he4, buffer4, sizeof buffer4, &errnop, &h_errnop, &ttl, &canonname));
 			if (family == AF_INET6 || family == AF_UNSPEC)
-				status6 = DL_CALL_FCT(data.gethostbyname3_r, (node, AF_INET6,
+				status6 = DL_CALL_FCT(priv->gethostbyname3_r, (node, AF_INET6,
 					&he6, buffer6, sizeof buffer6, &errnop, &h_errnop, &ttl, &canonname));
 		} else {
 			if (family == AF_INET || family == AF_UNSPEC)
-				status4 = DL_CALL_FCT(data.gethostbyname2_r, (node, AF_INET,
+				status4 = DL_CALL_FCT(priv->gethostbyname2_r, (node, AF_INET,
 					&he4, buffer4, sizeof buffer4, &errnop, &h_errnop));
 			if (family == AF_INET6 || family == AF_UNSPEC)
-				status6 = DL_CALL_FCT(data.gethostbyname2_r, (node, AF_INET6,
+				status6 = DL_CALL_FCT(priv->gethostbyname2_r, (node, AF_INET6,
 					&he6, buffer6, sizeof buffer6, &errnop, &h_errnop));
 		}
 
@@ -151,12 +151,12 @@ start(netresolve_backend_t resolver, char **settings)
 			if (status6 == NSS_STATUS_SUCCESS)
 				netresolve_backend_apply_hostent(resolver, &he6, false);
 		}
-	} else if (node && data.gethostbyname_r) {
+	} else if (node && priv->gethostbyname_r) {
 		char buffer[SIZE];
 		int errnop, h_errnop;
 		struct hostent he;
 
-		status = DL_CALL_FCT(data.gethostbyname_r, (node,
+		status = DL_CALL_FCT(priv->gethostbyname_r, (node,
 			&he, buffer, sizeof buffer, &errnop, &h_errnop));
 
 		if (status == NSS_STATUS_SUCCESS) {

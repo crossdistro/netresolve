@@ -87,7 +87,7 @@ When a name resolution request is ready, netresolve calls `start(resolver, setti
 2. Call `netresolve_backend_failed()` to signal failure.
 3. Add one or more file descriptors or timers using `netresolve_backend_watch_fd()` and `netresolve_backend_watch_timeout()`. In that case, the backend must also provide the `dispatch()` function to continue the request.
 
-Input data is gathered using `netresolve_backend_get_*()` functions. Internal state accross `start()` and `dispatch()` calls can be kept using `netresolve_backend_new_data()` and `netresolve_backend_get_data()`. The backend should provide `cleanup()` function to clean up any resources either after success/failure, or when the transaction was cancelled by the application.
+Input data is gathered using `netresolve_backend_get_*()` functions. Internal state accross `start()` and `dispatch()` calls can be kept using `netresolve_backend_new_priv()` and `netresolve_backend_get_data()`. The backend should provide `cleanup()` function to clean up any resources either after success/failure, or when the transaction was cancelled by the application.
 
 ## Acknowledgements and inspiration
 

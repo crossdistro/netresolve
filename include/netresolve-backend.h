@@ -31,8 +31,8 @@ void netresolve_backend_add_address(netresolve_backend_t resolver,
 void netresolve_backend_set_canonical_name(netresolve_backend_t resolver, const char *canonical_name);
 
 /* Tools */
-void *netresolve_backend_new_data(netresolve_backend_t resolver, size_t size);
-void *netresolve_backend_get_data(netresolve_backend_t resolver);
+void *netresolve_backend_new_priv(netresolve_backend_t resolver, size_t size);
+void *netresolve_backend_get_priv(netresolve_backend_t resolver);
 void netresolve_backend_watch_fd(netresolve_backend_t resolver, int fd, int events);
 int netresolve_backend_watch_timeout(netresolve_backend_t resolver, time_t sec, long nsec);
 void netresolve_backend_drop_timeout(netresolve_backend_t resolver, int fd);
