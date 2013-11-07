@@ -4,11 +4,7 @@
 
  * Reorder returned items
     - http://tools.ietf.org/html/rfc6724
- * Add callback-based API for bind/connect
-    - as a replacement or in addition to the current utility functions
-    - `netresolve_callback_set_connect()`
-    - `netresolve_callback_set_bind()`
-    - implement dualstack happy eyeballs
+ * Implement happy eyeballs for `netresolve_callback_set_connect()`
  * Use -fvisibility=hidden and mark exported symbols explicitly
     - avoid prefixing hidden symbols with underscore
  * Add DNSSEC validation information

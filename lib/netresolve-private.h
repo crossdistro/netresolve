@@ -76,6 +76,9 @@ struct netresolve_resolver {
 		void *user_data;
 		netresolve_fd_callback_t watch_fd;
 		void *user_data_fd;
+		netresolve_socket_callback_t on_bind;
+		netresolve_socket_callback_t on_connect;
+		void *user_data_sock;
 	} callbacks;
 	struct netresolve_request {
 		/* Perform L3 address resolution using 'node' if not NULL. Use

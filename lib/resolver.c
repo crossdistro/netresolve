@@ -140,6 +140,30 @@ netresolve_callback_set_watch_fd(netresolve_t resolver,
 	resolver->callbacks.user_data_fd = user_data;
 }
 
+void
+netresolve_callback_set_bind(netresolve_t resolver,
+		netresolve_socket_callback_t on_bind,
+		void *user_data)
+{
+	resolver->callbacks.on_bind = on_bind;
+	resolver->callbacks.on_connect = NULL;
+	resolver->callbacks.user_data_sock = user_data;
+
+	netresolve_unset_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
+}
+
+void
+netresolve_callback_set_connect(netresolve_t resolver,
+		netresolve_socket_callback_t on_connect,
+		void *user_data)
+{
+	resolver->callbacks.on_bind = NULL;
+	resolver->callbacks.on_connect = on_connect;
+	resolver->callbacks.user_data_sock = user_data;
+
+	netresolve_set_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
+}
+
 static struct netresolve_backend *
 load_backend(char **take_settings)
 {
@@ -222,6 +246,67 @@ netresolve_set_backend_string(netresolve_t resolver, const char *string)
 	load_backends(resolver, string);
 }
 
+static void
+_netresolve_bind(netresolve_t resolver)
+{
+	int flags = O_NONBLOCK;
+	size_t npaths = netresolve_get_path_count(resolver);
+	size_t i;
+
+	for (i = 0; i < npaths; i++) {
+		int socktype;
+		int protocol;
+		const struct sockaddr *sa;
+		socklen_t salen;
+		int sock;
+
+		sa = netresolve_get_path_sockaddr(resolver, i, &socktype, &protocol, &salen);
+		if (!sa)
+			continue;
+		sock = socket(sa->sa_family, socktype | flags, protocol);
+		if (sock == -1)
+			continue;
+		if (bind(sock, sa, salen) == -1) {
+			close(sock);
+			continue;
+		}
+
+		resolver->callbacks.on_bind(resolver, sock, resolver->callbacks.user_data_sock);
+	}
+}
+
+static void
+_netresolve_connect(netresolve_t resolver)
+{
+	int flags = O_NONBLOCK;
+	size_t npaths = netresolve_get_path_count(resolver);
+	size_t i;
+
+	for (i = 0; i < npaths; i++) {
+		int socktype;
+		int protocol;
+		const struct sockaddr *sa;
+		socklen_t salen;
+		int sock;
+
+		sa = netresolve_get_path_sockaddr(resolver, i, &socktype, &protocol, &salen);
+		if (!sa)
+			continue;
+		sock = socket(sa->sa_family, socktype | flags, protocol);
+		if (sock == -1)
+			continue;
+		if (connect(sock, sa, salen) == -1 && errno != EINPROGRESS) {
+			close(sock);
+			continue;
+		}
+
+		resolver->callbacks.on_connect(resolver, sock, resolver->callbacks.user_data_sock);
+		return;
+	}
+
+	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILURE);
+}
+
 void
 _netresolve_set_state(netresolve_t resolver, enum netresolve_state state)
 {
@@ -246,12 +331,16 @@ _netresolve_set_state(netresolve_t resolver, enum netresolve_state state)
 	if (state == NETRESOLVE_STATE_SUCCESS) {
 		_netresolve_cleanup(resolver);
 		/* Restart with the next *mandatory* backend if available. */
-		while (*++resolver->backend) {
+		while (*resolver->backend && *++resolver->backend) {
 			if ((*resolver->backend)->mandatory) {
 				_netresolve_start(resolver);
 				return;
 			}
 		}
+		if (resolver->callbacks.on_bind)
+			_netresolve_bind(resolver);
+		if (resolver->callbacks.on_connect)
+			_netresolve_connect(resolver);
 		if (resolver->callbacks.on_success)
 			resolver->callbacks.on_success(resolver, resolver->callbacks.user_data);
 	}
@@ -260,7 +349,7 @@ _netresolve_set_state(netresolve_t resolver, enum netresolve_state state)
 	if (state == NETRESOLVE_STATE_FAILURE) {
 		_netresolve_cleanup(resolver);
 		/* Restart with the next backend if available. */
-		if (*++resolver->backend) {
+		if (*resolver->backend && *++resolver->backend) {
 			_netresolve_start(resolver);
 			return;
 		}

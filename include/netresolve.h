@@ -46,6 +46,13 @@ typedef void (*netresolve_fd_callback_t)(netresolve_t resolver, int fd, int even
 void netresolve_callback_set_watch_fd(netresolve_t resolver,
 		netresolve_fd_callback_t watch_fd,
 		void *user_data);
+typedef void (*netresolve_socket_callback_t)(netresolve_t resolver, int sock, void *user_data);
+void netresolve_callback_set_bind(netresolve_t resolver,
+		netresolve_socket_callback_t on_bind,
+		void *user_data);
+void netresolve_callback_set_connect(netresolve_t resolver,
+		netresolve_socket_callback_t on_connect,
+		void *user_data);
 
 /* Request API */
 int netresolve_resolve(netresolve_t resolver,

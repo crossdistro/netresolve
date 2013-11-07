@@ -17,110 +17,73 @@
  */
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include <netresolve.h>
 #include <netresolve-utils.h>
 
-static int
-netresolve_bind(netresolve_t resolver, int flags)
+static void
+on_socket(netresolve_t resolver, int sock, void *user_data)
 {
-	size_t npaths = netresolve_get_path_count(resolver);
-	size_t i;
+	int *psock = user_data;
 
-	for (i = 0; i < npaths; i++) {
-		int socktype;
-		int protocol;
-		const struct sockaddr *sa;
-		socklen_t salen;
-		int sock;
-
-		sa = netresolve_get_path_sockaddr(resolver, i, &socktype, &protocol, &salen);
-		if (!sa)
-			continue;
-		sock = socket(sa->sa_family, socktype | flags, protocol);
-		if (sock == -1)
-			continue;
-		if (bind(sock, sa, salen) == -1) {
-			close(sock);
-			continue;
-		}
-
-		return sock;
-	}
-
-	return -1;
+	if (*psock == -1)
+		*psock = sock;
+	else
+		close(sock);
 }
 
-static int
-netresolve_connect(netresolve_t resolver, int flags)
+static void
+set_flags(int sock, int flags)
 {
-	size_t npaths = netresolve_get_path_count(resolver);
-	size_t i;
-
-	for (i = 0; i < npaths; i++) {
-		int socktype;
-		int protocol;
-		const struct sockaddr *sa;
-		socklen_t salen;
-		int sock;
-
-		sa = netresolve_get_path_sockaddr(resolver, i, &socktype, &protocol, &salen);
-		if (!sa)
-			continue;
-		sock = socket(sa->sa_family, socktype | flags, protocol);
-		if (sock == -1)
-			continue;
-		if (connect(sock, sa, salen) == -1) {
-			close(sock);
-			continue;
-		}
-
-		return sock;
-	}
-
-	return -1;
+	fcntl(sock, F_SETFL, (fcntl(sock, F_GETFL, 0) & ~(SOCK_NONBLOCK | SOCK_CLOEXEC)) | flags);
 }
 
 int
 netresolve_utils_bind(const char *node, const char *service, int family, int socktype, int protocol)
 {
 	netresolve_t resolver = netresolve_open();
+	int sock = -1;
 	int flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC);
 	int status;
 
 	if (!resolver)
 		return -1;
 
-	netresolve_unset_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
+	netresolve_callback_set_bind(resolver, on_socket, &sock);
+
 	socktype &= ~flags;
 
 	status = netresolve_resolve(resolver, node, service, family, socktype, protocol);
-	if (status) {
-		errno = status;
-		return -1;
-	}
 
-	return netresolve_bind(resolver, flags);
+	netresolve_close(resolver);
+
+	if (status)
+		errno = status;
+	return sock;
 }
 
 int
 netresolve_utils_connect(const char *node, const char *service, int family, int socktype, int protocol)
 {
-	netresolve_t resolver = netresolve_open();
+	netresolve_t resolver;
+	int sock = -1;
 	int flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC);
 	int status;
 
-	if (!resolver)
-		return -1;
-
-	netresolve_set_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
 	socktype &= ~flags;
 
-	status = netresolve_resolve(resolver, node, service, family, socktype, protocol);
-	if (status) {
-		errno = status;
+	resolver = netresolve_open();
+	if (!resolver)
 		return -1;
-	}
+	netresolve_callback_set_connect(resolver, on_socket, &sock);
+	status = netresolve_resolve(resolver, node, service, family, socktype, protocol);
+	netresolve_close(resolver);
 
-	return netresolve_connect(resolver, flags);
+	if (sock != -1)
+		set_flags(sock, flags);
+
+	if (status)
+		errno = status;
+	return sock;
 }

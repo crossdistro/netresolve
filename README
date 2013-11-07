@@ -40,6 +40,10 @@ Implementation notes:
 
 The current implementation only registers *one* file descriptor with the application. The file descriptor is an *epoll* file descripter and the associated event is allways `POLLIN`. It's used for tracking the file descriptors that are attached to it and can be used with `select()`, `poll()` as well as `epoll()`. On platforms without *epoll*, a similar mechanism can be used if available or the individual backend file descriptors can be conveyed to the application for use with standard `select()`, `poll()` and similar. A portable application shouldn't rely
 
+## Socket API
+
+Support for `socket()`, `bind()` and `connect()` is included. The only thing the application has to do is to register either `on_bind()` or `on_connect()` callback. The resolver is configured with flags suitable for the respective operation. When name resolution is finished, `on_bind()` callback is called for each successfully bound address. The `on_connect()` callback is called once, for the first successfully connected address.
+
 ## Utility functions
 
 They currently mainly serve as examples of how to use `netresolve_resolve()` together with system calls like `bind()` or `connect()`.
