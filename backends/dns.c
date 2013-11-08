@@ -22,7 +22,7 @@
 /* A timeout starting when the first successful answer has been received. */
 static int partial_timeout = 5;
 
-struct priv {
+struct priv_dns {
 	ares_channel channel;
 	fd_set rfds;
 	fd_set wfds;
@@ -33,7 +33,7 @@ struct priv {
 void
 register_fds(netresolve_backend_t resolver)
 {
-	struct priv *priv = netresolve_backend_get_priv(resolver);
+	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
 	fd_set rfds;
 	fd_set wfds;
 	int nfds, fd;
@@ -69,7 +69,7 @@ void
 host_callback(void *arg, int status, int timeouts, struct hostent *he)
 {
 	netresolve_backend_t resolver = arg;
-	struct priv *priv = netresolve_backend_get_priv(resolver);
+	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
 
 	switch (status) {
 	case ARES_EDESTRUCTION:
@@ -88,7 +88,7 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 void
 start(netresolve_backend_t resolver, char **settings)
 {
-	struct priv *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
+	struct priv_dns *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
 	const char *node = netresolve_backend_get_node(resolver);
 	int family = netresolve_backend_get_family(resolver);
 	int status;
@@ -125,7 +125,7 @@ fail:
 void
 dispatch(netresolve_backend_t resolver, int fd, int events)
 {
-	struct priv *priv = netresolve_backend_get_priv(resolver);
+	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
 
 	int rfd = events & POLLIN ? fd : ARES_SOCKET_BAD;
 	int wfd = events & POLLOUT ? fd : ARES_SOCKET_BAD;
@@ -143,7 +143,7 @@ dispatch(netresolve_backend_t resolver, int fd, int events)
 void
 cleanup(netresolve_backend_t resolver)
 {
-	struct priv *priv = netresolve_backend_get_priv(resolver);
+	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
 	int fd;
 
 	for (fd = 0; fd < priv->nfds; fd++) {

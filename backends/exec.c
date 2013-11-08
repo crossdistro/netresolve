@@ -29,7 +29,7 @@ struct buffer {
 	char *end;
 };
 
-struct priv {
+struct priv_exec {
 	int pid;
 	struct buffer inbuf;
 	int infd;
@@ -80,7 +80,7 @@ err_pipe1:
 }
 
 static void
-send_stdin(netresolve_backend_t resolver, struct priv *priv)
+send_stdin(netresolve_backend_t resolver, struct priv_exec *priv)
 {
 	ssize_t size;
 
@@ -100,7 +100,7 @@ send_stdin(netresolve_backend_t resolver, struct priv *priv)
 }
 
 static bool
-received_line(netresolve_backend_t resolver, struct priv *priv, const char *line)
+received_line(netresolve_backend_t resolver, struct priv_exec *priv, const char *line)
 {
 	char addrprefix[] = "address ";
 	int addrprefixlen = strlen(addrprefix);
@@ -123,7 +123,7 @@ received_line(netresolve_backend_t resolver, struct priv *priv, const char *line
 }
 
 static void
-pickup_stdout(netresolve_backend_t resolver, struct priv *priv)
+pickup_stdout(netresolve_backend_t resolver, struct priv_exec *priv)
 {
 	char *nl;
 	int size;
@@ -163,7 +163,7 @@ pickup_stdout(netresolve_backend_t resolver, struct priv *priv)
 void
 start(netresolve_backend_t resolver, char **settings)
 {
-	struct priv *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
+	struct priv_exec *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
 
 	if (!priv || !start_subprocess(settings, &priv->pid, &priv->infd, &priv->outfd)) {
 		netresolve_backend_failed(resolver);
@@ -181,7 +181,7 @@ start(netresolve_backend_t resolver, char **settings)
 void
 dispatch(netresolve_backend_t resolver, int fd, int events)
 {
-	struct priv *priv = netresolve_backend_get_priv(resolver);
+	struct priv_exec *priv = netresolve_backend_get_priv(resolver);
 
 	debug("events %d on fd %d\n", events, fd);
 
@@ -201,7 +201,7 @@ dispatch(netresolve_backend_t resolver, int fd, int events)
 void
 cleanup(netresolve_backend_t resolver)
 {
-	struct priv *priv = netresolve_backend_get_priv(resolver);
+	struct priv_exec *priv = netresolve_backend_get_priv(resolver);
 
 	netresolve_backend_watch_fd(resolver, priv->infd, 0);
 	netresolve_backend_watch_fd(resolver, priv->outfd, 0);

@@ -24,7 +24,7 @@
 
 #define SIZE (128*1024)
 
-struct priv {
+struct priv_nss {
 	char *name;
 	char filename[1024];
 	char *api;
@@ -87,7 +87,7 @@ combine_statuses(int s4, int s6)
 }
 
 static void
-try_symbol_pattern(netresolve_backend_t resolver, struct priv *priv, void **f, const char *pattern, const char *api)
+try_symbol_pattern(netresolve_backend_t resolver, struct priv_nss *priv, void **f, const char *pattern, const char *api)
 {
 	char symbol[1024];
 
@@ -108,7 +108,7 @@ try_symbol_pattern(netresolve_backend_t resolver, struct priv *priv, void **f, c
 void
 start(netresolve_backend_t resolver, char **settings)
 {
-	struct priv *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
+	struct priv_nss *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
 	const char *node = netresolve_backend_get_node(resolver);
 	int family = netresolve_backend_get_family(resolver);
 	int status = NSS_STATUS_UNAVAIL;
