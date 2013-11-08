@@ -7,7 +7,7 @@
  * Avoids many limitations and bugs found in glibc, getaddrinfo and nsswitch
    - Synchronous and asynchronous (aka non-blocking) API
    - Extensible request and result API
-   - Support for ifindex/scope_id (problematic in nsswitch)
+   - Support for ifindex/scope\_id (problematic in nsswitch)
    - Support for TTL information (problematic in nsswitch)
  * Compatibility measures
    - Compatibility backends (see below)
@@ -16,25 +16,25 @@
 
 The application creates a resolver instance using `netresolve_open()`, optionally performs additional configuration, and then calls `netresolve_resolve()` and uses retrieve the result using `netresolve_get_*()` functions.
 
-This is functionally similar to `getaddrinfo()` except that the resolver object is used for advanced configuration not supported by `netresolve_resolve()`. That's much more flexible than only supporting environment variables for advanced configuration, but they can still be used to tweak the default values.
+This is functionally similar to `getaddrinfo()` except that the resolver object is used for advanced configuration parameters not present in `netresolve_resolve()`. Defaults for many resolver configuration parameters are also settable via environment variables.
 
 ## Callback-based (asynchronous) API
 
 How to use it:
 
-1. Create a handle using `netresolve_open()`.
-2. Register callbacks using `netresolve_set_watch_fd()` and/or `netresolve_set_callback_*()`.
-3. Run netresolve_resolve().
+ * Create a handle using `netresolve_open()`.
+ * Register callbacks using `netresolve_callback_set_watch_fd()` and/or `netresolve_set_callbacks()`.
+ * Start name resolution using `netresolve_resolve()`.
+ * Run (or continue running) the event loop calling `netresolve_dispatch()` for file descriptor events.
+ * Close the handle using `netresolve_open()`
 
 What should the callbacks do:
 
-1. The `watch_fd()` callback is there to add/remove the netresolve's file descriptor
-2. The `on_success()` callback is called when the name resolution finished without error.
-3. The `on_failure()` callback is called when the name resolution failed.
+ * The `watch_fd()` callback is there to register the netresolve's file descriptors
+ * The `on_success()` callback is called when the name resolution finished without error.
+ * The `on_failure()` callback is called when the name resolution failed.
 
-The `watch_fd()` callback is only needed for asynchronous operation. A `watch_fd()` call with *events* equal to zero must result in removing the respective file descriptor from the main loop.
-
-You can use the `on_success()` and `on_failure()` callbacks synchronously as well, setting the `watch_fd()` callback activates asynchronous behavior.
+Registering the `watch_fd()` callback switches netresolve into nonblocking (aka asynchronous) mode. It is responsible for registering file descriptors and expected events with the application's event loop. The application is responsible for adding, modifying or removing the file descriptor event set whenever `watch_fd()` is called.
 
 Implementation notes:
 
@@ -44,10 +44,6 @@ The current implementation only registers *one* file descriptor with the applica
 
 Support for `socket()`, `bind()` and `connect()` is included. The only thing the application has to do is to register either `on_bind()` or `on_connect()` callback. The resolver is configured with flags suitable for the respective operation. When name resolution is finished, `on_bind()` callback is called for each successfully bound address. The `on_connect()` callback is called once, for the first successfully connected address.
 
-## Utility functions
-
-They currently mainly serve as examples of how to use `netresolve_resolve()` together with system calls like `bind()` or `connect()`.
-
 ## Tools
 
 The `netresolve` command-line tool can be used for testing the library. The `libnetresolve-getaddrinfo.so` library together with the `tools/wrapper.sh` script can be used to test any programs calling `getaddrinfo()` (see `TODO` for missing features).
@@ -56,15 +52,15 @@ The `netresolve` command-line tool can be used for testing the library. The `lib
 
 The list of backends can be chosen using `netresolve_set_backend_string()` or via the `NETRESOLVE_BACKENDS` environment variable. Backends are separated by a comma and accept options separated by a colon. A plus sign prepended to the backend name can be used to run that backend even if another backend already succeeded.
 
-    NETRESOLVE_BACKENDS=null,numerichost,hosts,services
+    NETRESOLVE_BACKENDS=unix,any,loopback,numerichost,hosts,dns
 
 ### Local backends
 
-Two backends, `null` and `numerichost`, are available that perform trivial translations. The `hosts` backends uses `/etc/hosts` database of nodes. The special `services` backend fills in service information using `/etc/services`.
+Two backends, `null` and `numerichost`, are available that perform trivial translations. The `hosts` backends uses `/etc/hosts` database of nodes. The `unix` backend is there to integrate unix socket path support and especially to transparently add support for `AF_UNIX` sockets to applications that would otherwise only support `AF_INET` and/or `AF_INET6`.
 
 ### Remote backends
 
-Nonblocking API is most useful for remote services. Currently there's `dns` backend based on *c-ares* with support for quick partial responses when only IPv4 (or, theoretically, only IPv6) query gets answered.
+Nonblocking API is most useful for remote services. Currently there's `dns` backend based on the *c-ares* library with support for quick partial responses when only IPv4 (or, theoretically, only IPv6) query gets answered.
 
 ### Compatibility backends
 
@@ -81,23 +77,26 @@ standard output.
 
     NETRESOLVE_BACKENDS=exec:/path/to/my/script ./netresolve localhost
 
-TODO: That backend isn't finished, yet.
-
 ## Writing a custom backend
 
 When a name resolution request is ready, netresolve calls `start(resolver, settings)`. Backend's `start()` implementation then has to do one of the following:
 
 1. Add any data items using `netresolve_backend_add_*()` functions and call `netresolve_backend_finished()` to signal that the name resolution has finished and we don't need to run any other backends.
 2. Call `netresolve_backend_failed()` to signal failure.
-3. Add one or more file descriptors or timers using `netresolve_backend_watch_fd()` and `netresolve_backend_watch_timeout()`. In that case, the backend must also provide the `dispatch()` function to continue the request.
+3. Add one or more file descriptors or timers using `netresolve_backend_watch_fd()` and `netresolve_backend_watch_timeout()`. In that case, the backend must also provide the `dispatch()` function so that the transaction can continue.
 
-Input data is gathered using `netresolve_backend_get_*()` functions. Internal state accross `start()` and `dispatch()` calls can be kept using `netresolve_backend_new_priv()` and `netresolve_backend_get_data()`. The backend should provide `cleanup()` function to clean up any resources either after success/failure, or when the transaction was cancelled by the application.
+Input data is gathered using `netresolve_backend_get_*()` functions. Internal state accross `start()` and `dispatch()` calls can be kept using `netresolve_backend_new_priv()` and `netresolve_backend_get_data()`. The backend should provide `cleanup()` function to clean up any resources. It's called by netresolve after success/failure or when the transaction was cancelled by the application.
 
 ## Acknowledgements and inspiration
 
 ### The community
 
-TODO: Add actual names.
+ * Tore Anderson was the first who discussed name resolution issues with me and especially the reasons to suppress A or AAAA queries when global address of the respective family is not present in the system.
+ * Simo Sorce told me about `getaddrinfo()` issues with canonical names.
+ * Carlos O'Donnel helped me to find my way in the glibc community.
+ * Petr Špaček pointed me to SSSD developers.
+ * Jakub Hrozek told me about c-ares DNS library and about SSSD resolution requirements.
+ * Miloslav Trmač reminded me of the need to also provide binding and connecting facilities on top of name resolution.
 
 ### c-ares
 
