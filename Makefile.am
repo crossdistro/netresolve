@@ -26,7 +26,7 @@ SED_PROCESS = \
 
 lib_LTLIBRARIES = \
 	libnetresolve.la \
-	libnetresolve-getaddrinfo.la
+	libnetresolve-posix.la
 
 libnetresolve_la_SOURCES = \
 	lib/netresolve-private.h \
@@ -42,12 +42,12 @@ libnetresolve_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	-export-symbols-regex '^netresolve_'
 
-libnetresolve_getaddrinfo_la_SOURCES = \
-	lib/getaddrinfo.c
-libnetresolve_getaddrinfo_la_LDFLAGS = \
+libnetresolve_posix_la_SOURCES = \
+	lib/posix.c
+libnetresolve_posix_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
-	-export-symbols-regex '^getaddrinfo$$'
-libnetresolve_getaddrinfo_la_LIBADD = \
+	--export-all-symbols
+libnetresolve_posix_la_LIBADD = \
 	libnetresolve.la
 
 lib_LTLIBRARIES += \
@@ -76,11 +76,18 @@ bin_PROGRAMS = netresolve
 
 netresolve_SOURCES = tools/netresolve.c
 netresolve_LDADD = libnetresolve.la
-netresolve_DEPENDENCIES = \
-	libnetresolve-getaddrinfo.la
 
-TESTS = tests/test-netresolve.sh test-async test-bind-connect test-getaddrinfo
-noinst_PROGRAMS = test-async test-bind-connect test-getaddrinfo
+TESTS = \
+	tests/test-netresolve.sh \
+	test-async \
+	test-bind-connect \
+	test-getaddrinfo \
+	test-gethostbyname
+noinst_PROGRAMS = \
+	test-async \
+	test-bind-connect \
+	test-getaddrinfo \
+	test-gethostbyname
 
 test_async_SOURCES = tests/test-async.c
 test_async_LDADD = libnetresolve.la
@@ -89,4 +96,7 @@ test_bind_connect_SOURCES = tests/test-bind-connect.c
 test_bind_connect_LDADD = libnetresolve.la
 
 test_getaddrinfo_SOURCES = tests/test-getaddrinfo.c
-test_getaddrinfo_LDADD = libnetresolve-getaddrinfo.la
+test_getaddrinfo_LDADD = libnetresolve-posix.la
+
+test_gethostbyname_SOURCES = tests/test-gethostbyname.c
+test_gethostbyname_LDADD = libnetresolve-posix.la

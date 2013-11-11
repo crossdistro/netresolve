@@ -79,5 +79,83 @@ getaddrinfo(const char *node, const char *service,
 		return EAI_SYSTEM;
 
 	*res = generate_addrinfo_list(resolver);
+	netresolve_close(resolver);
+
 	return *res ? 0 : EAI_NODATA;
+}
+
+static struct hostent *
+generate_hostent(netresolve_t resolver)
+{
+	size_t npaths = netresolve_get_path_count(resolver);
+	const char *canonname = netresolve_get_canonical_name(resolver);
+	struct hostent *he;
+	int i;
+	int n = 0;
+
+	if (!npaths)
+		return NULL;
+
+	he = calloc(1, sizeof *he);
+	if (canonname)
+		he->h_name = strdup(canonname);
+	he->h_aliases = calloc(1, sizeof *he->h_aliases);
+	he->h_addr_list = calloc(npaths + 1, sizeof *he->h_addr_list);
+
+	for (i = 0; i < npaths; i++) {
+		int family, ifindex, socktype, protocol, port;
+		const char *address = netresolve_get_path(resolver, i, &family, &ifindex, &socktype, &protocol, &port);
+
+		if (family != AF_INET && family != AF_INET6)
+			continue;
+
+		if (he->h_addrtype) {
+			if (he->h_addrtype != family)
+				continue;
+		} else {
+			he->h_addrtype = family;
+			he->h_length = family == AF_INET ? 4 : 16;
+		}
+
+		he->h_addr_list[n] = calloc(1, he->h_length);
+		if (!he->h_addr_list[n])
+			break;
+		memcpy(he->h_addr_list[n], address, he->h_length);
+		n++;
+	}
+
+	return he;
+}
+
+static void
+freehostent(struct hostent *he)
+{
+	char **p;
+
+	if (!he)
+		return;
+
+	free(he->h_name);
+	for (p = he->h_aliases; *p; p++)
+		free(*p);
+	free(he->h_aliases);
+	for (p = he->h_addr_list; *p; p++)
+		free(*p);
+	free(he->h_addr_list);
+}
+
+struct hostent *
+gethostbyname(const char *node)
+{
+	static struct hostent *result = NULL;
+	netresolve_t resolver = netresolve_open();
+	int status;
+
+	status = netresolve_resolve(resolver, node, NULL, AF_UNSPEC, 0, 0);
+
+	freehostent(result);
+	result = (status == 0) ? generate_hostent(resolver) : NULL;
+	netresolve_close(resolver);
+
+	return result;
 }

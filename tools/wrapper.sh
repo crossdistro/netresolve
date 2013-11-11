@@ -1,4 +1,4 @@
 #!/bin/bash
-export LD_PRELOAD=.libs/libnetresolve-getaddrinfo.so
+export LD_PRELOAD=.libs/libnetresolve-posix.so
 
 exec libtool execute "$@"
