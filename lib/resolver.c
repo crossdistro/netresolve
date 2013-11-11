@@ -52,12 +52,6 @@ netresolve_open(void)
 	return resolver;
 }
 
-void
-netresolve_set_log_level(netresolve_t resolver, int level)
-{
-	resolver->log_level = level;
-}
-
 static void
 free_backend(struct netresolve_backend *backend)
 {
@@ -100,6 +94,12 @@ netresolve_close(netresolve_t resolver)
 	clear_backends(resolver);
 	memset(resolver, 0, sizeof *resolver);
 	free(resolver);
+}
+
+void
+netresolve_set_log_level(netresolve_t resolver, int level)
+{
+	resolver->log_level = level;
 }
 
 void
@@ -203,8 +203,8 @@ fail:
 	return NULL;
 }
 
-static void
-load_backends(netresolve_t resolver, const char *string)
+void
+netresolve_set_backend_string(netresolve_t resolver, const char *string)
 {
 	const char *start, *end;
 	char **settings = NULL;
@@ -241,123 +241,50 @@ load_backends(netresolve_t resolver, const char *string)
 }
 
 void
-netresolve_set_backend_string(netresolve_t resolver, const char *string)
-{
-	load_backends(resolver, string);
-}
-
-static void
-_netresolve_bind(netresolve_t resolver)
-{
-	int flags = O_NONBLOCK;
-	size_t npaths = netresolve_get_path_count(resolver);
-	size_t i;
-
-	for (i = 0; i < npaths; i++) {
-		int socktype;
-		int protocol;
-		const struct sockaddr *sa;
-		socklen_t salen;
-		int sock;
-
-		sa = netresolve_get_path_sockaddr(resolver, i, &socktype, &protocol, &salen);
-		if (!sa)
-			continue;
-		sock = socket(sa->sa_family, socktype | flags, protocol);
-		if (sock == -1)
-			continue;
-		if (bind(sock, sa, salen) == -1) {
-			close(sock);
-			continue;
-		}
-
-		resolver->callbacks.on_bind(resolver, sock, resolver->callbacks.user_data_sock);
-	}
-}
-
-static void
-_netresolve_connect(netresolve_t resolver)
-{
-	int flags = O_NONBLOCK;
-	size_t npaths = netresolve_get_path_count(resolver);
-	size_t i;
-
-	for (i = 0; i < npaths; i++) {
-		int socktype;
-		int protocol;
-		const struct sockaddr *sa;
-		socklen_t salen;
-		int sock;
-
-		sa = netresolve_get_path_sockaddr(resolver, i, &socktype, &protocol, &salen);
-		if (!sa)
-			continue;
-		sock = socket(sa->sa_family, socktype | flags, protocol);
-		if (sock == -1)
-			continue;
-		if (connect(sock, sa, salen) == -1 && errno != EINPROGRESS) {
-			close(sock);
-			continue;
-		}
-
-		resolver->callbacks.on_connect(resolver, sock, resolver->callbacks.user_data_sock);
-		return;
-	}
-
-	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILURE);
-}
-
-void
 _netresolve_set_state(netresolve_t resolver, enum netresolve_state state)
 {
-	/* Entering the initial state */
-	if (resolver->state != NETRESOLVE_STATE_INIT && state == NETRESOLVE_STATE_INIT) {
+	enum netresolve_state old_state = resolver->state;
+
+	resolver->state = state;
+
+	/* Leaving state... */
+	switch (old_state) {
+	case NETRESOLVE_STATE_RESOLVING:
+		if (resolver->callbacks.watch_fd)
+			resolver->callbacks.watch_fd(resolver, resolver->epoll_fd, 0,
+					resolver->callbacks.user_data_fd);
+		_netresolve_backend_cleanup(resolver);
+		break;
+	default:
+		break;
+	}
+
+	/* Entering state... */
+	switch (state) {
+	case NETRESOLVE_STATE_INIT:
 		free(resolver->response.paths);
 		free(resolver->response.canonname);
 		memset(&resolver->response, 0, sizeof resolver->response);
-	}
-
-	/* Entering the waiting state. */
-	if (resolver->state == NETRESOLVE_STATE_INIT && state == NETRESOLVE_STATE_WAIT
-			&& resolver->callbacks.watch_fd)
-		resolver->callbacks.watch_fd(resolver, resolver->epoll_fd, POLLIN, resolver->callbacks.user_data_fd);
-
-	/* Leaving the waiting state. */
-	if (resolver->state == NETRESOLVE_STATE_WAIT && state != NETRESOLVE_STATE_WAIT
-			&& resolver->callbacks.watch_fd)
-		resolver->callbacks.watch_fd(resolver, resolver->epoll_fd, 0, resolver->callbacks.user_data_fd);
-
-	/* Notify about success. */
-	if (state == NETRESOLVE_STATE_SUCCESS) {
-		_netresolve_cleanup(resolver);
-		/* Restart with the next *mandatory* backend if available. */
-		while (*resolver->backend && *++resolver->backend) {
-			if ((*resolver->backend)->mandatory) {
-				_netresolve_start(resolver);
-				return;
-			}
-		}
+		break;
+	case NETRESOLVE_STATE_RESOLVING:
+		if (resolver->callbacks.watch_fd)
+			resolver->callbacks.watch_fd(resolver, resolver->epoll_fd, POLLIN,
+					resolver->callbacks.user_data_fd);
+		_netresolve_start(resolver);
+		break;
+	case NETRESOLVE_STATE_FINISHED:
 		if (resolver->callbacks.on_bind)
 			_netresolve_bind(resolver);
 		if (resolver->callbacks.on_connect)
 			_netresolve_connect(resolver);
 		if (resolver->callbacks.on_success)
 			resolver->callbacks.on_success(resolver, resolver->callbacks.user_data);
-	}
-
-	/* Notify about failure. */
-	if (state == NETRESOLVE_STATE_FAILURE) {
-		_netresolve_cleanup(resolver);
-		/* Restart with the next backend if available. */
-		if (*resolver->backend && *++resolver->backend) {
-			_netresolve_start(resolver);
-			return;
-		}
+		break;
+	case NETRESOLVE_STATE_FAILED:
 		if (resolver->callbacks.on_success)
 			resolver->callbacks.on_success(resolver, resolver->callbacks.user_data);
+		break;
 	}
-
-	resolver->state = state;
 }
 
 void
@@ -365,63 +292,66 @@ _netresolve_start(netresolve_t resolver)
 {
 	struct netresolve_backend *backend = *resolver->backend;
 
-	/* Make sure a backend is loaded. */
-	if (!backend || !backend->start) {
-		_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILURE);
-		return;
-	}
-
-	/* Run the backend start function. */
-	_netresolve_set_state(resolver, NETRESOLVE_STATE_WAIT);
 	backend->start(resolver, backend->settings+1);
 }
 
 void
-_netresolve_dispatch(netresolve_t resolver, int timeout)
+_netresolve_dispatch_fd(netresolve_t resolver, int fd, int events)
 {
 	struct netresolve_backend *backend = *resolver->backend;
+
+	if (backend && backend->dispatch) {
+		backend->dispatch(resolver, fd, events);
+		return;
+	}
+
+	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILED);
+}
+
+void
+_netresolve_epoll(netresolve_t resolver, int timeout)
+{
 	static const int maxevents = 1;
 	struct epoll_event events[maxevents];
 	int nevents;
 	int i;
 
-	if (resolver->state != NETRESOLVE_STATE_WAIT)
+	if (resolver->state != NETRESOLVE_STATE_RESOLVING)
 		return;
-	if (!backend || !backend->dispatch)
-		goto err;
 
 	nevents = epoll_wait(resolver->epoll_fd, events, maxevents, resolver->callbacks.watch_fd ? 0 : -1);
-	if (nevents == -1)
-		goto err;
-	for (i = 0; resolver->state == NETRESOLVE_STATE_WAIT && i < nevents; i++)
-		backend->dispatch(resolver, events[i].data.fd, events[i].events);
-
-	return;
-err:
-	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILURE);
+	if (nevents == -1) {
+		_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILED);
+		return;
+	}
+	for (i = 0; resolver->state == NETRESOLVE_STATE_RESOLVING && i < nevents; i++)
+		_netresolve_dispatch_fd(resolver, events[i].data.fd, events[i].events);
 }
 
 void
-_netresolve_cleanup(netresolve_t resolver)
+_netresolve_watch_fd(netresolve_t resolver, int fd, int events)
 {
-	struct netresolve_backend *backend = *resolver->backend;
+	struct epoll_event event = { .events = events, .data = { .fd = fd} };
 
-	if (backend && backend->data) {
-		backend->cleanup(resolver);
-		free(backend->data);
-		backend->data = NULL;
-	}
+	if (!resolver->backend || resolver->epoll_fd == -1)
+		abort();
+
+	if (epoll_ctl(resolver->epoll_fd, EPOLL_CTL_DEL, fd, &event) == -1 && errno != ENOENT && errno != EBADF)
+		error("epoll_ctl: %s", strerror(errno));
+	if (events)
+		if (epoll_ctl(resolver->epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1)
+			error("epoll_ctl: %s", strerror(errno));
 }
 
 static int
-state_to_error(enum netresolve_state state)
+state_to_errno(enum netresolve_state state)
 {
 	switch (state) {
-	case NETRESOLVE_STATE_WAIT:
+	case NETRESOLVE_STATE_RESOLVING:
 		return EWOULDBLOCK;
-	case NETRESOLVE_STATE_SUCCESS:
+	case NETRESOLVE_STATE_FINISHED:
 		return 0;
-	case NETRESOLVE_STATE_FAILURE:
+	case NETRESOLVE_STATE_FAILED:
 		return ENODATA;
 	default:
 		/* Shouldn't happen. */
@@ -433,11 +363,11 @@ int
 netresolve_resolve(netresolve_t resolver,
 		const char *node, const char *service, int family, int socktype, int protocol)
 {
-	if (resolver->state == NETRESOLVE_STATE_WAIT)
+	if (resolver->state == NETRESOLVE_STATE_RESOLVING)
 		return EBUSY;
 	_netresolve_set_state(resolver, NETRESOLVE_STATE_INIT);
 	if (!resolver->backends)
-		load_backends(resolver, getenv("NETRESOLVE_BACKENDS"));
+		netresolve_set_backend_string(resolver, getenv("NETRESOLVE_BACKENDS"));
 	if (!resolver->backends)
 		return ENODATA;
 	resolver->backend = resolver->backends;
@@ -448,15 +378,14 @@ netresolve_resolve(netresolve_t resolver,
 	resolver->request.socktype = socktype;
 	resolver->request.protocol = protocol;
 
-	/* Start network name resolution. */
-	_netresolve_start(resolver);
+	_netresolve_set_state(resolver, NETRESOLVE_STATE_RESOLVING);
 
 	/* Blocking mode. */
 	if (!resolver->callbacks.watch_fd)
-		while (resolver->state == NETRESOLVE_STATE_WAIT)
-			_netresolve_dispatch(resolver, -1);
+		while (resolver->state == NETRESOLVE_STATE_RESOLVING)
+			_netresolve_epoll(resolver, -1);
 
-	return state_to_error(resolver->state);
+	return state_to_errno(resolver->state);
 }
 
 int
@@ -465,9 +394,9 @@ netresolve_dispatch(netresolve_t resolver, int fd, int events)
 	if (fd != resolver->epoll_fd || events != EPOLLIN)
 		return EINVAL;
 
-	_netresolve_dispatch(resolver, 0);
+	_netresolve_epoll(resolver, 0);
 
-	return state_to_error(resolver->state);
+	return state_to_errno(resolver->state);
 }
 
 void

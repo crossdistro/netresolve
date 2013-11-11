@@ -32,9 +32,9 @@
 
 enum netresolve_state {
 	NETRESOLVE_STATE_INIT,
-	NETRESOLVE_STATE_WAIT,
-	NETRESOLVE_STATE_SUCCESS,
-	NETRESOLVE_STATE_FAILURE
+	NETRESOLVE_STATE_RESOLVING,
+	NETRESOLVE_STATE_FINISHED,
+	NETRESOLVE_STATE_FAILED
 };
 
 struct netresolve_backend {
@@ -115,8 +115,13 @@ struct netresolve_resolver {
 void _netresolve_set_state(netresolve_t resolver, enum netresolve_state state);
 
 void _netresolve_start(netresolve_t resolver);
-void _netresolve_dispatch(netresolve_t resolver, int timeout);
-void _netresolve_cleanup(netresolve_t resolver);
+void _netresolve_epoll(netresolve_t resolver, int timeout);
+void _netresolve_watch_fd(netresolve_t resolver, int fd, int events);
+
+void _netresolve_backend_cleanup(netresolve_t resolver);
+
+void _netresolve_bind(netresolve_t resolver);
+void _netresolve_connect(netresolve_t resolver);
 
 void _netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,
 		const char *request_service, int socktype, int protocol);

@@ -158,16 +158,7 @@ netresolve_backend_get_priv(netresolve_backend_t resolver)
 void
 netresolve_backend_watch_fd(netresolve_t resolver, int fd, int events)
 {
-	struct epoll_event event = { .events = events, .data = { .fd = fd} };
-
-	if (!resolver->backend || resolver->epoll_fd == -1)
-		abort();
-
-	if (epoll_ctl(resolver->epoll_fd, EPOLL_CTL_DEL, fd, &event) == -1 && errno != ENOENT && errno != EBADF)
-		error("epoll_ctl: %s", strerror(errno));
-	if (events)
-		if (epoll_ctl(resolver->epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1)
-			error("epoll_ctl: %s", strerror(errno));
+	_netresolve_watch_fd(resolver, fd, events);
 }
 
 int
@@ -194,15 +185,42 @@ netresolve_backend_drop_timeout(netresolve_backend_t resolver, int fd)
 }
 
 void
+_netresolve_backend_cleanup(netresolve_t resolver)
+{
+	struct netresolve_backend *backend = *resolver->backend;
+
+	if (backend && backend->data) {
+		backend->cleanup(resolver);
+		free(backend->data);
+		backend->data = NULL;
+	}
+}
+
+void
 netresolve_backend_finished(netresolve_t resolver)
 {
-	_netresolve_set_state(resolver, NETRESOLVE_STATE_SUCCESS);
+	/* Restart with the next *mandatory* backend. */
+	while (*resolver->backend && *++resolver->backend) {
+		if ((*resolver->backend)->mandatory) {
+			_netresolve_backend_cleanup(resolver);
+			_netresolve_start(resolver);
+			return;
+		}
+	}
+
+	_netresolve_set_state(resolver, NETRESOLVE_STATE_FINISHED);
 }
 
 void
 netresolve_backend_failed(netresolve_t resolver)
 {
-	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILURE);
+	/* Restart with the next backend. */
+	if (*resolver->backend && *++resolver->backend) {
+		_netresolve_start(resolver);
+		return;
+	}
+
+	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILED);
 }
 
 void netresolve_backend_log(netresolve_backend_t resolver, int level, const char *fmt, ...)

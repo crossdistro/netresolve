@@ -31,12 +31,13 @@ lib_LTLIBRARIES = \
 libnetresolve_la_SOURCES = \
 	lib/netresolve-private.h \
 	lib/resolver.c \
-	lib/response.c \
-	lib/string.c \
-	lib/utils.c \
 	lib/backend.c \
-	lib/cli.c \
-	lib/services.c
+	lib/services.c \
+	lib/response.c \
+	lib/socket.c \
+	lib/utils.c \
+	lib/string.c \
+	lib/cli.c
 libnetresolve_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	-export-symbols-regex '^netresolve_'
