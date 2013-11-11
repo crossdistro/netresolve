@@ -68,6 +68,7 @@ struct netresolve_resolver {
 	int log_level;
 	enum netresolve_state state;
 	int epoll_fd;
+	int epoll_count;
 	char *backend_string;
 	struct netresolve_backend **backends, **backend;
 	struct {

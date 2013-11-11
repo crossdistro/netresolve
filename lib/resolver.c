@@ -316,8 +316,11 @@ _netresolve_epoll(netresolve_t resolver, int timeout)
 	int nevents;
 	int i;
 
-	if (resolver->state != NETRESOLVE_STATE_RESOLVING)
+	/* Sanity check number of descriptors. */
+	if (resolver->epoll_count <= 0) {
+		_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILED);
 		return;
+	}
 
 	nevents = epoll_wait(resolver->epoll_fd, events, maxevents, resolver->callbacks.watch_fd ? 0 : -1);
 	if (nevents == -1) {
@@ -336,11 +339,18 @@ _netresolve_watch_fd(netresolve_t resolver, int fd, int events)
 	if (!resolver->backend || resolver->epoll_fd == -1)
 		abort();
 
-	if (epoll_ctl(resolver->epoll_fd, EPOLL_CTL_DEL, fd, &event) == -1 && errno != ENOENT && errno != EBADF)
+	if (epoll_ctl(resolver->epoll_fd, EPOLL_CTL_DEL, fd, &event) != -1)
+		resolver->epoll_count--;
+	else if (errno != ENOENT && errno != EBADF)
 		error("epoll_ctl: %s", strerror(errno));
-	if (events)
-		if (epoll_ctl(resolver->epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1)
-			error("epoll_ctl: %s", strerror(errno));
+
+	if (!events)
+		return;
+
+	if (epoll_ctl(resolver->epoll_fd, EPOLL_CTL_ADD, fd, &event) != -1)
+		resolver->epoll_count++;
+	else
+		error("epoll_ctl: %s", strerror(errno));
 }
 
 static int
