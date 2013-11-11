@@ -47,6 +47,8 @@ netresolve_open(void)
 		return NULL;
 	}
 
+	resolver->first_connect_timeout = -1;
+
 	if (strtob(getenv("NETRESOLVE_FLAG_DEFAULT_LOOPBACK")))
 		netresolve_set_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
 
@@ -294,7 +296,7 @@ _netresolve_set_state(netresolve_t resolver, enum netresolve_state state)
 		break;
 	case NETRESOLVE_STATE_FINISHED:
 		if (resolver->callbacks.on_connect)
-			_netresolve_connect(resolver);
+			_netresolve_connect_cleanup(resolver);
 		if (resolver->callbacks.on_success)
 			resolver->callbacks.on_success(resolver, resolver->callbacks.user_data);
 		break;
@@ -317,6 +319,9 @@ bool
 _netresolve_dispatch_fd(netresolve_t resolver, int fd, int events)
 {
 	struct netresolve_backend *backend = *resolver->backend;
+
+	if (!backend && _netresolve_connect_dispatch(resolver, fd, events))
+		return true;
 
 	if (backend && backend->dispatch) {
 		backend->dispatch(resolver, fd, events);
