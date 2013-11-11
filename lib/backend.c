@@ -200,6 +200,11 @@ netresolve_backend_finished(netresolve_backend_t resolver)
 		}
 	}
 
+	if (resolver->callbacks.on_connect) {
+		_netresolve_connect_start(resolver);
+		return;
+	}
+
 	_netresolve_set_state(resolver, NETRESOLVE_STATE_FINISHED);
 }
 

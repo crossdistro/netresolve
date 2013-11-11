@@ -62,6 +62,10 @@ struct netresolve_path {
 		int protocol;
 		int port;
 	} service;
+	struct {
+		enum netresolve_state state;
+		int fd;
+	} socket;
 };
 
 struct netresolve_resolver {
@@ -71,6 +75,7 @@ struct netresolve_resolver {
 	int epoll_count;
 	char *backend_string;
 	struct netresolve_backend **backends, **backend;
+	int first_connect_timeout;
 	struct {
 		netresolve_callback_t on_success;
 		netresolve_callback_t on_failure;
@@ -122,7 +127,9 @@ int _netresolve_add_timeout(netresolve_t resolver, time_t sec, long nsec);
 void _netresolve_remove_timeout(netresolve_t resolver, int fd);
 
 void _netresolve_bind_path(netresolve_t resolver, struct netresolve_path *path);
-void _netresolve_connect(netresolve_t resolver);
+void _netresolve_connect_start(netresolve_t resolver);
+bool _netresolve_connect_dispatch(netresolve_t resolver, int fd, int events);
+void _netresolve_connect_cleanup(netresolve_t resolver);
 
 void _netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,
 		const char *request_service, int socktype, int protocol);
