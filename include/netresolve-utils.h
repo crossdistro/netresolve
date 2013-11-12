@@ -20,7 +20,7 @@
 
 #include <netinet/in.h>
 
-int netresolve_utils_bind(const char *node, const char *service, int socktype, int protocol, int port);
-int netresolve_utils_connect(const char *node, const char *service, int socktype, int protocol, int port);
+int netresolve_utils_bind(const char *node, const char *service, int family, int socktype, int protocol);
+int netresolve_utils_connect(const char *node, const char *service, int family, int socktype, int protocol);
 
 #endif /* NETRESOLVE_UTILS_H */
