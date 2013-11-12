@@ -29,37 +29,37 @@
 #include "netresolve-private.h"
 
 const char *
-netresolve_backend_get_node(netresolve_t resolver)
+netresolve_backend_get_node(netresolve_backend_t resolver)
 {
 	return resolver->request.node;
 }
 
 const char *
-netresolve_backend_get_service(netresolve_t resolver)
+netresolve_backend_get_service(netresolve_backend_t resolver)
 {
 	return resolver->request.service;
 }
 
 int
-netresolve_backend_get_family(netresolve_t resolver)
+netresolve_backend_get_family(netresolve_backend_t resolver)
 {
 	return resolver->request.family;
 }
 
 int
-netresolve_backend_get_socktype(netresolve_t resolver)
+netresolve_backend_get_socktype(netresolve_backend_t resolver)
 {
 	return resolver->request.socktype;
 }
 
 int
-netresolve_backend_get_protocol(netresolve_t resolver)
+netresolve_backend_get_protocol(netresolve_backend_t resolver)
 {
 	return resolver->request.protocol;
 }
 
 bool
-netresolve_backend_get_flag(netresolve_t resolver, netresolve_flag_t flag)
+netresolve_backend_get_flag(netresolve_backend_t resolver, netresolve_flag_t flag)
 {
 	return resolver->request.flags & (1 << flag);
 }
@@ -78,7 +78,7 @@ family_to_length(int family)
 }
 
 void
-netresolve_backend_add_path(netresolve_t resolver, int family, const void *address, int ifindex, int socktype, int protocol, int portnum)
+netresolve_backend_add_path(netresolve_backend_t resolver, int family, const void *address, int ifindex, int socktype, int protocol, int portnum)
 {
 	struct netresolve_response *response = &resolver->response;
 	struct netresolve_path path;
@@ -104,7 +104,7 @@ netresolve_backend_add_path(netresolve_t resolver, int family, const void *addre
 }
 
 typedef struct {
-	netresolve_t resolver;
+	netresolve_backend_t resolver;
 	int family;
 	const void *address;
 	int ifindex;
@@ -119,7 +119,7 @@ path_callback(int socktype, int protocol, int port, void *user_data)
 }
 
 void
-netresolve_backend_add_address(netresolve_t resolver, int family, const void *address, int ifindex)
+netresolve_backend_add_address(netresolve_backend_t resolver, int family, const void *address, int ifindex)
 {
 	PathData data = { .resolver = resolver, .family = family, .address = address, .ifindex = ifindex };
 
@@ -128,7 +128,7 @@ netresolve_backend_add_address(netresolve_t resolver, int family, const void *ad
 }
 
 void
-netresolve_backend_set_canonical_name(netresolve_t resolver, const char *canonical_name)
+netresolve_backend_set_canonical_name(netresolve_backend_t resolver, const char *canonical_name)
 {
 	free(resolver->response.canonname);
 	resolver->response.canonname = strdup(canonical_name);
@@ -156,7 +156,7 @@ netresolve_backend_get_priv(netresolve_backend_t resolver)
 }
 
 void
-netresolve_backend_watch_fd(netresolve_t resolver, int fd, int events)
+netresolve_backend_watch_fd(netresolve_backend_t resolver, int fd, int events)
 {
 	_netresolve_watch_fd(resolver, fd, events);
 }
@@ -185,7 +185,7 @@ netresolve_backend_drop_timeout(netresolve_backend_t resolver, int fd)
 }
 
 void
-_netresolve_backend_cleanup(netresolve_t resolver)
+_netresolve_backend_cleanup(netresolve_backend_t resolver)
 {
 	struct netresolve_backend *backend = *resolver->backend;
 
@@ -197,7 +197,7 @@ _netresolve_backend_cleanup(netresolve_t resolver)
 }
 
 void
-netresolve_backend_finished(netresolve_t resolver)
+netresolve_backend_finished(netresolve_backend_t resolver)
 {
 	/* Restart with the next *mandatory* backend. */
 	while (*resolver->backend && *++resolver->backend) {
@@ -212,7 +212,7 @@ netresolve_backend_finished(netresolve_t resolver)
 }
 
 void
-netresolve_backend_failed(netresolve_t resolver)
+netresolve_backend_failed(netresolve_backend_t resolver)
 {
 	/* Restart with the next backend. */
 	if (*resolver->backend && *++resolver->backend) {
