@@ -28,7 +28,7 @@ start(netresolve_backend_t resolver, char **settings)
 	int family = netresolve_backend_get_family(resolver);
 	int socktype = netresolve_backend_get_socktype(resolver);
 
-	if ((family != AF_UNIX && family != AF_UNSPEC) || !node || *node != '/'){
+	if (family != AF_UNIX || !node || *node != '/'){
 		netresolve_backend_failed(resolver);
 		return;
 	}

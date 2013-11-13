@@ -18,7 +18,7 @@ $DIFF <(./netresolve 1:2:3:4:5:6:7:8%999999) tests/data/numeric6nines
 $DIFF <(./netresolve 1:2:3:4:5:6:7:8%999999x) tests/data/empty
 $DIFF <(./netresolve a.root-servers.net) tests/data/dns
 $DIFF <(./netresolve - exp1) tests/data/services
-$DIFF <(./netresolve /path/to/socket) tests/data/unix
-$DIFF <(./netresolve /path/to/socket - any stream) tests/data/unix-stream
-$DIFF <(./netresolve /path/to/socket - any dgram) tests/data/unix-dgram
+$DIFF <(./netresolve /path/to/socket - unix) tests/data/unix
+$DIFF <(./netresolve /path/to/socket - unix stream) tests/data/unix-stream
+$DIFF <(./netresolve /path/to/socket - unix dgram) tests/data/unix-dgram
 $DIFF <(./netresolve x-x-x-x-x-x-x-x-x) tests/data/empty

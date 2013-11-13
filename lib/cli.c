@@ -27,6 +27,8 @@ family_from_string(const char *str)
 		return AF_INET;
 	if (!strcmp(str, "ip6"))
 		return AF_INET6;
+	if (!strcmp(str, "unix"))
+		return AF_UNIX;
 	/* "any" */
 	return AF_UNSPEC;
 }
