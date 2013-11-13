@@ -20,32 +20,27 @@
 #include "netresolve-private.h"
 
 void
-_netresolve_bind(netresolve_t resolver)
+_netresolve_bind_path(netresolve_t resolver, struct netresolve_path *path)
 {
 	int flags = O_NONBLOCK;
-	size_t npaths = netresolve_get_path_count(resolver);
-	size_t i;
+	int socktype;
+	int protocol;
+	const struct sockaddr *sa;
+	socklen_t salen;
+	int sock;
 
-	for (i = 0; i < npaths; i++) {
-		int socktype;
-		int protocol;
-		const struct sockaddr *sa;
-		socklen_t salen;
-		int sock;
-
-		sa = netresolve_get_path_sockaddr(resolver, i, &socktype, &protocol, &salen);
-		if (!sa)
-			continue;
-		sock = socket(sa->sa_family, socktype | flags, protocol);
-		if (sock == -1)
-			continue;
-		if (bind(sock, sa, salen) == -1) {
-			close(sock);
-			continue;
-		}
-
-		resolver->callbacks.on_bind(resolver, sock, resolver->callbacks.user_data_sock);
+	sa = netresolve_get_path_sockaddr(resolver, path - resolver->response.paths, &socktype, &protocol, &salen);
+	if (!sa)
+		return;
+	sock = socket(sa->sa_family, socktype | flags, protocol);
+	if (sock == -1)
+		return;
+	if (bind(sock, sa, salen) == -1) {
+		close(sock);
+		return;
 	}
+
+	resolver->callbacks.on_bind(resolver, sock, resolver->callbacks.user_data_sock);
 }
 
 void

@@ -101,6 +101,9 @@ netresolve_backend_add_path(netresolve_backend_t resolver, int family, const voi
 
 	response->paths = realloc(response->paths, (response->pathcount + 1) * sizeof path);
 	memcpy(&response->paths[response->pathcount++], &path, sizeof path);
+
+	if (resolver->callbacks.on_bind)
+		_netresolve_bind_path(resolver, &response->paths[response->pathcount - 1]);
 }
 
 typedef struct {

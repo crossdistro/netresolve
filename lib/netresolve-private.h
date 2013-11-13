@@ -121,7 +121,7 @@ void _netresolve_watch_fd(netresolve_t resolver, int fd, int events);
 
 void _netresolve_backend_cleanup(netresolve_t resolver);
 
-void _netresolve_bind(netresolve_t resolver);
+void _netresolve_bind_path(netresolve_t resolver, struct netresolve_path *path);
 void _netresolve_connect(netresolve_t resolver);
 
 void _netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,

@@ -273,8 +273,6 @@ _netresolve_set_state(netresolve_t resolver, enum netresolve_state state)
 		_netresolve_start(resolver);
 		break;
 	case NETRESOLVE_STATE_FINISHED:
-		if (resolver->callbacks.on_bind)
-			_netresolve_bind(resolver);
 		if (resolver->callbacks.on_connect)
 			_netresolve_connect(resolver);
 		if (resolver->callbacks.on_success)
