@@ -13,6 +13,7 @@ Makefile.in
 stamp-h1
 
 /netresolve
+/netconnect
 /test-async
 /test-bind-connect
 /test-getaddrinfo
