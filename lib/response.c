@@ -67,14 +67,14 @@ netresolve_get_path_sockaddr(netresolve_t resolver, size_t idx,
 	switch (family) {
 	case AF_INET:
 		resolver->sa_buffer.sin.sin_family = family;
-		resolver->sa_buffer.sin.sin_port = port;
+		resolver->sa_buffer.sin.sin_port = htons(port);
 		resolver->sa_buffer.sin.sin_addr = *(struct in_addr *) address;
 		if (salen)
 			*salen = sizeof resolver->sa_buffer.sin;
 		break;
 	case AF_INET6:
 		resolver->sa_buffer.sin6.sin6_family = family;
-		resolver->sa_buffer.sin6.sin6_port = port;
+		resolver->sa_buffer.sin6.sin6_port = htons(port);
 		resolver->sa_buffer.sin6.sin6_scope_id = ifindex;
 		resolver->sa_buffer.sin6.sin6_addr = *(struct in6_addr *) address;
 		if (salen)

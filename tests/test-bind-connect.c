@@ -26,7 +26,7 @@ main(int argc, char **argv)
 {
 	int sock_server, sock_client, sock_accept;
 	const char *node = NULL;
-	const char *service = "exp1";
+	const char *service = "1024";
 	int family = AF_INET;
 	int socktype = SOCK_STREAM;
 	int protocol = IPPROTO_TCP;
