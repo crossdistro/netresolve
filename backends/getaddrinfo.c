@@ -32,7 +32,7 @@ add_addresses(netresolve_backend_t response, const struct addrinfo *first)
 			struct in6_addr address6;
 		} address = {{0}};
 		int ifindex = 0;
-		int port;
+		int port = 0;
 
 		if (!ai->ai_family)
 			continue;

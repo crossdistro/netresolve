@@ -24,6 +24,14 @@ SED_PROCESS = \
 %.pc: %.pc.in Makefile
 	$(SED_PROCESS)
 
+include_HEADERS = \
+	include/netresolve.h \
+	include/netresolve-common.h \
+	include/netresolve-utils.h \
+	include/netresolve-string.h \
+	include/netresolve-cli.h \
+	include/netresolve-backend.h
+
 lib_LTLIBRARIES = \
 	libnetresolve.la \
 	libnetresolve-posix.la
@@ -83,6 +91,28 @@ TESTS = \
 	test-bind-connect \
 	test-getaddrinfo \
 	test-gethostbyname
+EXTRA_DIST = \
+	tests/test-netresolve.sh \
+	tests/data/any \
+	tests/data/localhost \
+	tests/data/localhost \
+	tests/data/localhost4 \
+	tests/data/localhost6 \
+	tests/data/numeric4 \
+	tests/data/numeric4lo \
+	tests/data/numeric4lo \
+	tests/data/numeric4nines \
+	tests/data/empty \
+	tests/data/numeric6 \
+	tests/data/numeric6lo \
+	tests/data/numeric6nines \
+	tests/data/empty \
+	tests/data/dns \
+	tests/data/services \
+	tests/data/unix \
+	tests/data/unix-stream \
+	tests/data/unix-dgram \
+	tests/data/empty
 noinst_PROGRAMS = \
 	test-async \
 	test-bind-connect \
