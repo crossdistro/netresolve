@@ -1,1 +1,1 @@
-autocmd BufEnter {README,TODO} set filetype=markdown
+autocmd BufEnter {README,TODO,NEWS} set filetype=markdown
