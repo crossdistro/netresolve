@@ -17,6 +17,9 @@ stamp-h1
 /test-async
 /test-bind-connect
 /test-getaddrinfo
+/test-gethostbyname
+
+/netresolve-*.*.*
 
 /aclocal.m4
 /autom4te.cache
