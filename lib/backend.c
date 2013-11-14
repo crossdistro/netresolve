@@ -193,10 +193,15 @@ backend_cleanup(netresolve_backend_t resolver)
 void
 netresolve_backend_finished(netresolve_backend_t resolver)
 {
+	if (!*resolver->backend) {
+		error("Out of order backend callback.");
+		goto fail;
+	}
+
 	backend_cleanup(resolver);
 
 	/* Restart with the next *mandatory* backend. */
-	while (*resolver->backend && *++resolver->backend) {
+	while (*++resolver->backend) {
 		if ((*resolver->backend)->mandatory) {
 			_netresolve_start(resolver);
 			return;
@@ -209,19 +214,32 @@ netresolve_backend_finished(netresolve_backend_t resolver)
 	}
 
 	_netresolve_set_state(resolver, NETRESOLVE_STATE_FINISHED);
+	return;
+
+fail:
+	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILED);
 }
 
 void
 netresolve_backend_failed(netresolve_backend_t resolver)
 {
+	if (!*resolver->backend) {
+		error("Out of order backend callback.");
+		goto fail;
+	}
+
+	if (resolver->response.pathcount)
+		error("Non-empty failed reply.");
+
 	backend_cleanup(resolver);
 
 	/* Restart with the next backend. */
-	if (*resolver->backend && *++resolver->backend) {
+	if (*++resolver->backend) {
 		_netresolve_start(resolver);
 		return;
 	}
 
+fail:
 	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILED);
 }
 
