@@ -80,10 +80,13 @@ libnetresolve_backend_getaddrinfo_la_SOURCES = backends/getaddrinfo.c
 libnetresolve_backend_nss_la_SOURCES = backends/nss.c
 libnetresolve_backend_exec_la_SOURCES = backends/exec.c
 
-bin_PROGRAMS = netresolve
+bin_PROGRAMS = netresolve netconnect
 
 netresolve_SOURCES = tools/netresolve.c
 netresolve_LDADD = libnetresolve.la
+
+netconnect_SOURCES = tools/netconnect.c
+netconnect_LDADD = libnetresolve.la
 
 TESTS = \
 	tests/test-netresolve.sh \
