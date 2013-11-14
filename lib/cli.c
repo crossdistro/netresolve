@@ -15,10 +15,12 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-#include <netresolve.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "netresolve-private.h"
+#include "netresolve-string.h"
 
 int
 family_from_string(const char *str)
@@ -62,6 +64,12 @@ netresolve_resolve_argv(netresolve_t resolver, char **argv)
 {
 	const char *node = NULL, *service = NULL;
 	int family = 0, socktype = 0, protocol = 0;
+	int status;
+
+	if (*argv && !strcmp(*argv, "-v")) {
+		netresolve_set_log_level(resolver, 10);
+		argv++;
+	}
 
 	if (*argv) {
 		node = *argv++;
@@ -79,5 +87,8 @@ netresolve_resolve_argv(netresolve_t resolver, char **argv)
 	if (*argv)
 		protocol = protocol_from_string(*argv++);
 
-	return netresolve_resolve(resolver, node, service, family, socktype, protocol);
+	status = netresolve_resolve(resolver, node, service, family, socktype, protocol);
+	debug("%s", netresolve_get_request_string(resolver));
+
+	return status;
 }
