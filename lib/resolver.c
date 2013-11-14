@@ -249,7 +249,7 @@ _netresolve_set_state(netresolve_t resolver, enum netresolve_state state)
 
 	/* Leaving state... */
 	switch (old_state) {
-	case NETRESOLVE_STATE_RESOLVING:
+	case NETRESOLVE_STATE_WAITING:
 		if (resolver->callbacks.watch_fd)
 			resolver->callbacks.watch_fd(resolver, resolver->epoll_fd, 0,
 					resolver->callbacks.user_data_fd);
@@ -266,7 +266,7 @@ _netresolve_set_state(netresolve_t resolver, enum netresolve_state state)
 		free(resolver->response.canonname);
 		memset(&resolver->response, 0, sizeof resolver->response);
 		break;
-	case NETRESOLVE_STATE_RESOLVING:
+	case NETRESOLVE_STATE_WAITING:
 		if (resolver->callbacks.watch_fd)
 			resolver->callbacks.watch_fd(resolver, resolver->epoll_fd, POLLIN,
 					resolver->callbacks.user_data_fd);
@@ -325,7 +325,7 @@ _netresolve_epoll(netresolve_t resolver, int timeout)
 		_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILED);
 		return;
 	}
-	for (i = 0; resolver->state == NETRESOLVE_STATE_RESOLVING && i < nevents; i++)
+	for (i = 0; resolver->state == NETRESOLVE_STATE_WAITING && i < nevents; i++)
 		_netresolve_dispatch_fd(resolver, events[i].data.fd, events[i].events);
 }
 
@@ -355,7 +355,7 @@ static int
 state_to_errno(enum netresolve_state state)
 {
 	switch (state) {
-	case NETRESOLVE_STATE_RESOLVING:
+	case NETRESOLVE_STATE_WAITING:
 		return EWOULDBLOCK;
 	case NETRESOLVE_STATE_FINISHED:
 		return 0;
@@ -371,7 +371,7 @@ int
 netresolve_resolve(netresolve_t resolver,
 		const char *node, const char *service, int family, int socktype, int protocol)
 {
-	if (resolver->state == NETRESOLVE_STATE_RESOLVING)
+	if (resolver->state == NETRESOLVE_STATE_WAITING)
 		return EBUSY;
 	_netresolve_set_state(resolver, NETRESOLVE_STATE_INIT);
 	if (!resolver->backends)
@@ -386,11 +386,11 @@ netresolve_resolve(netresolve_t resolver,
 	resolver->request.socktype = socktype;
 	resolver->request.protocol = protocol;
 
-	_netresolve_set_state(resolver, NETRESOLVE_STATE_RESOLVING);
+	_netresolve_set_state(resolver, NETRESOLVE_STATE_WAITING);
 
 	/* Blocking mode. */
 	if (!resolver->callbacks.watch_fd)
-		while (resolver->state == NETRESOLVE_STATE_RESOLVING)
+		while (resolver->state == NETRESOLVE_STATE_WAITING)
 			_netresolve_epoll(resolver, -1);
 
 	return state_to_errno(resolver->state);
