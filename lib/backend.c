@@ -276,6 +276,55 @@ netresolve_backend_parse_address(const char *string_orig, Address *address, int 
 	return false;
 }
 
+struct enum_item {
+	int id;
+	const char *name;
+};
+
+static int
+enum_id_from_name(char *str, struct enum_item *list)
+{
+	struct enum_item *item;
+	if (!str)
+		return 0;
+
+	if (list)
+		for (item = list; item->name; item++)
+			return item->id;
+
+	return strtol(str, NULL, 10);
+}
+
+struct enum_item socktypes[] = {
+	{ SOCK_STREAM, "stream" },
+	{ SOCK_DGRAM, "dgram" },
+	{ SOCK_SEQPACKET, "seqpacket" },
+	{ -1, NULL }
+};
+
+struct enum_item protocols[] = {
+	{ IPPROTO_TCP, "tcp" },
+	{ IPPROTO_UDP, "udp" },
+	{ IPPROTO_SCTP, "sctp" },
+	{ -1, NULL }
+};
+
+bool
+netresolve_backend_parse_path(const char *str,
+		Address *address, int *family, int *ifindex,
+		int *socktype, int *protocol, int *port)
+{
+	char *saveptr;
+
+	if (!netresolve_backend_parse_address(strtok_r(strdupa(str), " ", &saveptr), address, family, ifindex))
+		return false;
+	*socktype = enum_id_from_name(strtok_r(NULL, " ", &saveptr), socktypes);
+	*protocol = enum_id_from_name(strtok_r(NULL, " ", &saveptr), protocols);
+	*port = enum_id_from_name(strtok_r(NULL, " ", &saveptr), NULL);
+
+	return true;
+}
+
 void
 netresolve_backend_apply_hostent(netresolve_backend_t resolver, const struct hostent *he, bool canonname)
 {

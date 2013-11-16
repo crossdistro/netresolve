@@ -63,7 +63,11 @@ void netresolve_backend_log(netresolve_backend_t resolver, int level, const char
 
 /* Convenience */
 typedef union { struct in_addr address4; struct in6_addr address6; } Address;
-bool netresolve_backend_parse_address(const char *string_orig, Address *address, int *family, int *ifindex);
+bool netresolve_backend_parse_address(const char *string_orig,
+		Address *address, int *family, int *ifindex);
+bool netresolve_backend_parse_path(const char *str,
+		Address *address, int *family, int *ifindex,
+		int *socktype, int *protocol, int *port);
 void netresolve_backend_apply_hostent(netresolve_backend_t resolver, const struct hostent *he, bool canonname);
 
 /* Backend function prototypes */

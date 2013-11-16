@@ -104,6 +104,14 @@ received_line(netresolve_backend_t resolver, struct priv_exec *priv, const char 
 {
 	char addrprefix[] = "address ";
 	int addrprefixlen = strlen(addrprefix);
+	char pathprefix[] = "path ";
+	int pathprefixlen = strlen(pathprefix);
+	Address address;
+	int family;
+	int ifindex;
+	int socktype;
+	int protocol;
+	int port;
 
 	debug("received: %s\n", priv->outbuf.buffer);
 
@@ -111,12 +119,13 @@ received_line(netresolve_backend_t resolver, struct priv_exec *priv, const char 
 		return true;
 
 	if (!strncmp(addrprefix, line, addrprefixlen)) {
-		Address address;
-		int family;
-		int ifindex;
-
-		if (netresolve_backend_parse_address(line + addrprefixlen, &address, &family, &ifindex))
+		if (netresolve_backend_parse_address(line + addrprefixlen,
+					&address, &family, &ifindex))
 			netresolve_backend_add_address(resolver, family, &address, ifindex);
+	} else if (!strncmp(pathprefix, line, pathprefixlen)) {
+		if (netresolve_backend_parse_path(line + pathprefixlen,
+					&address, &family, &ifindex, &socktype, &protocol, &port))
+			netresolve_backend_add_path(resolver, family, &address, ifindex, socktype, protocol, port);
 	}
 
 	return false;
