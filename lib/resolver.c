@@ -254,7 +254,6 @@ _netresolve_set_state(netresolve_t resolver, enum netresolve_state state)
 		if (resolver->callbacks.watch_fd)
 			resolver->callbacks.watch_fd(resolver, resolver->epoll_fd, 0,
 					resolver->callbacks.user_data_fd);
-		_netresolve_backend_cleanup(resolver);
 		break;
 	default:
 		break;

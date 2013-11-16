@@ -175,8 +175,8 @@ netresolve_backend_drop_timeout(netresolve_backend_t resolver, int fd)
 	_netresolve_remove_timeout(resolver, fd);
 }
 
-void
-_netresolve_backend_cleanup(netresolve_backend_t resolver)
+static void
+backend_cleanup(netresolve_backend_t resolver)
 {
 	struct netresolve_backend *backend = *resolver->backend;
 
@@ -190,10 +190,11 @@ _netresolve_backend_cleanup(netresolve_backend_t resolver)
 void
 netresolve_backend_finished(netresolve_backend_t resolver)
 {
+	backend_cleanup(resolver);
+
 	/* Restart with the next *mandatory* backend. */
 	while (*resolver->backend && *++resolver->backend) {
 		if ((*resolver->backend)->mandatory) {
-			_netresolve_backend_cleanup(resolver);
 			_netresolve_start(resolver);
 			return;
 		}
@@ -205,6 +206,8 @@ netresolve_backend_finished(netresolve_backend_t resolver)
 void
 netresolve_backend_failed(netresolve_backend_t resolver)
 {
+	backend_cleanup(resolver);
+
 	/* Restart with the next backend. */
 	if (*resolver->backend && *++resolver->backend) {
 		_netresolve_start(resolver);

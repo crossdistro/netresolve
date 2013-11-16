@@ -121,8 +121,6 @@ void _netresolve_watch_fd(netresolve_t resolver, int fd, int events);
 int _netresolve_add_timeout(netresolve_t resolver, time_t sec, long nsec);
 void _netresolve_remove_timeout(netresolve_t resolver, int fd);
 
-void _netresolve_backend_cleanup(netresolve_t resolver);
-
 void _netresolve_bind_path(netresolve_t resolver, struct netresolve_path *path);
 void _netresolve_connect(netresolve_t resolver);
 
