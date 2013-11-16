@@ -294,17 +294,17 @@ _netresolve_start(netresolve_t resolver)
 	backend->start(resolver, backend->settings+1);
 }
 
-void
+bool
 _netresolve_dispatch_fd(netresolve_t resolver, int fd, int events)
 {
 	struct netresolve_backend *backend = *resolver->backend;
 
 	if (backend && backend->dispatch) {
 		backend->dispatch(resolver, fd, events);
-		return;
+		return true;
 	}
 
-	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILED);
+	return false;
 }
 
 void
