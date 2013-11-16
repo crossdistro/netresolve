@@ -241,12 +241,32 @@ netresolve_set_backend_string(netresolve_t resolver, const char *string)
 	}
 }
 
+static const char *
+state_to_string(enum netresolve_state state)
+{
+	switch (state) {
+	case NETRESOLVE_STATE_INIT:
+		return "init";
+	case NETRESOLVE_STATE_WAITING:
+		return "waiting";
+	case NETRESOLVE_STATE_FINISHED:
+		return "finished";
+	case NETRESOLVE_STATE_FAILED:
+		return "failed";
+	default:
+		/* Shouldn't happen. */
+		return "UNKNOWN";
+	}
+}
+
 void
 _netresolve_set_state(netresolve_t resolver, enum netresolve_state state)
 {
 	enum netresolve_state old_state = resolver->state;
 
 	resolver->state = state;
+
+	debug("state: %s -> %s\n", state_to_string(old_state), state_to_string(state));
 
 	/* Leaving state... */
 	switch (old_state) {

@@ -120,6 +120,17 @@ netresolve_get_request_string(netresolve_t resolver)
 }
 
 const char *
+netresolve_get_path_string(netresolve_t resolver, int i)
+{
+	char *start = resolver->buffer;
+	char *end = resolver->buffer + sizeof resolver->buffer;
+
+	add_path(&start, end, resolver, i);
+
+	return resolver->buffer;
+}
+
+const char *
 netresolve_get_response_string(netresolve_t resolver)
 {
 	char *start = resolver->buffer;

@@ -24,6 +24,7 @@
 #include <sys/epoll.h>
 
 #include <netresolve-backend.h>
+#include <netresolve-string.h>
 
 #include "netresolve-private.h"
 
@@ -100,6 +101,8 @@ netresolve_backend_add_path(netresolve_backend_t resolver, int family, const voi
 
 	response->paths = realloc(response->paths, (response->pathcount + 1) * sizeof path);
 	memcpy(&response->paths[response->pathcount++], &path, sizeof path);
+
+	debug("added path: %s", netresolve_get_path_string(resolver, response->pathcount - 1));
 
 	if (resolver->callbacks.on_bind)
 		_netresolve_bind_path(resolver, &response->paths[response->pathcount - 1]);

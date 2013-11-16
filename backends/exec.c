@@ -192,17 +192,17 @@ dispatch(netresolve_backend_t resolver, int fd, int events)
 {
 	struct priv_exec *priv = netresolve_backend_get_priv(resolver);
 
-	debug("events %d on fd %d\n", events, fd);
+	debug("exec: events %d on fd %d\n", events, fd);
 
 	if (fd == priv->infd && events & POLLOUT)
 		send_stdin(resolver, priv);
 	else if (fd == priv->outfd && events & POLLIN) {
 		pickup_stdout(resolver, priv);
 	} else if (fd == priv->outfd && events & POLLHUP) {
-		error("incomplete request\n");
+		error("exec: incomplete response\n");
 		netresolve_backend_failed(resolver);
 	} else {
-		error("unknown events %d on fd %d\n", events, fd);
+		error("exec: unknown events %d on fd %d\n", events, fd);
 		netresolve_backend_failed(resolver);
 	}
 }
