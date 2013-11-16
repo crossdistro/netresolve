@@ -82,21 +82,18 @@ err_pipe1:
 static void
 send_stdin(netresolve_backend_t resolver, struct priv_exec *priv)
 {
-	ssize_t size;
-
-	if (priv->inbuf.start == priv->inbuf.end) {
-		netresolve_backend_watch_fd(resolver, priv->infd, 0);
-		return;
-	}
-	size = write(priv->infd, priv->inbuf.start, priv->inbuf.end - priv->inbuf.start);
-	if (size <= 0) {
-		abort();
+	if (priv->inbuf.start != priv->inbuf.end) {
+		ssize_t size = write(priv->infd, priv->inbuf.start, priv->inbuf.end - priv->inbuf.start);
+		if (size > 0) {
+			priv->inbuf.start += size;
+			return;
+		}
 		debug("write failed: %s", strerror(errno));
-		netresolve_backend_failed(resolver);
-		return;
 	}
-	priv->inbuf.start += size;
-	return;
+
+	netresolve_backend_watch_fd(resolver, priv->infd, 0);
+	close(priv->infd);
+	priv->infd = -1;
 }
 
 static bool
@@ -174,6 +171,9 @@ start(netresolve_backend_t resolver, char **settings)
 {
 	struct priv_exec *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
 
+	priv->infd = -1;
+	priv->outfd = -1;
+
 	if (!priv || !start_subprocess(settings, &priv->pid, &priv->infd, &priv->outfd)) {
 		netresolve_backend_failed(resolver);
 		return;
@@ -212,10 +212,14 @@ cleanup(netresolve_backend_t resolver)
 {
 	struct priv_exec *priv = netresolve_backend_get_priv(resolver);
 
-	netresolve_backend_watch_fd(resolver, priv->infd, 0);
-	netresolve_backend_watch_fd(resolver, priv->outfd, 0);
-	close(priv->infd);
-	close(priv->outfd);
+	if (priv->infd != -1) {
+		netresolve_backend_watch_fd(resolver, priv->infd, 0);
+		close(priv->infd);
+	}
+	if (priv->outfd != -1) {
+		netresolve_backend_watch_fd(resolver, priv->outfd, 0);
+		close(priv->outfd);
+	}
 	/* TODO: Implement proper child handling. */
 	kill(priv->pid, SIGKILL);
 	free(priv->inbuf.buffer);
