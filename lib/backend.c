@@ -22,7 +22,6 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/epoll.h>
-#include <sys/timerfd.h>
 
 #include <netresolve-backend.h>
 
@@ -167,24 +166,13 @@ netresolve_backend_watch_fd(netresolve_backend_t resolver, int fd, int events)
 int
 netresolve_backend_watch_timeout(netresolve_backend_t resolver, time_t sec, long nsec)
 {
-	int fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
-	struct itimerspec timerspec = {{0, 0}, {sec, nsec}};
-
-	if (fd != -1 && timerfd_settime(fd, 0, &timerspec, NULL) == -1) {
-		close(fd);
-		return -1;
-	}
-
-	netresolve_backend_watch_fd(resolver, fd, POLLIN);
-
-	return fd;
+	return _netresolve_add_timeout(resolver, sec, nsec);
 }
 
 void
 netresolve_backend_drop_timeout(netresolve_backend_t resolver, int fd)
 {
-	netresolve_backend_watch_fd(resolver, fd, 0);
-	close(fd);
+	_netresolve_remove_timeout(resolver, fd);
 }
 
 void

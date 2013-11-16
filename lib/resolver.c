@@ -22,6 +22,7 @@
 #include <dlfcn.h>
 #include <poll.h>
 #include <sys/epoll.h>
+#include <sys/timerfd.h>
 #include <errno.h>
 
 #include "netresolve-private.h"
@@ -334,6 +335,8 @@ _netresolve_watch_fd(netresolve_t resolver, int fd, int events)
 {
 	struct epoll_event event = { .events = events, .data = { .fd = fd} };
 
+	debug("watching file descriptor: %d %d\n", fd, events);
+
 	if (!resolver->backend || resolver->epoll_fd == -1)
 		abort();
 
@@ -349,6 +352,33 @@ _netresolve_watch_fd(netresolve_t resolver, int fd, int events)
 		resolver->epoll_count++;
 	else
 		error("epoll_ctl: %s", strerror(errno));
+}
+
+int
+_netresolve_add_timeout(netresolve_t resolver, time_t sec, long nsec)
+{
+	int fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+	struct itimerspec timerspec = {{0, 0}, {sec, nsec}};
+
+	if (fd != -1) {
+		if (timerfd_settime(fd, 0, &timerspec, NULL) == -1) {
+			close(fd);
+			return -1;
+		}
+		_netresolve_watch_fd(resolver, fd, POLLIN);
+	}
+
+	debug("added timeout: %d %d %d\n", fd, (int) sec, (int) nsec);
+
+	return fd;
+}
+
+void
+_netresolve_remove_timeout(netresolve_t resolver, int fd)
+{
+	_netresolve_watch_fd(resolver, fd, 0);
+	debug("removed timeout: %d\n", fd);
+	close(fd);
 }
 
 static int
