@@ -49,7 +49,7 @@ netresolve_open(void)
 
 	resolver->first_connect_timeout = -1;
 
-	if (strtob(getenv("NETRESOLVE_FLAG_DEFAULT_LOOPBACK")))
+	if (strtob(secure_getenv("NETRESOLVE_FLAG_DEFAULT_LOOPBACK")))
 		netresolve_set_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
 
 	return resolver;
@@ -429,7 +429,7 @@ netresolve_resolve(netresolve_t resolver,
 		return EBUSY;
 	_netresolve_set_state(resolver, NETRESOLVE_STATE_INIT);
 	if (!resolver->backends)
-		netresolve_set_backend_string(resolver, getenv("NETRESOLVE_BACKENDS"));
+		netresolve_set_backend_string(resolver, secure_getenv("NETRESOLVE_BACKENDS"));
 	if (!resolver->backends)
 		return ENODATA;
 	resolver->backend = resolver->backends;

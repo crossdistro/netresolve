@@ -3,9 +3,11 @@ AC_INIT([netresolve], [0.0.1], [psimerda@redhat.com], [netresolve], [])
 AC_CONFIG_SRCDIR([tools/netresolve.c])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([check-news foreign 1.11 -Wall -Wno-portability silent-rules tar-pax no-dist-gzip dist-xz subdir-objects])
+AC_USE_SYSTEM_EXTENSIONS
 LT_INIT([disable-static pic-only dlopen])
 AC_PROG_CC_STDC
-#AC_USE_SYSTEM_EXTENSIONS
+AC_CHECK_FUNC(__secure_getenv,
+	AC_DEFINE(secure_getenv, __secure_getenv, [A prefixed version of secure_getenv found.]))
 AC_SYS_LARGEFILE
 AC_CONFIG_MACRO_DIR([m4])
 AM_SILENT_RULES([yes])
