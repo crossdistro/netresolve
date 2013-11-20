@@ -64,6 +64,12 @@ netresolve_backend_get_default_loopback(netresolve_backend_t resolver)
 	return resolver->request.default_loopback;
 }
 
+bool
+netresolve_backend_get_dns_srv_lookup(netresolve_backend_t resolver)
+{
+	return resolver->request.dns_srv_lookup;
+}
+
 static size_t
 family_to_length(int family)
 {

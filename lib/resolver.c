@@ -111,6 +111,12 @@ netresolve_set_default_loopback(netresolve_t resolver, bool value)
 }
 
 void
+netresolve_set_dns_srv_lookup(netresolve_t resolver, bool value)
+{
+	resolver->request.dns_srv_lookup = value;
+}
+
+void
 netresolve_callback_set_callbacks(netresolve_t resolver,
 		netresolve_callback_t on_success,
 		netresolve_callback_t on_failure,

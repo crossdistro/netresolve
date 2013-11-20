@@ -15,9 +15,11 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
-#include <ares.h>
-
 #include <netresolve-backend.h>
+#include <ares.h>
+#include <arpa/nameser.h>
+#include <stdlib.h>
+#include <stdio.h>
 
 /* A timeout starting when the first successful answer has been received. */
 static int partial_timeout = 5;
@@ -28,6 +30,7 @@ struct priv_dns {
 	fd_set wfds;
 	int nfds;
 	int ptfd;
+	struct ares_srv_reply *srv_reply;
 };
 
 void
@@ -65,16 +68,31 @@ register_fds(netresolve_backend_t resolver)
 		netresolve_backend_finished(resolver);
 }
 
+struct priv_address_lookup {
+	netresolve_backend_t resolver;
+	struct ares_srv_reply *srv;
+};
+
 void
 host_callback(void *arg, int status, int timeouts, struct hostent *he)
 {
-	netresolve_backend_t resolver = arg;
+	struct priv_address_lookup *lookup_data = arg;
+	netresolve_backend_t resolver = lookup_data->resolver;
+	struct ares_srv_reply *srv = lookup_data->srv;
 	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
 	int socktype = -1;
 	int protocol = -1;
 	int port = -1;
 	int priority = 0;
 	int weight = 0;
+
+	if (srv) {
+		socktype = netresolve_backend_get_socktype(resolver);
+		protocol = netresolve_backend_get_protocol(resolver);
+		port = srv->port;
+		priority = srv->priority;
+		weight = srv->weight;
+	}
 
 	switch (status) {
 	case ARES_EDESTRUCTION:
@@ -91,11 +109,94 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 }
 
 void
+start_address_lookup(netresolve_backend_t resolver, struct ares_srv_reply *srv)
+{
+	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
+	int family = netresolve_backend_get_family(resolver);
+	const char *node = netresolve_backend_get_node(resolver);
+	struct priv_address_lookup *lookup_data = calloc(1, sizeof *lookup_data);
+
+	if (!lookup_data) {
+		netresolve_backend_failed(resolver);
+		return;
+	}
+
+	lookup_data->resolver = resolver;
+
+	if (srv) {
+		node = srv->host;
+		lookup_data->srv = srv;
+	}
+
+	if (family == AF_INET || family == AF_UNSPEC)
+		ares_gethostbyname(priv->channel, node, AF_INET, host_callback, lookup_data);
+	if (family == AF_INET6 || family == AF_UNSPEC)
+		ares_gethostbyname(priv->channel, node, AF_INET6, host_callback, lookup_data);
+}
+
+static void
+srv_callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
+{
+	netresolve_backend_t resolver = arg;
+	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
+
+	switch (status) {
+	case ARES_EDESTRUCTION:
+		break;
+	case ARES_SUCCESS:
+		status = ares_parse_srv_reply(abuf, alen, &priv->srv_reply);
+		if (status)
+			error("ares: SRV lookup failed: %s", ares_strerror(status));
+		if (priv->srv_reply) {
+			struct ares_srv_reply *reply;
+
+			for (reply = priv->srv_reply; reply; reply = reply->next)
+				start_address_lookup(resolver, reply);
+		} else
+			start_address_lookup(resolver, NULL);
+		break;
+	default:
+		error("ares: %s\n", ares_strerror(status));
+	}
+}
+
+static const char *
+protocol_to_string(int proto)
+{
+	switch (proto) {
+	case IPPROTO_UDP:
+		return "udp";
+	case IPPROTO_TCP:
+		return "tcp";
+	case IPPROTO_SCTP:
+		return "sctp";
+	default:
+		return "0";
+	}
+}
+
+void
+start_srv_lookup(netresolve_backend_t resolver)
+{
+	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
+	char *name;
+
+	if (asprintf(&name, "_%s._%s.%s",
+			netresolve_backend_get_service(resolver),
+			protocol_to_string(netresolve_backend_get_protocol(resolver)),
+			netresolve_backend_get_node(resolver)) == -1) {
+		netresolve_backend_failed(resolver);
+		return;
+	}
+
+	debug("looking up SRV %s\n", name);
+	ares_query(priv->channel, name, ns_c_in, ns_t_srv, srv_callback, resolver);
+}
+
+void
 start(netresolve_backend_t resolver, char **settings)
 {
 	struct priv_dns *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
-	const char *node = netresolve_backend_get_node(resolver);
-	int family = netresolve_backend_get_family(resolver);
 	int status;
 
 	if (!priv)
@@ -113,14 +214,13 @@ start(netresolve_backend_t resolver, char **settings)
 	if (status != ARES_SUCCESS)
 		goto fail_ares;
 
-	if (family == AF_INET || family == AF_UNSPEC)
-		ares_gethostbyname(priv->channel, node, AF_INET, host_callback, resolver);
-	if (family == AF_INET6 || family == AF_UNSPEC)
-		ares_gethostbyname(priv->channel, node, AF_INET6, host_callback, resolver);
+	if (netresolve_backend_get_dns_srv_lookup(resolver))
+		start_srv_lookup(resolver);
+	else
+		start_address_lookup(resolver, NULL);
 	register_fds(resolver);
 
 	return;
-
 fail_ares:
 	error("ares: %s\n", ares_strerror(status));
 fail:
@@ -160,6 +260,8 @@ cleanup(netresolve_backend_t resolver)
 
 	if (priv->ptfd != -1)
 		netresolve_backend_drop_timeout(resolver, priv->ptfd);
+	if (priv->srv_reply)
+		ares_free_data(priv->srv_reply);
 
 	ares_destroy(priv->channel);
 	//ares_library_cleanup();

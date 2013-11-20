@@ -71,6 +71,11 @@ netresolve_resolve_argv(netresolve_t resolver, char **argv)
 		argv++;
 	}
 
+	if (*argv && !strcmp(*argv, "--srv")) {
+		netresolve_set_dns_srv_lookup(resolver, true);
+		argv++;
+	}
+
 	if (*argv) {
 		node = *argv++;
 		if (node[0] == '-' && !node[1])
