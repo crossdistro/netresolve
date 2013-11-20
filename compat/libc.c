@@ -30,10 +30,10 @@
 #include <netresolve.h>
 
 static struct addrinfo *
-generate_addrinfo_list(const netresolve_t resolver)
+generate_addrinfo_list(const netresolve_query_t query)
 {
-	size_t npaths = netresolve_get_path_count(resolver);
-	const char *canonname = netresolve_get_canonical_name(resolver);
+	size_t npaths = netresolve_query_get_count(query);
+	const char *canonname = netresolve_query_get_canonical_name(query);
 	struct addrinfo head = {0};
 	struct addrinfo *ai = &head;
 	int i;
@@ -41,7 +41,7 @@ generate_addrinfo_list(const netresolve_t resolver)
 	for (i = 0; i < npaths; i++) {
 		int socktype, protocol;
 		socklen_t salen;
-		const struct sockaddr *sa = netresolve_get_path_sockaddr(resolver, i, &socktype, &protocol, &salen);
+		const struct sockaddr *sa = netresolve_query_get_path_sockaddr(query, i, &salen, &socktype, &protocol);
 
 		ai = ai->ai_next = calloc(1, sizeof *ai + salen);
 		if (!ai)
@@ -65,35 +65,38 @@ fail:
 
 int
 getaddrinfo(const char *node, const char *service,
-		const struct addrinfo *hints, struct addrinfo **res)
+		const struct addrinfo *hints, struct addrinfo **result)
 {
-	netresolve_t resolver = netresolve_open();
+	netresolve_t channel = netresolve_open();
 	struct addrinfo default_hints = { 0 };
-	int status;
+	netresolve_query_t query;
 
 	if (!hints)
 		hints = &default_hints;
 
-	netresolve_set_default_loopback(resolver, !(hints->ai_flags & AI_PASSIVE));
+	netresolve_set_default_loopback(channel, !(hints->ai_flags & AI_PASSIVE));
+	netresolve_set_family(channel, hints->ai_family);
+	netresolve_set_socktype(channel, hints->ai_socktype);
+	netresolve_set_protocol(channel, hints->ai_protocol);
 
-	status = netresolve_resolve(resolver, node, service, hints->ai_family, hints->ai_socktype, hints->ai_protocol);
-
-	if (status)
+	if (!(query = netresolve_query(channel, node, service))) {
+		netresolve_close(channel);
 		return EAI_SYSTEM;
+	}
 
-	*res = generate_addrinfo_list(resolver);
-	netresolve_close(resolver);
+	*result = generate_addrinfo_list(query);
+	netresolve_close(channel);
 
-	return *res ? 0 : EAI_NODATA;
+	return *result ? 0 : EAI_NODATA;
 }
 
 static struct hostent *
-generate_hostent(netresolve_t resolver)
+generate_hostent(netresolve_query_t query)
 {
-	size_t npaths = netresolve_get_path_count(resolver);
-	const char *canonname = netresolve_get_canonical_name(resolver);
+	size_t npaths = netresolve_query_get_count(query);
+	const char *canonname = netresolve_query_get_canonical_name(query);
 	struct hostent *he;
-	int i;
+	int idx;
 	int n = 0;
 
 	if (!npaths)
@@ -105,14 +108,12 @@ generate_hostent(netresolve_t resolver)
 	he->h_aliases = calloc(1, sizeof *he->h_aliases);
 	he->h_addr_list = calloc(npaths + 1, sizeof *he->h_addr_list);
 
-	for (i = 0; i < npaths; i++) {
+	for (idx = 0; idx < npaths; idx++) {
 		int family, ifindex, socktype, protocol, port;
 		const void *address;
 
-		netresolve_get_path(resolver, i,
-				&family, &address, &ifindex,
-				&socktype, &protocol, &port,
-				NULL, NULL);
+		netresolve_query_get_address_info(query, idx, &family, &address, &ifindex);
+		netresolve_query_get_port_info(query, idx, &socktype, &protocol, &port);
 
 		if (family != AF_INET && family != AF_INET6)
 			continue;
@@ -156,14 +157,18 @@ struct hostent *
 gethostbyname(const char *node)
 {
 	static struct hostent *result = NULL;
-	netresolve_t resolver = netresolve_open();
-	int status;
+	netresolve_t channel;
+	netresolve_query_t query;
+   
+	if (!(channel = netresolve_open()))
+		return NULL;
 
-	status = netresolve_resolve(resolver, node, NULL, AF_UNSPEC, 0, 0);
+	query = netresolve_query(channel, node, NULL);
 
 	freehostent(result);
-	result = (status == 0) ? generate_hostent(resolver) : NULL;
-	netresolve_close(resolver);
+	result = query ? generate_hostent(query) : NULL;
+
+	netresolve_close(channel);
 
 	return result;
 }

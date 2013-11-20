@@ -35,4 +35,6 @@ main(int argc, char **argv)
 	assert(result);
 	assert(result->h_addr_list[0]);
 	assert(!result->h_addr_list[1]);
+
+	return EXIT_SUCCESS;
 }

@@ -2,7 +2,7 @@
 
 DIFF="diff -u"
 NR="./netresolve"
-DATA="$srcdir/tests/data"
+DATA="${srcdir:-.}/tests/data"
 
 $DIFF <($NR) $DATA/any
 $DIFF <(NETRESOLVE_FLAG_DEFAULT_LOOPBACK=yes $NR) $DATA/localhost

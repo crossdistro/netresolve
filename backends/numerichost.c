@@ -24,18 +24,18 @@
 #include <netresolve-backend.h>
 
 void
-start(netresolve_backend_t resolver, char **settings)
+start(netresolve_query_t query, char **settings)
 {
-	const char *request_node = netresolve_backend_get_node(resolver);
+	const char *request_node = netresolve_backend_get_node(query);
 	Address address;
 	int family;
 	int ifindex;
 
 	if (!netresolve_backend_parse_address(request_node, &address, &family, &ifindex)) {
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 		return;
 	}
 
-	netresolve_backend_add_address(resolver, family, &address, ifindex);
-	netresolve_backend_finished(resolver);
+	netresolve_backend_add_address(query, family, &address, ifindex);
+	netresolve_backend_finished(query);
 }

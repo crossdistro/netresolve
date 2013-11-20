@@ -2,22 +2,19 @@
 
 ## Core library
 
- * Reorder returned items
-    - by always inserting in the right place
+ * Return items in the right order
     - http://tools.ietf.org/html/rfc6724
-    - SRV data
- * Allow NULL pointers in all retrieval functions
- * Use `*_set_something()` instead of `*_set_flag(SOMETHING)`
-    - for better version maintainance
-    - reported by mitr
+    - use priority from DNS SRV
+    - randomize order using weight from DNS SRV
+ * Support multiple concurrent queries per channel
+ * Support reverse lookup
+ * Improve socket API and happy eyeballs
+    - support TCP application layer happy eyeballs
+    - support UDP happy eyeballs
  * Add DNSSEC validation information
     - what about non-DNS protocols?
     - what about any, localhost or numeric addresses
- * Support reverse lookup
- * Rework happy eyeballs to also support UDP
-    - and TCP with fallback from application-layer errors
  * Use -fvisibility=hidden and mark exported symbols explicitly
-    - avoid prefixing hidden symbols with underscore
  * Support non-epoll platforms
     - by passing multiple file descriptors to application using `watch_fd()` calls
     - emulate timerfd file descriptors, pass a timeout to the application
@@ -26,21 +23,26 @@
 
  * Improve `netresolve-libc` and extend `netresolve` accordingly
     - add support for other libc resolver functions
-    - `getaddrinfo_a()`, `gai_suspend()`, `gai_error()` and `gai_cancel()`
     - `getnameinfo()`, `gethostbyaddr()`
+    - `getaddrinfo_a()`, `gai_suspend()`, `gai_error()` and `gai_cancel()`
+ * Implement name service switch backend on top of netresolve
+    - environment variables and/or a configuration file for defaults
+ * Implement other network resolution APIs
+    - libasyncns
+    - getdns
+ * Build a fake ares library to support DNS testing
  * Use long options instead of arguments or environment variables for netresolve
     - `--host` and `--service`
     - `--family`, `--socktype` and `--protocol`
     - `--backends`
- * Name service switch backend on top of netresolve
-    - environment variables and/or a configuration file for defaults
  * A comprehensive dualstack test plan
     - DNS: AAAA record not answered, A answered (and vice versa)
     - DNS: SRV not answered, A/AAAA answered
     - TCP: IPv6/SYN not answered, IPv4 SYN answered (and vice versa)
     - TCP: first IPv6/SYN not answered, second IPv6/SYN answered (the same for IPv4)
-    - IPv6-only destination, first address not answered, second address answered
- * Build a fake ares library to support DNS testing
+    - TCP: IPv6-only destination, first address not answered, next address works
+    - TCP: first SYN answered, application layer failure, next address works
+    - UDP: application layer failure, next address works
  * Implement wrappers over netresolve for notable event loops or event connectors
     - GLib main loop
     - libevent
@@ -52,10 +54,8 @@
 
  * Improve the DNS backend
     - add PTR support
-    - add SRV support
     - consider MX/SSH/TLSA and other records; add DNS-only API for that
     - validation information
-    - SRV and MX support
     - `ai_addrconfig`-like functionality
  * Implement a multicast DNS backend
     - nonblocking
@@ -67,11 +67,8 @@
     - add tests
  * Implement `hostname` backend
 
-## Documentation
+## Documentation and non-development stuff
 
  * manpages
-
-## Development side effects
-
  * Provide fixes for glibc resolver
  * notes and errata on IETF standards

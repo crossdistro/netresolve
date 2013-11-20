@@ -28,8 +28,8 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef struct netresolve_resolver *netresolve_t;
+typedef struct netresolve_channel *netresolve_t;
 
-int netresolve_resolve_argv(netresolve_t resolver, char **argv);
+netresolve_query_t netresolve_query_argv(netresolve_t channel, char **argv);
 
 #endif /* NETRESOLVE_CLI_H */

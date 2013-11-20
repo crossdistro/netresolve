@@ -6,6 +6,7 @@
    - suitable for various file descriptor based event loops
    - unlike glibc or POSIX APIs
  * Extensible request and result APIs
+   - DNS SRV records
    - unlike glibc or POSIX APIs
  * Backend-based network name resolution similar to that one found in glibc's nsswitch
    - configurable backend options
@@ -17,40 +18,38 @@
    - concurent A/AAAA requests
    - quick timeout when there's no answer to one of A/AAAA requests
  * Socket API
-   - resolver-based wrappers over `bind()` and `connect()`
+   - callback based wrappers over `socket()`, `bind()` and `connect()`
+   - the application receives a successfully bound or connected socket
  * TCP happy eyeballs implementation
    - concurrent IPv4/IPv6 connect
    - quick timeout when there's no answer to one of IPv4/IPv6 TCP SYN packets
 
-## Basic API
+## Blocking API
 
-The application creates a resolver instance using `netresolve_open()`, optionally performs additional configuration, and then calls `netresolve_resolve()` and uses retrieve the result using `netresolve_get_*()` functions. Without additional steps the basic API is blocking.
+The application creates a channel using `netresolve_open()` and  optionally performs additional configuration. Then it creates a query instance `netresolve_query()`. By default this call blocks until the query is finished and the application can immediately use `netresolve_query_get_*()` functions to retrieve the query result bits.
 
-## Callback-based (asynchronous) API
+When you're finished, call `netresolve_close()` to free the channel and the related query objects.
 
-How to use it:
+## Nonlocking API
 
- * Create a handle using `netresolve_open()` (as with basic API)
- * Register callbacks using `netresolve_callback_set_watch_fd()` and/or `netresolve_set_callbacks()`.
- * Start name resolution using `netresolve_resolve()`.
- * Run (or continue running) the event loop calling `netresolve_dispatch()` for file descriptor events.
- * Close the handle using `netresolve_close()` (as with basic API)
+Before calling `netresolve_query()` the application can register a file descriptor callback to provide netresolve a means to register and unregister file descriptors and their associated events. That is done using `netresolve_set_fd_callback()` and has a side effect of turning `netresolve_query()` into a nonblocking call.
 
-What should the callbacks do:
+The application can simply include the file descriptor(s) acquired using the file descriptor callback in its event loop and call `netresolve_dispatch_fd()` on the channel whenever a file descriptor is ready. For simplicity, the `netresolve_dispatch_fd()` just returns `false` if the file descriptor is not recognised, `true` otherwise.
 
- * The `watch_fd()` callback is there to register the netresolve's file descriptors
- * The `on_success()` callback is called when the name resolution finished without error.
- * The `on_failure()` callback is called when the name resolution failed.
+After `netresolve_query()`, at least one file descriptor is registered with the application. When all file descriptors are unregistered, the library has finished its work. But the application typically needs to process queries as they are finished and that's where `netresolve_set_success_callback()` (usable with the blocking API as well) gets handy.
 
-Registering the `watch_fd()` callback switches netresolve into nonblocking (aka asynchronous) mode. It is responsible for registering file descriptors and expected events with the application's event loop. The application is responsible for adding, modifying or removing the file descriptor event set whenever `watch_fd()` is called.
+Limitations:
 
-Implementation notes:
+ * You can currently only run one query at a time on one channel.
+ * There's no real error reporting, yet.
+ * The API requires nonstandard OS features such as timerfd.
+ * The implementation requires additional features like epoll.
 
-The current implementation only registers *one* file descriptor with the application. The file descriptor is an *epoll* file descripter and the associated event is allways `POLLIN`. It's used for tracking the file descriptors that are attached to it and can be used with `select()`, `poll()` as well as `epoll()`. On platforms without *epoll*, a similar mechanism can be used if available or the individual backend file descriptors can be conveyed to the application for use with standard `select()`, `poll()` and similar. A portable application shouldn't rely
+Implementation notes: The current implementation only registers *one* file descriptor with the application. The file descriptor is an *epoll* file descripter and the associated event is allways `POLLIN`. It's used for tracking the file descriptors that are attached to it and can be used with `select()`, `poll()` as well as `epoll()`.
 
-## POSIX-style API
+## Classic API (POSIX and some nonstandard libc APIs)
 
-If your program doesn't need the full power of the provided API but you still want to use `netresolve` as your resolver implementation, you can simply link your program to `libnetresolve-libc.so` which overrides selected POSIX-style name resolution functions.
+If your program doesn't need the full power of the provided API but you still want to use `netresolve` as your resolver implementation, you can simply link your program to `libnetresolve-libc.so` which overrides selected libc name resolution functions.
 
 Supported functions:
 
@@ -63,7 +62,7 @@ Support for `socket()`, `bind()` and `connect()` is included. The only thing the
 
 ## Tools
 
-The `netresolve` command-line tool can be used for testing the library. The `libnetresolve-getaddrinfo.so` library together with the `tools/wrapper.sh` script can be used to test any programs calling `getaddrinfo()` (see `TODO` for missing features).
+The `netresolve` command-line tool can be used for testing the library. The `libnetresolve-libc.so` library together with the `tools/wrapper.sh` script can be used to test any programs calling `getaddrinfo()` and similar.
 
 ## Backends
 
@@ -87,6 +86,10 @@ There's also a nonblocking `exec` backend that calls an executable and feeds it 
 
     NETRESOLVE_BACKENDS=exec:/path/to/my/script ./netresolve localhost
 
+That one can be used for interactive testing as well:
+
+    NETRESOLVE_BACKENDS=exec:socat:-:/dev/tty ./netresolve www.example.com
+
 ## Writing a custom backend
 
 When a name resolution request is ready, netresolve calls `start(resolver, settings)`. Backend's `start()` implementation then has to do one of the following:
@@ -98,8 +101,6 @@ When a name resolution request is ready, netresolve calls `start(resolver, setti
 Input data is gathered using `netresolve_backend_get_*()` functions. Internal state accross `start()` and `dispatch()` calls can be kept using `netresolve_backend_new_priv()` and `netresolve_backend_get_data()`. The backend should provide `cleanup()` function to clean up any resources. It's called by netresolve upon success/failure or when the transaction was cancelled by the application.
 
 ## Acknowledgements and inspiration
-
-### The community
 
  * Tore Anderson was the first who discussed name resolution issues with me and especially the reasons to suppress A or AAAA queries when global address of the respective family is not present in the system.
     - [sourceware.org: #12377](https://sourceware.org/bugzilla/show_bug.cgi?id=12377)
@@ -115,6 +116,9 @@ Input data is gathered using `netresolve_backend_get_*()` functions. Internal st
  * Jakub Hrozek told me about c-ares DNS library and about SSSD name resolution requirements.
     - https://fedorahosted.org/sssd/ticket/2155
  * Miloslav Trmač reminded me of the need to also provide binding and connecting facilities on top of name resolution.
+ * Lennart Poettering wrote *libasyncns*, an async wrapper over libc resolver functions
+
+## Related projects
 
 ### c-ares
 

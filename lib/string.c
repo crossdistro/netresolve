@@ -21,14 +21,13 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-private.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdio.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
-
-#include "netresolve-private.h"
 
 static const char *
 socktype_to_string(int socktype)
@@ -82,19 +81,18 @@ bprintf(char **current, char *end, const char *fmt, ...)
 }
 
 static void
-add_path(char **start, char *end, netresolve_t resolver, int i)
+add_path(char **start, char *end, netresolve_query_t query, int i)
 {
-	int family, ifindex, socktype, protocol, port, priority, weight;
+	int family, ifindex, socktype, protocol, port, priority, weight, ttl;
 	const void *address;
 	char ifname[IF_NAMESIZE] = {0};
 	char addrstr[1024] = {0};
 	const char *socktypestr;
 	const char *protocolstr;
 
-	netresolve_get_path(resolver, i,
-			&family, &address, &ifindex,
-			&socktype, &protocol, &port,
-			&priority, &weight);
+	netresolve_query_get_address_info(query, i, &family, &address, &ifindex);
+	netresolve_query_get_port_info(query, i, &socktype, &protocol, &port);
+	netresolve_query_get_aux_info(query, i, &priority, &weight, &ttl);
 
 	socktypestr = socktype_to_string(socktype);
 	protocolstr = protocol_to_string(protocol);
@@ -116,12 +114,12 @@ add_path(char **start, char *end, netresolve_t resolver, int i)
 }
 
 const char *
-netresolve_get_request_string(netresolve_t resolver)
+netresolve_get_request_string(netresolve_query_t query)
 {
-	const char *node = netresolve_backend_get_node(resolver);
-	const char *service = netresolve_backend_get_service(resolver);
-	char *start = resolver->buffer;
-	char *end = resolver->buffer + sizeof resolver->buffer;
+	const char *node = netresolve_backend_get_node(query);
+	const char *service = netresolve_backend_get_service(query);
+	char *start = query->buffer;
+	char *end = query->buffer + sizeof query->buffer;
 
 	bprintf(&start, end, "request %s %s\n", PACKAGE_NAME, VERSION);
 	if (node)
@@ -130,33 +128,33 @@ netresolve_get_request_string(netresolve_t resolver)
 		bprintf(&start, end, "service %s\n", service);
 	bprintf(&start, end, "\n");
 
-	return resolver->buffer;
+	return query->buffer;
 }
 
 const char *
-netresolve_get_path_string(netresolve_t resolver, int i)
+netresolve_get_path_string(netresolve_query_t query, int i)
 {
-	char *start = resolver->buffer;
-	char *end = resolver->buffer + sizeof resolver->buffer;
+	char *start = query->buffer;
+	char *end = query->buffer + sizeof query->buffer;
 
-	add_path(&start, end, resolver, i);
+	add_path(&start, end, query, i);
 
-	return resolver->buffer;
+	return query->buffer;
 }
 
 const char *
-netresolve_get_response_string(netresolve_t resolver)
+netresolve_get_response_string(netresolve_query_t query)
 {
-	char *start = resolver->buffer;
-	char *end = resolver->buffer + sizeof resolver->buffer;
+	char *start = query->buffer;
+	char *end = query->buffer + sizeof query->buffer;
 
-	size_t npaths = netresolve_get_path_count(resolver);
+	size_t npaths = netresolve_query_get_count(query);
 	size_t i;
 
 	bprintf(&start, end, "response %s %s\n", PACKAGE_NAME, VERSION);
 	for (i = 0; i < npaths; i++)
-		add_path(&start, end, resolver, i);
+		add_path(&start, end, query, i);
 	bprintf(&start, end, "\n");
 
-	return resolver->buffer;
+	return query->buffer;
 }

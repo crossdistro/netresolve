@@ -23,18 +23,14 @@
  */
 #include <netresolve.h>
 #include <netresolve-backend.h>
+#include <netresolve-string.h>
+#include <netresolve-cli.h>
 #include <nss.h>
 #include <netdb.h>
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <assert.h>
-
-#include <stdio.h>
-#undef error
-#undef debug
-#define error(...) fprintf(stderr, __VA_ARGS__)
-#define debug(...) fprintf(stderr, __VA_ARGS__)
 
 enum netresolve_state {
 	NETRESOLVE_STATE_INIT,
@@ -47,9 +43,9 @@ struct netresolve_backend {
 	bool mandatory;
 	char **settings;
 	void *dl_handle;
-	void (*start)(netresolve_t resolver, char **settings);
-	void (*dispatch)(netresolve_t resolver, int fd, int revents);
-	void (*cleanup)(netresolve_t resolver);
+	void (*start)(netresolve_t channel, char **settings);
+	void (*dispatch)(netresolve_t channel, int fd, int revents);
+	void (*cleanup)(netresolve_t channel);
 	void *data;
 };
 
@@ -70,13 +66,14 @@ struct netresolve_path {
 	} service;
 	int priority;
 	int weight;
+	int ttl;
 	struct {
 		enum netresolve_state state;
 		int fd;
 	} socket;
 };
 
-struct netresolve_resolver {
+struct netresolve_channel {
 	int log_level;
 	enum netresolve_state state;
 	int epoll_fd;
@@ -127,18 +124,18 @@ struct netresolve_resolver {
 	char buffer[1024];
 };
 
-void _netresolve_set_state(netresolve_t resolver, enum netresolve_state state);
+void netresolve_set_state(netresolve_t channel, enum netresolve_state state);
 
-void _netresolve_start(netresolve_t resolver);
-void _netresolve_epoll(netresolve_t resolver, int timeout);
-void _netresolve_watch_fd(netresolve_t resolver, int fd, int events);
-int _netresolve_add_timeout(netresolve_t resolver, time_t sec, long nsec);
-void _netresolve_remove_timeout(netresolve_t resolver, int fd);
+void netresolve_start(netresolve_t channel);
+void netresolve_epoll(netresolve_t channel, int timeout);
+void netresolve_watch_fd(netresolve_t channel, int fd, int events);
+int netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec);
+void netresolve_remove_timeout(netresolve_t channel, int fd);
 
-void _netresolve_bind_path(netresolve_t resolver, struct netresolve_path *path);
-void _netresolve_connect_start(netresolve_t resolver);
-bool _netresolve_connect_dispatch(netresolve_t resolver, int fd, int events);
-void _netresolve_connect_cleanup(netresolve_t resolver);
+void netresolve_bind_path(netresolve_t channel, struct netresolve_path *path);
+void netresolve_connect_start(netresolve_t channel);
+bool netresolve_connect_dispatch(netresolve_t channel, int fd, int events);
+void netresolve_connect_cleanup(netresolve_t channel);
 
-void _netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,
+void netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,
 		const char *request_service, int socktype, int protocol);

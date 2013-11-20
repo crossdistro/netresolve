@@ -31,7 +31,7 @@
 static int partial_timeout = 5;
 
 struct priv_dns {
-	ares_channel channel;
+	ares_channel query;
 	fd_set rfds;
 	fd_set wfds;
 	int nfds;
@@ -39,53 +39,53 @@ struct priv_dns {
 	struct ares_srv_reply *srv_reply;
 };
 
-void
-register_fds(netresolve_backend_t resolver)
+static void
+register_fds(netresolve_query_t query)
 {
-	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
+	struct priv_dns *priv = netresolve_backend_get_priv(query);
 	fd_set rfds;
 	fd_set wfds;
 	int nfds, fd;
 
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
-	nfds = ares_fds(priv->channel, &rfds, &wfds);
+	nfds = ares_fds(priv->query, &rfds, &wfds);
 
 	for (fd = 0; fd < nfds || fd < priv->nfds; fd++) {
 		if (!FD_ISSET(fd, &rfds) && FD_ISSET(fd, &priv->rfds)) {
 			FD_CLR(fd, &priv->rfds);
-			netresolve_backend_watch_fd(resolver, fd, 0);
+			netresolve_backend_watch_fd(query, fd, 0);
 		} else if (FD_ISSET(fd, &rfds) && !FD_ISSET(fd, &priv->rfds)) {
 			FD_SET(fd, &priv->rfds);
-			netresolve_backend_watch_fd(resolver, fd, POLLIN);
+			netresolve_backend_watch_fd(query, fd, POLLIN);
 		}
 		if (!FD_ISSET(fd, &wfds) && FD_ISSET(fd, &priv->wfds)) {
 			FD_CLR(fd, &priv->wfds);
-			netresolve_backend_watch_fd(resolver, fd, 0);
+			netresolve_backend_watch_fd(query, fd, 0);
 		} else if (FD_ISSET(fd, &wfds) && !FD_ISSET(fd, &priv->wfds)) {
 			FD_SET(fd, &priv->wfds);
-			netresolve_backend_watch_fd(resolver, fd, POLLOUT);
+			netresolve_backend_watch_fd(query, fd, POLLOUT);
 		}
 	}
 
 	priv->nfds = nfds;
 
 	if (!nfds)
-		netresolve_backend_finished(resolver);
+		netresolve_backend_finished(query);
 }
 
 struct priv_address_lookup {
-	netresolve_backend_t resolver;
+	netresolve_query_t query;
 	struct ares_srv_reply *srv;
 };
 
-void
+static void
 host_callback(void *arg, int status, int timeouts, struct hostent *he)
 {
 	struct priv_address_lookup *lookup_data = arg;
-	netresolve_backend_t resolver = lookup_data->resolver;
+	netresolve_query_t query = lookup_data->query;
 	struct ares_srv_reply *srv = lookup_data->srv;
-	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
+	struct priv_dns *priv = netresolve_backend_get_priv(query);
 	int socktype = -1;
 	int protocol = -1;
 	int port = -1;
@@ -93,8 +93,8 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 	int weight = 0;
 
 	if (srv) {
-		socktype = netresolve_backend_get_socktype(resolver);
-		protocol = netresolve_backend_get_protocol(resolver);
+		socktype = netresolve_backend_get_socktype(query);
+		protocol = netresolve_backend_get_protocol(query);
 		port = srv->port;
 		priority = srv->priority;
 		weight = srv->weight;
@@ -104,30 +104,30 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 	case ARES_EDESTRUCTION:
 		break;
 	case ARES_SUCCESS:
-		priv->ptfd = netresolve_backend_watch_timeout(resolver, partial_timeout, 0);
+		priv->ptfd = netresolve_backend_watch_timeout(query, partial_timeout, 0);
 		if (priv->ptfd == -1)
 			error("timer: %s", strerror(errno));
-		netresolve_backend_apply_hostent(resolver, he, socktype, protocol, port, priority, weight);
+		netresolve_backend_apply_hostent(query, he, socktype, protocol, port, priority, weight);
 		break;
 	default:
 		error("ares: %s\n", ares_strerror(status));
 	}
 }
 
-void
-start_address_lookup(netresolve_backend_t resolver, struct ares_srv_reply *srv)
+static void
+start_address_lookup(netresolve_query_t query, struct ares_srv_reply *srv)
 {
-	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
-	int family = netresolve_backend_get_family(resolver);
-	const char *node = netresolve_backend_get_node(resolver);
+	struct priv_dns *priv = netresolve_backend_get_priv(query);
+	int family = netresolve_backend_get_family(query);
+	const char *node = netresolve_backend_get_node(query);
 	struct priv_address_lookup *lookup_data = calloc(1, sizeof *lookup_data);
 
 	if (!lookup_data) {
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 		return;
 	}
 
-	lookup_data->resolver = resolver;
+	lookup_data->query = query;
 
 	if (srv) {
 		node = srv->host;
@@ -135,16 +135,16 @@ start_address_lookup(netresolve_backend_t resolver, struct ares_srv_reply *srv)
 	}
 
 	if (family == AF_INET || family == AF_UNSPEC)
-		ares_gethostbyname(priv->channel, node, AF_INET, host_callback, lookup_data);
+		ares_gethostbyname(priv->query, node, AF_INET, host_callback, lookup_data);
 	if (family == AF_INET6 || family == AF_UNSPEC)
-		ares_gethostbyname(priv->channel, node, AF_INET6, host_callback, lookup_data);
+		ares_gethostbyname(priv->query, node, AF_INET6, host_callback, lookup_data);
 }
 
 static void
 srv_callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 {
-	netresolve_backend_t resolver = arg;
-	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
+	netresolve_query_t query = arg;
+	struct priv_dns *priv = netresolve_backend_get_priv(query);
 
 	switch (status) {
 	case ARES_EDESTRUCTION:
@@ -157,9 +157,9 @@ srv_callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 			struct ares_srv_reply *reply;
 
 			for (reply = priv->srv_reply; reply; reply = reply->next)
-				start_address_lookup(resolver, reply);
+				start_address_lookup(query, reply);
 		} else
-			start_address_lookup(resolver, NULL);
+			start_address_lookup(query, NULL);
 		break;
 	default:
 		error("ares: %s\n", ares_strerror(status));
@@ -181,28 +181,28 @@ protocol_to_string(int proto)
 	}
 }
 
-void
-start_srv_lookup(netresolve_backend_t resolver)
+static void
+start_srv_lookup(netresolve_query_t query)
 {
-	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
+	struct priv_dns *priv = netresolve_backend_get_priv(query);
 	char *name;
 
 	if (asprintf(&name, "_%s._%s.%s",
-			netresolve_backend_get_service(resolver),
-			protocol_to_string(netresolve_backend_get_protocol(resolver)),
-			netresolve_backend_get_node(resolver)) == -1) {
-		netresolve_backend_failed(resolver);
+			netresolve_backend_get_service(query),
+			protocol_to_string(netresolve_backend_get_protocol(query)),
+			netresolve_backend_get_node(query)) == -1) {
+		netresolve_backend_failed(query);
 		return;
 	}
 
 	debug("looking up SRV %s\n", name);
-	ares_query(priv->channel, name, ns_c_in, ns_t_srv, srv_callback, resolver);
+	ares_query(priv->query, name, ns_c_in, ns_t_srv, srv_callback, query);
 }
 
 void
-start(netresolve_backend_t resolver, char **settings)
+start(netresolve_query_t query, char **settings)
 {
-	struct priv_dns *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
+	struct priv_dns *priv = netresolve_backend_new_priv(query, sizeof *priv);
 	int status;
 
 	if (!priv)
@@ -216,59 +216,59 @@ start(netresolve_backend_t resolver, char **settings)
 	status = ares_library_init(ARES_LIB_INIT_ALL);
 	if (status != ARES_SUCCESS)
 		goto fail_ares;
-	status = ares_init(&priv->channel);
+	status = ares_init(&priv->query);
 	if (status != ARES_SUCCESS)
 		goto fail_ares;
 
-	if (netresolve_backend_get_dns_srv_lookup(resolver))
-		start_srv_lookup(resolver);
+	if (netresolve_backend_get_dns_srv_lookup(query))
+		start_srv_lookup(query);
 	else
-		start_address_lookup(resolver, NULL);
-	register_fds(resolver);
+		start_address_lookup(query, NULL);
+	register_fds(query);
 
 	return;
 fail_ares:
 	error("ares: %s\n", ares_strerror(status));
 fail:
-	netresolve_backend_failed(resolver);
+	netresolve_backend_failed(query);
 }
 
 void
-dispatch(netresolve_backend_t resolver, int fd, int events)
+dispatch(netresolve_query_t query, int fd, int events)
 {
-	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
+	struct priv_dns *priv = netresolve_backend_get_priv(query);
 
 	int rfd = events & POLLIN ? fd : ARES_SOCKET_BAD;
 	int wfd = events & POLLOUT ? fd : ARES_SOCKET_BAD;
 
 	if (fd == priv->ptfd) {
 		error("partial response used due to a timeout\n");
-		netresolve_backend_finished(resolver);
+		netresolve_backend_finished(query);
 		return;
 	}
 
-	ares_process_fd(priv->channel, rfd, wfd);
-	register_fds(resolver);
+	ares_process_fd(priv->query, rfd, wfd);
+	register_fds(query);
 }
 
 void
-cleanup(netresolve_backend_t resolver)
+cleanup(netresolve_query_t query)
 {
-	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
+	struct priv_dns *priv = netresolve_backend_get_priv(query);
 	int fd;
 
 	for (fd = 0; fd < priv->nfds; fd++) {
 		if (FD_ISSET(fd, &priv->rfds) || FD_ISSET(fd, &priv->wfds)) {
 			FD_CLR(fd, &priv->rfds);
-			netresolve_backend_watch_fd(resolver, fd, 0);
+			netresolve_backend_watch_fd(query, fd, 0);
 		}
 	}
 
 	if (priv->ptfd != -1)
-		netresolve_backend_drop_timeout(resolver, priv->ptfd);
+		netresolve_backend_drop_timeout(query, priv->ptfd);
 	if (priv->srv_reply)
 		ares_free_data(priv->srv_reply);
 
-	ares_destroy(priv->channel);
+	ares_destroy(priv->query);
 	//ares_library_cleanup();
 }

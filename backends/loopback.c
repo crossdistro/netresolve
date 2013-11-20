@@ -21,11 +21,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-backend.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <string.h>
-
-#include <netresolve-backend.h>
 
 #if BYTE_ORDER == BIG_ENDIAN
 static const struct in_addr inaddr_loopback = { 0x7f000001 };
@@ -36,20 +35,20 @@ static const struct in_addr inaddr_loopback = { 0x0100007f };
 #endif
 
 void
-start(netresolve_backend_t resolver, char **settings)
+start(netresolve_query_t query, char **settings)
 {
-	const char *node = netresolve_backend_get_node(resolver);
+	const char *node = netresolve_backend_get_node(query);
 	bool ipv4 = !node || !*node || !strcmp(node, "localhost") || !strcmp(node, "localhost4");
 	bool ipv6 = !node || !*node || !strcmp(node, "localhost") || !strcmp(node, "localhost6");
 
 	if (!ipv4 && !ipv6) {
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 		return;
 	}
 
 	if (ipv4)
-		netresolve_backend_add_address(resolver, AF_INET, &inaddr_loopback, 0);
+		netresolve_backend_add_address(query, AF_INET, &inaddr_loopback, 0);
 	if (ipv6)
-		netresolve_backend_add_address(resolver, AF_INET6, &in6addr_loopback, 0);
-	netresolve_backend_finished(resolver);
+		netresolve_backend_add_address(query, AF_INET6, &in6addr_loopback, 0);
+	netresolve_backend_finished(query);
 }

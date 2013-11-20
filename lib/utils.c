@@ -29,7 +29,7 @@
 #include <netresolve-utils.h>
 
 static void
-on_socket(netresolve_t resolver, int sock, void *user_data)
+on_socket(netresolve_t channel, int idx, int sock, void *user_data)
 {
 	int *psock = user_data;
 
@@ -48,48 +48,46 @@ set_flags(int sock, int flags)
 int
 netresolve_utils_bind(const char *node, const char *service, int family, int socktype, int protocol)
 {
-	netresolve_t resolver = netresolve_open();
+	netresolve_t channel;
 	int sock = -1;
 	int flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC);
-	int status;
 
-	if (!resolver)
+	if (!(channel = netresolve_open()))
 		return -1;
 
-	netresolve_callback_set_bind(resolver, on_socket, &sock);
+	netresolve_set_bind_callback(channel, on_socket, &sock);
+	netresolve_set_family(channel, family);
+	netresolve_set_socktype(channel, socktype & ~flags);
+	netresolve_set_protocol(channel, protocol);
 
-	socktype &= ~flags;
+	netresolve_query(channel, node, service);
 
-	status = netresolve_resolve(resolver, node, service, family, socktype, protocol);
+	netresolve_close(channel);
 
-	netresolve_close(resolver);
-
-	if (status)
-		errno = status;
 	return sock;
 }
 
 int
 netresolve_utils_connect(const char *node, const char *service, int family, int socktype, int protocol)
 {
-	netresolve_t resolver;
+	netresolve_t channel;
 	int sock = -1;
 	int flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC);
-	int status;
 
-	socktype &= ~flags;
-
-	resolver = netresolve_open();
-	if (!resolver)
+	if (!(channel = netresolve_open()))
 		return -1;
-	netresolve_callback_set_connect(resolver, on_socket, &sock);
-	status = netresolve_resolve(resolver, node, service, family, socktype, protocol);
-	netresolve_close(resolver);
+
+	netresolve_set_connect_callback(channel, on_socket, &sock);
+	netresolve_set_family(channel, family);
+	netresolve_set_socktype(channel, socktype & ~flags);
+	netresolve_set_protocol(channel, protocol);
+
+	netresolve_query(channel, node, service);
+
+	netresolve_close(channel);
 
 	if (sock != -1)
 		set_flags(sock, flags);
 
-	if (status)
-		errno = status;
 	return sock;
 }

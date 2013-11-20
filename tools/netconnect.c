@@ -32,7 +32,7 @@
 #include <netresolve-cli.h>
 #include <netresolve-string.h>
 
-void
+static void
 read_and_write(int rfd, int wfd)
 {
 	char buffer[1024];
@@ -63,8 +63,8 @@ read_and_write(int rfd, int wfd)
 	}
 }
 
-void
-on_connect(netresolve_t resolver, int sock, void *user_data)
+static void
+on_connect(netresolve_t channel, int idx, int sock, void *user_data)
 {
 	*(int *) user_data = sock;
 }
@@ -72,22 +72,22 @@ on_connect(netresolve_t resolver, int sock, void *user_data)
 int
 main(int argc, char **argv)
 {
-	netresolve_t resolver;
-	int status;
+	netresolve_t channel;
+	netresolve_query_t query;
 	int sock = -1;
 	struct pollfd fds[2];
 
-	resolver = netresolve_open();
-	if (!resolver) {
+	channel = netresolve_open();
+	if (!channel) {
 		fprintf(stderr, "netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
 
-	netresolve_callback_set_connect(resolver, on_connect, &sock);
+	netresolve_set_connect_callback(channel, on_connect, &sock);
 
-	status = netresolve_resolve_argv(resolver, argv + 1);
-	if (status) {
-		fprintf(stderr, "netresolve: %s\n", strerror(status));
+	query = netresolve_query_argv(channel, argv + 1);
+	if (!query) {
+		fprintf(stderr, "netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
 
@@ -115,6 +115,6 @@ main(int argc, char **argv)
 			read_and_write(sock, 1);
 	}
 
-	netresolve_close(resolver);
+	netresolve_close(channel);
 	return EXIT_SUCCESS;
 }

@@ -27,77 +27,94 @@
 #include "netresolve-private.h"
 
 size_t
-netresolve_get_path_count(netresolve_t resolver)
+netresolve_query_get_count(netresolve_query_t query)
 {
-	return resolver->response.pathcount;
+	return query->response.pathcount;
 }
 
 void
-netresolve_get_path(netresolve_t resolver, size_t idx,
-		int *family, const void **address, int *ifindex,
-		int *socktype, int *protocol, int *port,
-		int *priority, int *weight)
+netresolve_query_get_address_info(netresolve_query_t query, size_t idx,
+		int *family, const void **address, int *ifindex)
 {
-	assert (idx < resolver->response.pathcount);
+	assert (idx < query->response.pathcount);
 
 	if (family)
-		*family = resolver->response.paths[idx].node.family;
+		*family = query->response.paths[idx].node.family;
 	if (address)
-		*address = &resolver->response.paths[idx].node.address;
+		*address = &query->response.paths[idx].node.address;
 	if (ifindex)
-		*ifindex = resolver->response.paths[idx].node.ifindex;
+		*ifindex = query->response.paths[idx].node.ifindex;
+}
+
+void
+netresolve_query_get_port_info(netresolve_query_t query, size_t idx,
+		int *socktype, int *protocol, int *port)
+{
+	assert (idx < query->response.pathcount);
+
 	if (socktype)
-		*socktype = resolver->response.paths[idx].service.socktype;
+		*socktype = query->response.paths[idx].service.socktype;
 	if (protocol)
-		*protocol = resolver->response.paths[idx].service.protocol;
+		*protocol = query->response.paths[idx].service.protocol;
 	if (port)
-		*port = resolver->response.paths[idx].service.port;
+		*port = query->response.paths[idx].service.port;
+}
+
+void
+netresolve_query_get_aux_info(netresolve_query_t query, size_t idx,
+		int *priority, int *weight, int *ttl)
+{
+	assert (idx < query->response.pathcount);
+
 	if (priority)
-		*priority = resolver->response.paths[idx].priority;
+		*priority = query->response.paths[idx].priority;
 	if (weight)
-		*weight = resolver->response.paths[idx].weight;
+		*weight = query->response.paths[idx].weight;
+	if (ttl)
+		*ttl = query->response.paths[idx].ttl;
 }
 
 const char *
-netresolve_get_canonical_name(const netresolve_t resolver)
+netresolve_query_get_canonical_name(const netresolve_query_t query)
 {
-	return resolver->response.canonname;
+	return query->response.canonname;
 }
 
 const struct sockaddr *
-netresolve_get_path_sockaddr(netresolve_t resolver, size_t idx,
-		int *socktype, int *protocol, socklen_t *salen)
+netresolve_query_get_path_sockaddr(netresolve_query_t query, size_t idx,
+		socklen_t *salen, int *socktype, int *protocol)
 {
 	int family, ifindex, port;
 	const void *address;
 
-	netresolve_get_path(resolver, idx, &family, &address, &ifindex, socktype, protocol, &port, NULL, NULL);
+	netresolve_query_get_address_info(query, idx, &family, &address, &ifindex);
+	netresolve_query_get_port_info(query, idx, socktype, protocol, &port);
 
 	if (!address)
 		return NULL;
 
-	memset(&resolver->sa_buffer, 0, sizeof resolver->sa_buffer);
+	memset(&query->sa_buffer, 0, sizeof query->sa_buffer);
 
 	switch (family) {
 	case AF_INET:
-		resolver->sa_buffer.sin.sin_family = family;
-		resolver->sa_buffer.sin.sin_port = htons(port);
-		resolver->sa_buffer.sin.sin_addr = *(struct in_addr *) address;
+		query->sa_buffer.sin.sin_family = family;
+		query->sa_buffer.sin.sin_port = htons(port);
+		query->sa_buffer.sin.sin_addr = *(struct in_addr *) address;
 		if (salen)
-			*salen = sizeof resolver->sa_buffer.sin;
+			*salen = sizeof query->sa_buffer.sin;
 		break;
 	case AF_INET6:
-		resolver->sa_buffer.sin6.sin6_family = family;
-		resolver->sa_buffer.sin6.sin6_port = htons(port);
-		resolver->sa_buffer.sin6.sin6_scope_id = ifindex;
-		resolver->sa_buffer.sin6.sin6_addr = *(struct in6_addr *) address;
+		query->sa_buffer.sin6.sin6_family = family;
+		query->sa_buffer.sin6.sin6_port = htons(port);
+		query->sa_buffer.sin6.sin6_scope_id = ifindex;
+		query->sa_buffer.sin6.sin6_addr = *(struct in6_addr *) address;
 		if (salen)
-			*salen = sizeof resolver->sa_buffer.sin6;
+			*salen = sizeof query->sa_buffer.sin6;
 		break;
 	default:
 		return NULL;
 	}
 
-	return &resolver->sa_buffer.sa;
+	return &query->sa_buffer.sa;
 }
 

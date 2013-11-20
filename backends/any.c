@@ -21,25 +21,24 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-backend.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
-
-#include <netresolve-backend.h>
 
 static struct in_addr inaddr_any = { 0 };
 
 void
-start(netresolve_backend_t resolver, char **settings)
+start(netresolve_query_t query, char **settings)
 {
-	const char *node = netresolve_backend_get_node(resolver);
+	const char *node = netresolve_backend_get_node(query);
 
 	/* Fail for non-NULL node name and when defaulting to loopback is requested. */
-	if (netresolve_backend_get_default_loopback(resolver) || (node && *node)) {
-		netresolve_backend_failed(resolver);
+	if (netresolve_backend_get_default_loopback(query) || (node && *node)) {
+		netresolve_backend_failed(query);
 		return;
 	}
 
-	netresolve_backend_add_address(resolver, AF_INET, &inaddr_any, 0);
-	netresolve_backend_add_address(resolver, AF_INET6, &in6addr_any, 0);
-	netresolve_backend_finished(resolver);
+	netresolve_backend_add_address(query, AF_INET, &inaddr_any, 0);
+	netresolve_backend_add_address(query, AF_INET6, &in6addr_any, 0);
+	netresolve_backend_finished(query);
 }

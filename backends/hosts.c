@@ -21,10 +21,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-backend.h>
 #include <stdlib.h>
 #include <unistd.h>
-
-#include <netresolve-backend.h>
 
 typedef struct {
 	char *name;
@@ -52,7 +51,7 @@ family_to_length(int family)
 	}
 }
 
-void
+static void
 add_node(const char *name, int family, void *address, int ifindex)
 {
 	Node node;
@@ -75,7 +74,7 @@ add_node(const char *name, int family, void *address, int ifindex)
 	memcpy(&nodes[nodecount++], &node, sizeof node);
 }
 
-void
+static void
 read_node(char *line)
 {
 	const char *name;
@@ -92,7 +91,7 @@ read_node(char *line)
 #define HOSTS_FILE "/etc/hosts"
 #define SIZE 1024
 
-void
+static void
 read_nodes(void)
 {
 	int fd = open(HOSTS_FILE, O_RDONLY);
@@ -141,9 +140,9 @@ out:
 }
 
 void
-start(netresolve_backend_t resolver, char **settings)
+start(netresolve_query_t query, char **settings)
 {
-	const char *request_node = netresolve_backend_get_node(resolver);
+	const char *request_node = netresolve_backend_get_node(query);
 	const Node *node;
 	int count = 0;
 
@@ -152,12 +151,12 @@ start(netresolve_backend_t resolver, char **settings)
 	for (node = nodes; node->name; node++) {
 		if (request_node && strcmp(request_node, node->name))
 			continue;
-		netresolve_backend_add_address(resolver, node->family, &node->address, node->ifindex);
+		netresolve_backend_add_address(query, node->family, &node->address, node->ifindex);
 		count++;
 	}
 
 	if (count)
-		netresolve_backend_finished(resolver);
+		netresolve_backend_finished(query);
 	else
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 }

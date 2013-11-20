@@ -28,16 +28,17 @@
 #define FIRST_CONNECT_TIMEOUT 1
 
 void
-_netresolve_bind_path(netresolve_t resolver, struct netresolve_path *path)
+netresolve_bind_path(netresolve_query_t query, struct netresolve_path *path)
 {
 	int flags = O_NONBLOCK;
 	int socktype;
 	int protocol;
 	const struct sockaddr *sa;
 	socklen_t salen;
+	int idx = path - query->response.paths;
 	int sock;
 
-	sa = netresolve_get_path_sockaddr(resolver, path - resolver->response.paths, &socktype, &protocol, &salen);
+	sa = netresolve_query_get_path_sockaddr(query, idx, &salen, &socktype, &protocol);
 	if (!sa)
 		return;
 	sock = socket(sa->sa_family, socktype | flags, protocol);
@@ -48,11 +49,11 @@ _netresolve_bind_path(netresolve_t resolver, struct netresolve_path *path)
 		return;
 	}
 
-	resolver->callbacks.on_bind(resolver, sock, resolver->callbacks.user_data_sock);
+	query->callbacks.on_bind(query, idx, sock, query->callbacks.user_data_sock);
 }
 
 static void
-connect_path(netresolve_t resolver, struct netresolve_path *path)
+connect_path(netresolve_query_t query, struct netresolve_path *path)
 {
 	static const int flags = O_NONBLOCK;
 	int socktype;
@@ -63,7 +64,7 @@ connect_path(netresolve_t resolver, struct netresolve_path *path)
 	if (path->socket.state != NETRESOLVE_STATE_INIT)
 		return;
 
-	sa = netresolve_get_path_sockaddr(resolver, path - resolver->response.paths, &socktype, &protocol, &salen);
+	sa = netresolve_query_get_path_sockaddr(query, path - query->response.paths, &salen, &socktype, &protocol);
 	if (!sa)
 		goto fail;
 	path->socket.fd = socket(sa->sa_family, socktype | flags, protocol);
@@ -72,7 +73,7 @@ connect_path(netresolve_t resolver, struct netresolve_path *path)
 	if (connect(path->socket.fd, sa, salen) == -1 && errno != EINPROGRESS)
 		goto fail_connect;
 
-	_netresolve_watch_fd(resolver, path->socket.fd, POLLOUT);
+	netresolve_watch_fd(query, path->socket.fd, POLLOUT);
 	path->socket.state = NETRESOLVE_STATE_WAITING;
 	return;
 
@@ -84,53 +85,53 @@ fail:
 }
 
 static void
-connect_check(netresolve_t resolver)
+connect_check(netresolve_query_t query)
 {
-	int i;
+	int idx;
 
-	for (i = 0; i < resolver->response.pathcount; i++) {
-		struct netresolve_path *path = &resolver->response.paths[i];
+	for (idx = 0; idx < query->response.pathcount; idx++) {
+		struct netresolve_path *path = &query->response.paths[idx];
 
 		if (path->socket.state < NETRESOLVE_STATE_FINISHED)
 			break;
 
 		if (path->socket.state == NETRESOLVE_STATE_FINISHED) {
-			resolver->callbacks.on_connect(resolver, path->socket.fd, resolver->callbacks.user_data_sock);
+			query->callbacks.on_connect(query, idx, path->socket.fd, query->callbacks.user_data_sock);
 			path->socket.state = NETRESOLVE_STATE_INIT;
-			_netresolve_set_state(resolver, NETRESOLVE_STATE_FINISHED);
+			netresolve_set_state(query, NETRESOLVE_STATE_FINISHED);
 			break;
 		}
 	}
 }
 
 static void
-connect_finished(netresolve_t resolver, struct netresolve_path *path)
+connect_finished(netresolve_query_t query, struct netresolve_path *path)
 {
 	path->socket.state = NETRESOLVE_STATE_FINISHED;
 
-	if (resolver->first_connect_timeout == -1)
-		resolver->first_connect_timeout = _netresolve_add_timeout(resolver, FIRST_CONNECT_TIMEOUT, 0);
+	if (query->first_connect_timeout == -1)
+		query->first_connect_timeout = netresolve_add_timeout(query, FIRST_CONNECT_TIMEOUT, 0);
 
-	connect_check(resolver);
+	connect_check(query);
 }
 
 static void
-connect_failed(netresolve_t resolver, struct netresolve_path *path)
+connect_failed(netresolve_query_t query, struct netresolve_path *path)
 {
 	int family = path->node.family;
 
 	path->socket.state = NETRESOLVE_STATE_FAILED;
 	close(path->socket.fd);
 
-	while (path < resolver->response.paths + resolver->response.pathcount)
+	while (path < query->response.paths + query->response.pathcount)
 		if (path->node.family == family)
-			connect_path(resolver, path);
+			connect_path(query, path);
 
-	connect_check(resolver);
+	connect_check(query);
 }
 
 void
-_netresolve_connect_start(netresolve_t resolver)
+netresolve_connect_start(netresolve_query_t query)
 {
 	bool ip4 = false;
 	bool ip6 = false;
@@ -138,32 +139,32 @@ _netresolve_connect_start(netresolve_t resolver)
 
 	debug("socket: connecting...\n");
 
-	for (i = 0; i < resolver->response.pathcount; i++) {
-		struct netresolve_path *path = &resolver->response.paths[i];
+	for (i = 0; i < query->response.pathcount; i++) {
+		struct netresolve_path *path = &query->response.paths[i];
 
 		if (!ip4 && path->node.family == AF_INET && path->socket.state == NETRESOLVE_STATE_INIT) {
-			connect_path(resolver, path);
+			connect_path(query, path);
 			ip4 = true;
 		}
 		if (!ip6 && path->node.family == AF_INET6 && path->socket.state == NETRESOLVE_STATE_INIT) {
-			connect_path(resolver, path);
+			connect_path(query, path);
 			ip6 = true;
 		}
 	}
 }
 
 bool
-_netresolve_connect_dispatch(netresolve_t resolver, int fd, int events)
+netresolve_connect_dispatch(netresolve_query_t query, int fd, int events)
 {
 	int i;
 
 	debug("socket: dispatching file descriptor: %d %d\n", fd, events);
 
-	for (i = 0; i < resolver->response.pathcount; i++) {
-		struct netresolve_path *path = &resolver->response.paths[i];
+	for (i = 0; i < query->response.pathcount; i++) {
+		struct netresolve_path *path = &query->response.paths[i];
 
 		if (fd == path->socket.fd) {
-			_netresolve_watch_fd(resolver, path->socket.fd, 0);
+			netresolve_watch_fd(query, path->socket.fd, 0);
 
 			if (events & POLLOUT) {
 				socklen_t len = sizeof(errno);
@@ -171,18 +172,18 @@ _netresolve_connect_dispatch(netresolve_t resolver, int fd, int events)
 				getsockopt(path->socket.fd, SOL_SOCKET, SO_ERROR, &errno, &len);
 
 				if (errno)
-					connect_failed(resolver, path);
+					connect_failed(query, path);
 				else
-					connect_finished(resolver, path);
+					connect_finished(query, path);
 			}
 
 			return true;
 		}
 	}
 
-	if (fd == resolver->first_connect_timeout) {
-		for (i = 0; i < resolver->response.pathcount; i++) {
-			struct netresolve_path *path = &resolver->response.paths[i];
+	if (fd == query->first_connect_timeout) {
+		for (i = 0; i < query->response.pathcount; i++) {
+			struct netresolve_path *path = &query->response.paths[i];
 
 			switch (path->socket.state) {
 			case NETRESOLVE_STATE_WAITING:
@@ -196,7 +197,7 @@ _netresolve_connect_dispatch(netresolve_t resolver, int fd, int events)
 			}
 		}
 
-		connect_check(resolver);
+		connect_check(query);
 		return true;
 	}
 
@@ -204,14 +205,14 @@ _netresolve_connect_dispatch(netresolve_t resolver, int fd, int events)
 }
 
 void
-_netresolve_connect_cleanup(netresolve_t resolver)
+netresolve_connect_cleanup(netresolve_query_t query)
 {
 	int i;
 
 	debug("socket: cleaning up...\n");
 
-	for (i = 0; i < resolver->response.pathcount; i++) {
-		struct netresolve_path *path = &resolver->response.paths[i];
+	for (i = 0; i < query->response.pathcount; i++) {
+		struct netresolve_path *path = &query->response.paths[i];
 
 		switch (path->socket.state) {
 		case NETRESOLVE_STATE_WAITING:
@@ -223,8 +224,8 @@ _netresolve_connect_cleanup(netresolve_t resolver)
 		}
 	}
 
-	if (resolver->first_connect_timeout != -1) {
-		_netresolve_remove_timeout(resolver, resolver->first_connect_timeout);
-		resolver->first_connect_timeout = -1;
+	if (query->first_connect_timeout != -1) {
+		netresolve_remove_timeout(query, query->first_connect_timeout);
+		query->first_connect_timeout = -1;
 	}
 }

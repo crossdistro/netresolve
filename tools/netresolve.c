@@ -32,23 +32,23 @@
 int
 main(int argc, char **argv)
 {
-	netresolve_t resolver;
-	int status;
+	netresolve_t channel;
+	netresolve_query_t query;
 
-	resolver = netresolve_open();
-	if (!resolver) {
+	channel = netresolve_open();
+	if (!channel) {
 		fprintf(stderr, "netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
 
-	status = netresolve_resolve_argv(resolver, argv + 1);
-	if (status) {
-		fprintf(stderr, "netresolve: %s\n", strerror(status));
+	query = netresolve_query_argv(channel, argv + 1);
+	if (!query) {
+		fprintf(stderr, "netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
 
-	printf("%s", netresolve_get_response_string(resolver));
+	printf("%s", netresolve_get_response_string(query));
 
-	netresolve_close(resolver);
+	netresolve_close(channel);
 	return EXIT_SUCCESS;
 }

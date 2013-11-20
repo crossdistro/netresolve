@@ -21,14 +21,13 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-private.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <arpa/inet.h>
-
-#include <netresolve-backend.h>
 
 typedef struct {
 	int socktype;
@@ -179,7 +178,7 @@ found_port(void (*callback)(int, int, int, void *), void *user_data,
 }
 
 void
-_netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,
+netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,
 		const char *request_service, int socktype, int protocol)
 {
 	int port = 0;

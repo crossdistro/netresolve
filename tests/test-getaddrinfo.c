@@ -45,4 +45,6 @@ main(int argc, char **argv)
 	assert(status == 0);
 	assert(result);
 	assert(!result->ai_next);
+
+	return EXIT_SUCCESS;
 }

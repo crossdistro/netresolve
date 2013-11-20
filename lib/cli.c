@@ -28,7 +28,7 @@
 #include "netresolve-private.h"
 #include "netresolve-string.h"
 
-int
+static int
 family_from_string(const char *str)
 {
 	if (!strcmp(str, "ip4"))
@@ -41,7 +41,7 @@ family_from_string(const char *str)
 	return AF_UNSPEC;
 }
 
-int
+static int
 socktype_from_string(const char *str)
 {
 	if (!strcmp(str, "stream"))
@@ -53,7 +53,7 @@ socktype_from_string(const char *str)
 	return 0;
 }
 
-int
+static int
 protocol_from_string(const char *str)
 {
 	if (!strcmp(str, "tcp"))
@@ -65,20 +65,19 @@ protocol_from_string(const char *str)
 	return 0;
 }
 
-int
-netresolve_resolve_argv(netresolve_t resolver, char **argv)
+netresolve_query_t
+netresolve_query_argv(netresolve_t channel, char **argv)
 {
 	const char *node = NULL, *service = NULL;
-	int family = 0, socktype = 0, protocol = 0;
-	int status;
+	netresolve_query_t query;
 
 	if (*argv && !strcmp(*argv, "-v")) {
-		netresolve_set_log_level(resolver, 10);
+		netresolve_set_log_level(NETRESOLVE_LOG_LEVEL_DEBUG);
 		argv++;
 	}
 
 	if (*argv && !strcmp(*argv, "--srv")) {
-		netresolve_set_dns_srv_lookup(resolver, true);
+		netresolve_set_dns_srv_lookup(channel, true);
 		argv++;
 	}
 
@@ -92,14 +91,15 @@ netresolve_resolve_argv(netresolve_t resolver, char **argv)
 		if (service[0] == '-' && !service[1])
 			service = NULL;
 	} if (*argv)
-		family = family_from_string(*argv++);
+		netresolve_set_family(channel, family_from_string(*argv++));
 	if (*argv)
-		socktype = socktype_from_string(*argv++);
+		netresolve_set_socktype(channel, socktype_from_string(*argv++));
 	if (*argv)
-		protocol = protocol_from_string(*argv++);
+		netresolve_set_protocol(channel, protocol_from_string(*argv++));
 
-	status = netresolve_resolve(resolver, node, service, family, socktype, protocol);
-	debug("%s", netresolve_get_request_string(resolver));
+	query = netresolve_query(channel, node, service);
 
-	return status;
+	debug("%s", netresolve_get_request_string(query));
+
+	return query;
 }

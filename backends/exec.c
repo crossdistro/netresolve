@@ -21,13 +21,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-backend.h>
+#include <netresolve-string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
 #include <stdio.h>
-
-#include <netresolve-backend.h>
-#include <netresolve-string.h>
 
 struct buffer {
 	char *buffer;
@@ -86,7 +85,7 @@ err_pipe1:
 }
 
 static void
-send_stdin(netresolve_backend_t resolver, struct priv_exec *priv)
+send_stdin(netresolve_query_t query, struct priv_exec *priv)
 {
 	if (priv->inbuf.start != priv->inbuf.end) {
 		ssize_t size = write(priv->infd, priv->inbuf.start, priv->inbuf.end - priv->inbuf.start);
@@ -97,13 +96,13 @@ send_stdin(netresolve_backend_t resolver, struct priv_exec *priv)
 		debug("write failed: %s", strerror(errno));
 	}
 
-	netresolve_backend_watch_fd(resolver, priv->infd, 0);
+	netresolve_backend_watch_fd(query, priv->infd, 0);
 	close(priv->infd);
 	priv->infd = -1;
 }
 
 static bool
-received_line(netresolve_backend_t resolver, struct priv_exec *priv, const char *line)
+received_line(netresolve_query_t query, struct priv_exec *priv, const char *line)
 {
 	char addrprefix[] = "address ";
 	int addrprefixlen = strlen(addrprefix);
@@ -124,18 +123,18 @@ received_line(netresolve_backend_t resolver, struct priv_exec *priv, const char 
 	if (!strncmp(addrprefix, line, addrprefixlen)) {
 		if (netresolve_backend_parse_address(line + addrprefixlen,
 					&address, &family, &ifindex))
-			netresolve_backend_add_address(resolver, family, &address, ifindex);
+			netresolve_backend_add_address(query, family, &address, ifindex);
 	} else if (!strncmp(pathprefix, line, pathprefixlen)) {
 		if (netresolve_backend_parse_path(line + pathprefixlen,
 					&address, &family, &ifindex, &socktype, &protocol, &port))
-			netresolve_backend_add_path(resolver, family, &address, ifindex, socktype, protocol, port, 0, 0);
+			netresolve_backend_add_path(query, family, &address, ifindex, socktype, protocol, port, 0, 0);
 	}
 
 	return false;
 }
 
 static void
-pickup_stdout(netresolve_backend_t resolver, struct priv_exec *priv)
+pickup_stdout(netresolve_query_t query, struct priv_exec *priv)
 {
 	char *nl;
 	int size;
@@ -146,7 +145,7 @@ pickup_stdout(netresolve_backend_t resolver, struct priv_exec *priv)
 			priv->outbuf.end = priv->outbuf.start + 1024;
 	}
 	if (!priv->outbuf.buffer) {
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 		return;
 	}
 
@@ -155,7 +154,7 @@ pickup_stdout(netresolve_backend_t resolver, struct priv_exec *priv)
 		abort();
 		if (size < 0)
 			error("read: %s", strerror(errno));
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 		return;
 	}
 	debug("read: %*s\n", size, priv->outbuf.start);
@@ -163,8 +162,8 @@ pickup_stdout(netresolve_backend_t resolver, struct priv_exec *priv)
 
 	while ((nl = memchr(priv->outbuf.buffer, '\n', priv->outbuf.start - priv->outbuf.buffer))) {
 		*nl++ = '\0';
-		if (received_line(resolver, priv, priv->outbuf.buffer)) {
-			netresolve_backend_finished(resolver);
+		if (received_line(query, priv, priv->outbuf.buffer)) {
+			netresolve_backend_finished(query);
 			return;
 		}
 		memmove(priv->outbuf.buffer, nl, priv->outbuf.end - priv->outbuf.start);
@@ -173,57 +172,57 @@ pickup_stdout(netresolve_backend_t resolver, struct priv_exec *priv)
 }
 
 void
-start(netresolve_backend_t resolver, char **settings)
+start(netresolve_query_t query, char **settings)
 {
-	struct priv_exec *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
+	struct priv_exec *priv = netresolve_backend_new_priv(query, sizeof *priv);
 
 	priv->infd = -1;
 	priv->outfd = -1;
 
 	if (!priv || !start_subprocess(settings, &priv->pid, &priv->infd, &priv->outfd)) {
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 		return;
 	}
 
-	priv->inbuf.buffer = strdup(netresolve_get_request_string(resolver));
+	priv->inbuf.buffer = strdup(netresolve_get_request_string(query));
 	priv->inbuf.start = priv->inbuf.buffer;
 	priv->inbuf.end = priv->inbuf.buffer + strlen(priv->inbuf.buffer);
 
-	netresolve_backend_watch_fd(resolver, priv->infd, POLLOUT);
-	netresolve_backend_watch_fd(resolver, priv->outfd, POLLIN);
+	netresolve_backend_watch_fd(query, priv->infd, POLLOUT);
+	netresolve_backend_watch_fd(query, priv->outfd, POLLIN);
 }
 
 void
-dispatch(netresolve_backend_t resolver, int fd, int events)
+dispatch(netresolve_query_t query, int fd, int events)
 {
-	struct priv_exec *priv = netresolve_backend_get_priv(resolver);
+	struct priv_exec *priv = netresolve_backend_get_priv(query);
 
 	debug("exec: events %d on fd %d\n", events, fd);
 
 	if (fd == priv->infd && events & POLLOUT)
-		send_stdin(resolver, priv);
+		send_stdin(query, priv);
 	else if (fd == priv->outfd && events & POLLIN) {
-		pickup_stdout(resolver, priv);
+		pickup_stdout(query, priv);
 	} else if (fd == priv->outfd && events & POLLHUP) {
 		error("exec: incomplete response\n");
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 	} else {
 		error("exec: unknown events %d on fd %d\n", events, fd);
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 	}
 }
 
 void
-cleanup(netresolve_backend_t resolver)
+cleanup(netresolve_query_t query)
 {
-	struct priv_exec *priv = netresolve_backend_get_priv(resolver);
+	struct priv_exec *priv = netresolve_backend_get_priv(query);
 
 	if (priv->infd != -1) {
-		netresolve_backend_watch_fd(resolver, priv->infd, 0);
+		netresolve_backend_watch_fd(query, priv->infd, 0);
 		close(priv->infd);
 	}
 	if (priv->outfd != -1) {
-		netresolve_backend_watch_fd(resolver, priv->outfd, 0);
+		netresolve_backend_watch_fd(query, priv->outfd, 0);
 		close(priv->outfd);
 	}
 	/* TODO: Implement proper child handling. */

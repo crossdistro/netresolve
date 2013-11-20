@@ -21,7 +21,31 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef NETRESOLVE_COMMON_H
-#define NETRESOLVE_COMMON_H
+#include <netresolve-private.h>
+#include <stdarg.h>
 
-#endif /* NETRESOLVE_COMMON_H */
+static enum netresolve_log_level log_level = 0;
+
+enum netresolve_log_level
+netresolve_get_log_level(void)
+{
+	return log_level;
+}
+
+void
+netresolve_set_log_level(enum netresolve_log_level new_log_level)
+{
+	log_level = new_log_level;
+}
+
+void
+netresolve_log(int level, const char *fmt, ...)
+{
+	if (level <= netresolve_get_log_level()) {
+		va_list ap;
+
+		va_start(ap, fmt);
+		vfprintf(stderr, fmt, ap);
+		va_end(ap);
+	}
+}

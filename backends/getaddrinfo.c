@@ -21,14 +21,13 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-backend.h>
 #include <stdlib.h>
 #include <string.h>
 #include <netdb.h>
 
-#include <netresolve-backend.h>
-
 static void
-add_addresses(netresolve_backend_t response, const struct addrinfo *first)
+add_addresses(netresolve_query_t query, const struct addrinfo *first)
 {
 	const struct addrinfo *ai;
 
@@ -56,7 +55,7 @@ add_addresses(netresolve_backend_t response, const struct addrinfo *first)
 			break;
 		}
 
-		netresolve_backend_add_path(response,
+		netresolve_backend_add_path(query,
 				ai->ai_family, &address, ifindex,
 				ai->ai_socktype, ai->ai_protocol, port,
 				0, 0);
@@ -65,34 +64,34 @@ add_addresses(netresolve_backend_t response, const struct addrinfo *first)
 }
 
 void
-start(netresolve_backend_t resolver, char **settings)
+start(netresolve_query_t query, char **settings)
 {
-	const char *node = netresolve_backend_get_node(resolver);
-	const char *service = netresolve_backend_get_service(resolver);
+	const char *node = netresolve_backend_get_node(query);
+	const char *service = netresolve_backend_get_service(query);
 	struct addrinfo hints = {
-		.ai_family = netresolve_backend_get_family(resolver),
-		.ai_socktype = netresolve_backend_get_socktype(resolver),
-		.ai_protocol = netresolve_backend_get_protocol(resolver),
+		.ai_family = netresolve_backend_get_family(query),
+		.ai_socktype = netresolve_backend_get_socktype(query),
+		.ai_protocol = netresolve_backend_get_protocol(query),
 		.ai_flags = 0,
 	};
 	struct addrinfo *result;
 	int status;
 
-	if (!netresolve_backend_get_default_loopback(resolver))
+	if (!netresolve_backend_get_default_loopback(query))
 		hints.ai_flags |= AI_PASSIVE;
 
 	status = getaddrinfo(node, service, &hints, &result);
 
 	switch (status) {
 	case 0:
-		add_addresses(resolver, result);
+		add_addresses(query, result);
 		freeaddrinfo(result);
 		/* fall through */
 	case EAI_NONAME:
 	//case EAI_NODATA:
-		netresolve_backend_finished(resolver);
+		netresolve_backend_finished(query);
 		break;
 	default:
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 	}
 }

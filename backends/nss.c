@@ -21,12 +21,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-backend.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <nss.h>
 #include <dlfcn.h>
-
-#include <netresolve-backend.h>
 
 #define SIZE (128*1024)
 
@@ -93,7 +92,7 @@ combine_statuses(int s4, int s6)
 }
 
 static void
-try_symbol_pattern(netresolve_backend_t resolver, struct priv_nss *priv, void **f, const char *pattern, const char *api)
+try_symbol_pattern(netresolve_query_t query, struct priv_nss *priv, void **f, const char *pattern, const char *api)
 {
 	char symbol[1024];
 
@@ -112,15 +111,15 @@ try_symbol_pattern(netresolve_backend_t resolver, struct priv_nss *priv, void **
 }
 
 void
-start(netresolve_backend_t resolver, char **settings)
+start(netresolve_query_t query, char **settings)
 {
-	struct priv_nss *priv = netresolve_backend_new_priv(resolver, sizeof *priv);
-	const char *node = netresolve_backend_get_node(resolver);
-	int family = netresolve_backend_get_family(resolver);
+	struct priv_nss *priv = netresolve_backend_new_priv(query, sizeof *priv);
+	const char *node = netresolve_backend_get_node(query);
+	int family = netresolve_backend_get_family(query);
 	int status = NSS_STATUS_UNAVAIL;
 
 	if (!priv || !settings || !*settings) {
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 		return;
 	}
 
@@ -132,13 +131,13 @@ start(netresolve_backend_t resolver, char **settings)
 	priv->dl_handle = dlopen(priv->filename, RTLD_LAZY);
 	if (!priv->dl_handle) {
 		error("%s\n", dlerror());
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 		return;
 	}
-	try_symbol_pattern(resolver, priv, (void *) &priv->gethostbyname_r, "_nss_%s_gethostbyname_r", "gethostbyname");
-	try_symbol_pattern(resolver, priv, (void *) &priv->gethostbyname2_r, "_nss_%s_gethostbyname2_r", "gethostbyname2");
-	try_symbol_pattern(resolver, priv, (void *) &priv->gethostbyname3_r, "_nss_%s_gethostbyname3_r", "gethostbyname3");
-	try_symbol_pattern(resolver, priv, (void *) &priv->gethostbyname4_r, "_nss_%s_gethostbyname4_r", "gethostbyname4");
+	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname_r, "_nss_%s_gethostbyname_r", "gethostbyname");
+	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname2_r, "_nss_%s_gethostbyname2_r", "gethostbyname2");
+	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname3_r, "_nss_%s_gethostbyname3_r", "gethostbyname3");
+	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname4_r, "_nss_%s_gethostbyname4_r", "gethostbyname4");
 
 	/*if (priv->gethostbyname4_r) {
 		TODO
@@ -170,9 +169,9 @@ start(netresolve_backend_t resolver, char **settings)
 		status = combine_statuses(status4, status6);
 		if (status == NSS_STATUS_SUCCESS) {
 			if (status4 == NSS_STATUS_SUCCESS)
-				netresolve_backend_apply_hostent(resolver, &he4, 0, 0, 0, 0, 0);
+				netresolve_backend_apply_hostent(query, &he4, 0, 0, 0, 0, 0);
 			if (status6 == NSS_STATUS_SUCCESS)
-				netresolve_backend_apply_hostent(resolver, &he6, 0, 0, 0, 0, 0);
+				netresolve_backend_apply_hostent(query, &he6, 0, 0, 0, 0, 0);
 		}
 	} else if (node && priv->gethostbyname_r) {
 		char buffer[SIZE];
@@ -183,12 +182,12 @@ start(netresolve_backend_t resolver, char **settings)
 			&he, buffer, sizeof buffer, &errnop, &h_errnop));
 
 		if (status == NSS_STATUS_SUCCESS) {
-			netresolve_backend_apply_hostent(resolver, &he, 0, 0, 0, 0, 0);
+			netresolve_backend_apply_hostent(query, &he, 0, 0, 0, 0, 0);
 		}
 	}
 
 	if (status == NSS_STATUS_SUCCESS)
-		netresolve_backend_finished(resolver);
+		netresolve_backend_finished(query);
 	else
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 }

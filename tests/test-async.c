@@ -31,8 +31,8 @@
 
 #include <netresolve.h>
 
-void
-watch_fd(netresolve_t resolver, int fd, int events, void *user_data)
+static void
+watch_fd(netresolve_t channel, int fd, int events, void *user_data)
 {
 	int epoll_fd = *(int *) user_data;
 
@@ -48,17 +48,17 @@ watch_fd(netresolve_t resolver, int fd, int events, void *user_data)
 	}
 }
 
-void
-on_success(netresolve_t resolver, void *user_data)
+static void
+on_success(netresolve_query_t query, void *user_data)
 {
 	unsigned char expected_address[16] = { 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8 };
 	int family;
 	const void *address;
 	int ifindex;
 
-	assert(netresolve_get_path_count(resolver) == 1);
+	assert(netresolve_query_get_count(query) == 1);
 
-	netresolve_get_path(resolver, 0, &family, &address, &ifindex, NULL, NULL, NULL, NULL, NULL);
+	netresolve_query_get_address_info(query, 0, &family, &address, &ifindex);
 	assert(family = AF_INET6);
 	assert(ifindex == 999999);
 	assert(!memcmp(address, expected_address, sizeof expected_address));
@@ -66,16 +66,11 @@ on_success(netresolve_t resolver, void *user_data)
 	*(bool *) user_data = true;
 }
 
-void
-on_failure(netresolve_t resolver, void *user_data)
-{
-	abort();
-}
-
 int
 main(int argc, char **argv)
 {
-	netresolve_t resolver;
+	netresolve_t channel;
+	netresolve_query_t query;
 	int epoll_fd;
 	bool finished = false;
 	const char *node = "1:2:3:4:5:6:7:8%999999";
@@ -91,19 +86,23 @@ main(int argc, char **argv)
 		abort();
 	}
 
-	/* Create a resolver. */
-	resolver = netresolve_open();
-	if (!resolver) {
+	/* Create a channel. */
+	channel = netresolve_open();
+	if (!channel) {
 		perror("netresolve_open");
 		abort();
 	}
 
 	/* Set callbacks. */
-	netresolve_callback_set_watch_fd(resolver, watch_fd, &epoll_fd);
-	netresolve_callback_set_callbacks(resolver, on_success, on_failure, &finished);
+	netresolve_set_fd_callback(channel, watch_fd, &epoll_fd);
+	netresolve_set_success_callback(channel, on_success, &finished);
+	netresolve_set_family(channel, family);
+	netresolve_set_socktype(channel, socktype);
+	netresolve_set_protocol(channel, protocol);
 
 	/* Start name resolution. */
-	netresolve_resolve(resolver, node, service, family, socktype, protocol);
+	query = netresolve_query(channel, node, service);
+	assert(query);
 
 	/* Run the main loop. */
 	while (!finished) {
@@ -119,11 +118,11 @@ main(int argc, char **argv)
 		}
 
 		for (i = 0; i < nevents; i++)
-			netresolve_dispatch(resolver, events[i].data.fd, events[i].events);
+			netresolve_dispatch_fd(channel, events[i].data.fd, events[i].events);
 	}
 
 	/* Clean up. */
-	netresolve_close(resolver);
+	netresolve_close(channel);
 	close(epoll_fd);
 
 	exit(EXIT_SUCCESS);

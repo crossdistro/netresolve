@@ -21,24 +21,26 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-backend.h>
 #include <stdlib.h>
 #include <arpa/inet.h>
 #include <string.h>
 
-#include <netresolve-backend.h>
-
 void
-start(netresolve_backend_t resolver, char **settings)
+start(netresolve_query_t query, char **settings)
 {
-	const char *node = netresolve_backend_get_node(resolver);
-	int family = netresolve_backend_get_family(resolver);
-	int socktype = netresolve_backend_get_socktype(resolver);
+	const char *node = netresolve_backend_get_node(query);
+	int family = netresolve_backend_get_family(query);
+	int socktype = netresolve_backend_get_socktype(query);
 
 	if (family != AF_UNIX || !node || *node != '/'){
-		netresolve_backend_failed(resolver);
+		netresolve_backend_failed(query);
 		return;
 	}
 
-	netresolve_backend_add_path(resolver, AF_UNIX, node, 0, socktype, 0, 0, 0, 0);
-	netresolve_backend_finished(resolver);
+	if (!socktype)
+		socktype = -1;
+
+	netresolve_backend_add_path(query, AF_UNIX, node, 0, socktype, 0, 0, 0, 0);
+	netresolve_backend_finished(query);
 }

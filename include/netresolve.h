@@ -28,52 +28,63 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-#include <netresolve-common.h>
+typedef struct netresolve_channel *netresolve_t;
+typedef struct netresolve_channel *netresolve_query_t;
 
-typedef struct netresolve_resolver *netresolve_t;
+/* Channel API */
+netresolve_t netresolve_open(void);
+void netresolve_close(netresolve_t channel);
+bool netresolve_dispatch_fd(netresolve_t channel, int fd, int events);
 
-/* Open/close resolver instance */
-netresolve_t netresolve_open();
-void netresolve_close(netresolve_t resolver);
+/* Node/service resolution options */
+void netresolve_set_family(netresolve_t channel, int family);
+void netresolve_set_socktype(netresolve_t channel, int socktype);
+void netresolve_set_protocol(netresolve_t channel, int protocol);
+void netresolve_set_default_loopback(netresolve_t channel, bool value);
+void netresolve_set_dns_srv_lookup(netresolve_t channel, bool value);
 
-/* Configuration API */
-void netresolve_set_log_level(netresolve_t resolver, int level);
-void netresolve_set_backend_string(netresolve_t resolver, const char *string);
-void netresolve_set_default_loopback(netresolve_t resolver, bool value);
-void netresolve_set_dns_srv_lookup(netresolve_t resolver, bool value);
+/* Advanced configuration */
+void netresolve_set_backend_string(netresolve_t channel, const char *string);
 
-/* Callback API */
-typedef void (*netresolve_callback_t)(netresolve_t resolver, void *user_data);
-void netresolve_callback_set_callbacks(netresolve_t resolver,
-		netresolve_callback_t on_success,
-		netresolve_callback_t on_failure,
-		void *user_data);
-typedef void (*netresolve_fd_callback_t)(netresolve_t resolver, int fd, int events, void *user_data);
-void netresolve_callback_set_watch_fd(netresolve_t resolver,
-		netresolve_fd_callback_t watch_fd,
-		void *user_data);
-typedef void (*netresolve_socket_callback_t)(netresolve_t resolver, int sock, void *user_data);
-void netresolve_callback_set_bind(netresolve_t resolver,
-		netresolve_socket_callback_t on_bind,
-		void *user_data);
-void netresolve_callback_set_connect(netresolve_t resolver,
-		netresolve_socket_callback_t on_connect,
-		void *user_data);
+/* Channel callbacks */
+typedef void (*netresolve_callback_t)(netresolve_query_t query, void *user_data);
+typedef void (*netresolve_fd_callback_t)(netresolve_query_t query, int fd, int events, void *user_data);
+typedef void (*netresolve_socket_callback_t)(netresolve_query_t query, int idx, int sock, void *user_data);
 
-/* Request API */
-int netresolve_resolve(netresolve_t resolver,
-		const char *node, const char *service, int family, int socktype, int protocol);
-int netresolve_dispatch(netresolve_t resolver, int fd, int events);
+void netresolve_set_success_callback(netresolve_t channel,
+		netresolve_callback_t on_success, void *user_data);
+void netresolve_set_fd_callback(netresolve_t channel,
+		netresolve_fd_callback_t watch_fd, void *user_data);
+void netresolve_set_bind_callback(netresolve_t channel,
+		netresolve_socket_callback_t on_bind, void *user_data);
+void netresolve_set_connect_callback(netresolve_t channel,
+		netresolve_socket_callback_t on_connect, void *user_data);
 
-/* Response API */
-size_t netresolve_get_path_count(const netresolve_t resolver);
-void netresolve_get_path(const netresolve_t resolver, size_t idx,
-		int *family, const void **address, int *ifindex,
-		int *socktype, int *protocol, int *port,
-		int *priority, int *weight);
-const char *netresolve_get_canonical_name(const netresolve_t resolver);
-/* Convenient API for use with BSD socket API */
-const struct sockaddr *netresolve_get_path_sockaddr(const netresolve_t resolver, size_t n,
-		int *socktype, int *protocol, socklen_t *salen);
+/* Query API */
+netresolve_query_t netresolve_query(netresolve_t channel, const char *node, const char *service);
+void netresolve_query_cancel(netresolve_query_t query);
+
+/* Query results */
+size_t netresolve_query_get_count(const netresolve_query_t query);
+void netresolve_query_get_address_info(const netresolve_query_t query, size_t idx,
+		int *family, const void **address,  int *ifindex);
+void netresolve_query_get_port_info(const netresolve_query_t query, size_t idx,
+		int *socktype, int *protocol, int *port);
+void netresolve_query_get_aux_info(const netresolve_query_t query, size_t idx,
+		int *priority, int *weight, int *ttl);
+const char *netresolve_query_get_canonical_name(const netresolve_query_t query);
+
+/* BSD socket API compatibility */
+const struct sockaddr *netresolve_query_get_path_sockaddr(const netresolve_query_t query, size_t idx,
+		socklen_t *salen, int *socktype, int *protocol);
+
+/* Logging */
+enum netresolve_log_level {
+	NETRESOLVE_LOG_LEVEL_FATAL = 0x10,
+	NETRESOLVE_LOG_LEVEL_ERROR = 0x20,
+	NETRESOLVE_LOG_LEVEL_INFO = 0x30,
+	NETRESOLVE_LOG_LEVEL_DEBUG = 0x40
+};
+void netresolve_set_log_level(enum netresolve_log_level level);
 
 #endif /* NETRESOLVE_H */

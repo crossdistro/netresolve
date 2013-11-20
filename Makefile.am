@@ -25,11 +25,7 @@ SED_PROCESS = \
 
 include_HEADERS = \
 	include/netresolve.h \
-	include/netresolve-common.h \
-	include/netresolve-utils.h \
-	include/netresolve-string.h \
-	include/netresolve-cli.h \
-	include/netresolve-backend.h
+	include/netresolve-utils.h
 
 lib_LTLIBRARIES = \
 	libnetresolve.la \
@@ -37,7 +33,11 @@ lib_LTLIBRARIES = \
 
 libnetresolve_la_SOURCES = \
 	lib/netresolve-private.h \
+	lib/netresolve-backend.h \
+	lib/netresolve-string.h \
+	lib/netresolve-cli.h \
 	lib/resolver.c \
+	lib/logging.c \
 	lib/backend.c \
 	lib/services.c \
 	lib/response.c \

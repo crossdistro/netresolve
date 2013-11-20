@@ -33,41 +33,39 @@
 #include <netdb.h>
 #include <poll.h>
 
-#include <netresolve-common.h>
-
-typedef struct netresolve_resolver *netresolve_backend_t;
+typedef struct netresolve_channel *netresolve_query_t;
 
 /* Input */
-const char *netresolve_backend_get_node(netresolve_backend_t resolver);
-const char *netresolve_backend_get_service(netresolve_backend_t resolver);
-int netresolve_backend_get_family(netresolve_backend_t resolver);
-int netresolve_backend_get_protocol(netresolve_backend_t resolver);
-int netresolve_backend_get_socktype(netresolve_backend_t resolver);
-bool netresolve_backend_get_default_loopback(netresolve_backend_t resolver);
-bool netresolve_backend_get_dns_srv_lookup(netresolve_backend_t resolver);
+const char *netresolve_backend_get_node(netresolve_query_t query);
+const char *netresolve_backend_get_service(netresolve_query_t query);
+int netresolve_backend_get_family(netresolve_query_t query);
+int netresolve_backend_get_protocol(netresolve_query_t query);
+int netresolve_backend_get_socktype(netresolve_query_t query);
+bool netresolve_backend_get_default_loopback(netresolve_query_t query);
+bool netresolve_backend_get_dns_srv_lookup(netresolve_query_t query);
 
 /* Output */
-void netresolve_backend_add_path(netresolve_backend_t resolver,
+void netresolve_backend_add_path(netresolve_query_t query,
 		int family, const void *address, int ifindex,
 		int socktype, int protocol, int port,
 		int priority, int weight);
-#define netresolve_backend_add_address(resolver, family, address, ifindex) \
-	netresolve_backend_add_path(resolver, family, address, ifindex, -1, -1, -1, 0, 0);
-void netresolve_backend_set_canonical_name(netresolve_backend_t resolver, const char *canonical_name);
+#define netresolve_backend_add_address(query, family, address, ifindex) \
+	netresolve_backend_add_path(query, family, address, ifindex, -1, -1, -1, 0, 0);
+void netresolve_backend_set_canonical_name(netresolve_query_t query, const char *canonical_name);
 
 /* Tools */
-void *netresolve_backend_new_priv(netresolve_backend_t resolver, size_t size);
-void *netresolve_backend_get_priv(netresolve_backend_t resolver);
-void netresolve_backend_watch_fd(netresolve_backend_t resolver, int fd, int events);
-int netresolve_backend_watch_timeout(netresolve_backend_t resolver, time_t sec, long nsec);
-void netresolve_backend_drop_timeout(netresolve_backend_t resolver, int fd);
-void netresolve_backend_finished(netresolve_backend_t resolver);
-void netresolve_backend_failed(netresolve_backend_t resolver);
+void *netresolve_backend_new_priv(netresolve_query_t query, size_t size);
+void *netresolve_backend_get_priv(netresolve_query_t query);
+void netresolve_backend_watch_fd(netresolve_query_t query, int fd, int events);
+int netresolve_backend_watch_timeout(netresolve_query_t query, time_t sec, long nsec);
+void netresolve_backend_drop_timeout(netresolve_query_t query, int fd);
+void netresolve_backend_finished(netresolve_query_t query);
+void netresolve_backend_failed(netresolve_query_t query);
 
 /* Logging */
-#define error(...) netresolve_backend_log(resolver, 1, __VA_ARGS__)
-#define debug(...) netresolve_backend_log(resolver, 2, __VA_ARGS__)
-void netresolve_backend_log(netresolve_backend_t resolver, int level, const char *fmt, ...);
+#define error(...) netresolve_log(0x20, __VA_ARGS__)
+#define debug(...) netresolve_log(0x40, __VA_ARGS__)
+void netresolve_log(int level, const char *fmt, ...);
 
 /* Convenience */
 typedef union { struct in_addr address4; struct in6_addr address6; } Address;
@@ -76,14 +74,14 @@ bool netresolve_backend_parse_address(const char *string_orig,
 bool netresolve_backend_parse_path(const char *str,
 		Address *address, int *family, int *ifindex,
 		int *socktype, int *protocol, int *port);
-void netresolve_backend_apply_hostent(netresolve_backend_t resolver,
+void netresolve_backend_apply_hostent(netresolve_query_t query,
 		const struct hostent *he,
 		int socktype, int protocol, int port,
 		int priority, int weight);
 
 /* Backend function prototypes */
-void start(netresolve_backend_t resolver, char **settings);
-void dispatch(netresolve_backend_t resolver, int fd, int revents);
-void cleanup(netresolve_backend_t resolver);
+void start(netresolve_query_t query, char **settings);
+void dispatch(netresolve_query_t query, int fd, int revents);
+void cleanup(netresolve_query_t query);
 
 #endif /* NETRESOLVE_BACKEND_H */

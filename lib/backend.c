@@ -24,7 +24,6 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
-#include <stdarg.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/epoll.h>
@@ -35,45 +34,45 @@
 #include "netresolve-private.h"
 
 const char *
-netresolve_backend_get_node(netresolve_backend_t resolver)
+netresolve_backend_get_node(netresolve_query_t channel)
 {
-	return resolver->request.node;
+	return channel->request.node;
 }
 
 const char *
-netresolve_backend_get_service(netresolve_backend_t resolver)
+netresolve_backend_get_service(netresolve_query_t channel)
 {
-	return resolver->request.service;
+	return channel->request.service;
 }
 
 int
-netresolve_backend_get_family(netresolve_backend_t resolver)
+netresolve_backend_get_family(netresolve_query_t channel)
 {
-	return resolver->request.family;
+	return channel->request.family;
 }
 
 int
-netresolve_backend_get_socktype(netresolve_backend_t resolver)
+netresolve_backend_get_socktype(netresolve_query_t channel)
 {
-	return resolver->request.socktype;
+	return channel->request.socktype;
 }
 
 int
-netresolve_backend_get_protocol(netresolve_backend_t resolver)
+netresolve_backend_get_protocol(netresolve_query_t channel)
 {
-	return resolver->request.protocol;
+	return channel->request.protocol;
 }
 
 bool
-netresolve_backend_get_default_loopback(netresolve_backend_t resolver)
+netresolve_backend_get_default_loopback(netresolve_query_t channel)
 {
-	return resolver->request.default_loopback;
+	return channel->request.default_loopback;
 }
 
 bool
-netresolve_backend_get_dns_srv_lookup(netresolve_backend_t resolver)
+netresolve_backend_get_dns_srv_lookup(netresolve_query_t channel)
 {
-	return resolver->request.dns_srv_lookup;
+	return channel->request.dns_srv_lookup;
 }
 
 static size_t
@@ -90,7 +89,7 @@ family_to_length(int family)
 }
 
 typedef struct {
-	netresolve_backend_t resolver;
+	netresolve_query_t channel;
 	int family;
 	const void *address;
 	int ifindex;
@@ -101,35 +100,41 @@ path_callback(int socktype, int protocol, int port, void *user_data)
 {
 	PathData *data = user_data;
 
-	netresolve_backend_add_path(data->resolver,
+	netresolve_backend_add_path(data->channel,
 			data->family, data->address, data->ifindex,
 			socktype, protocol, port,
 			0, 0);
 }
 
 void
-netresolve_backend_add_path(netresolve_backend_t resolver,
+netresolve_backend_add_path(netresolve_query_t channel,
 		int family, const void *address, int ifindex,
 		int socktype, int protocol, int portnum,
 		int priority, int weight)
 {
-	struct netresolve_response *response = &resolver->response;
+	struct netresolve_response *response = &channel->response;
 	struct netresolve_path path;
 
-	if (socktype == -1 && protocol == -1 && portnum == -1) {
+	if (family == AF_UNIX && socktype == -1) {
+		netresolve_backend_add_path(channel, family, address, 0, SOCK_STREAM, 0, 0, 0, 0);
+		netresolve_backend_add_path(channel, family, address, 0, SOCK_DGRAM, 0, 0, 0, 0);
+		return;
+	}
+
+	if (socktype == -1 || protocol == -1 || portnum == -1) {
 		PathData data = {
-			.resolver = resolver,
+			.channel = channel,
 			.family = family,
 			.address = address,
 			.ifindex = ifindex,
 		};
 
-		_netresolve_get_service_info(path_callback, &data, resolver->request.service,
-				resolver->request.socktype, resolver->request.protocol);
+		netresolve_get_service_info(path_callback, &data, channel->request.service,
+				channel->request.socktype, channel->request.protocol);
 		return;
 	}
 
-	if (resolver->request.family != AF_UNSPEC && resolver->request.family != family)
+	if (channel->request.family != AF_UNSPEC && channel->request.family != family)
 		return;
 
 	size_t length = family_to_length(family);
@@ -150,133 +155,122 @@ netresolve_backend_add_path(netresolve_backend_t resolver,
 	response->paths = realloc(response->paths, (response->pathcount + 1) * sizeof path);
 	memcpy(&response->paths[response->pathcount++], &path, sizeof path);
 
-	debug("added path: %s", netresolve_get_path_string(resolver, response->pathcount - 1));
+	debug("added path: %s", netresolve_get_path_string(channel, response->pathcount - 1));
 
-	if (resolver->callbacks.on_bind)
-		_netresolve_bind_path(resolver, &response->paths[response->pathcount - 1]);
+	if (channel->callbacks.on_bind)
+		netresolve_bind_path(channel, &response->paths[response->pathcount - 1]);
 }
 
 void
-netresolve_backend_set_canonical_name(netresolve_backend_t resolver, const char *canonical_name)
+netresolve_backend_set_canonical_name(netresolve_query_t channel, const char *canonical_name)
 {
-	free(resolver->response.canonname);
-	resolver->response.canonname = strdup(canonical_name);
+	free(channel->response.canonname);
+	channel->response.canonname = strdup(canonical_name);
 }
 
 void *
-netresolve_backend_new_priv(netresolve_backend_t resolver, size_t size)
+netresolve_backend_new_priv(netresolve_query_t channel, size_t size)
 {
-	if ((*resolver->backend)->data) {
+	if ((*channel->backend)->data) {
 		error("Backend data already present.\n");
-		free((*resolver->backend)->data);
+		free((*channel->backend)->data);
 	}
 
-	(*resolver->backend)->data = calloc(1, size);
-	if (!(*resolver->backend)->data)
-		netresolve_backend_failed(resolver);
+	(*channel->backend)->data = calloc(1, size);
+	if (!(*channel->backend)->data)
+		netresolve_backend_failed(channel);
 
-	return (*resolver->backend)->data;
+	return (*channel->backend)->data;
 }
 
 void *
-netresolve_backend_get_priv(netresolve_backend_t resolver)
+netresolve_backend_get_priv(netresolve_query_t channel)
 {
-	return (*resolver->backend)->data;
+	return (*channel->backend)->data;
 }
 
 void
-netresolve_backend_watch_fd(netresolve_backend_t resolver, int fd, int events)
+netresolve_backend_watch_fd(netresolve_query_t channel, int fd, int events)
 {
-	_netresolve_watch_fd(resolver, fd, events);
+	netresolve_watch_fd(channel, fd, events);
 }
 
 int
-netresolve_backend_watch_timeout(netresolve_backend_t resolver, time_t sec, long nsec)
+netresolve_backend_watch_timeout(netresolve_query_t channel, time_t sec, long nsec)
 {
-	return _netresolve_add_timeout(resolver, sec, nsec);
+	return netresolve_add_timeout(channel, sec, nsec);
 }
 
 void
-netresolve_backend_drop_timeout(netresolve_backend_t resolver, int fd)
+netresolve_backend_drop_timeout(netresolve_query_t channel, int fd)
 {
-	_netresolve_remove_timeout(resolver, fd);
+	netresolve_remove_timeout(channel, fd);
 }
 
 static void
-backend_cleanup(netresolve_backend_t resolver)
+backend_cleanup(netresolve_query_t channel)
 {
-	struct netresolve_backend *backend = *resolver->backend;
+	struct netresolve_backend *backend = *channel->backend;
 
 	if (backend && backend->data) {
 		if (backend->cleanup)
-			backend->cleanup(resolver);
+			backend->cleanup(channel);
 		free(backend->data);
 		backend->data = NULL;
 	}
 }
 
 void
-netresolve_backend_finished(netresolve_backend_t resolver)
+netresolve_backend_finished(netresolve_query_t channel)
 {
-	if (!*resolver->backend) {
+	if (!*channel->backend) {
 		error("Out of order backend callback.");
 		goto fail;
 	}
 
-	backend_cleanup(resolver);
+	backend_cleanup(channel);
 
 	/* Restart with the next *mandatory* backend. */
-	while (*++resolver->backend) {
-		if ((*resolver->backend)->mandatory) {
-			_netresolve_start(resolver);
+	while (*++channel->backend) {
+		if ((*channel->backend)->mandatory) {
+			netresolve_start(channel);
 			return;
 		}
 	}
 
-	if (resolver->callbacks.on_connect) {
-		_netresolve_connect_start(resolver);
+	if (channel->callbacks.on_connect) {
+		netresolve_connect_start(channel);
 		return;
 	}
 
-	_netresolve_set_state(resolver, NETRESOLVE_STATE_FINISHED);
+	netresolve_set_state(channel, NETRESOLVE_STATE_FINISHED);
 	return;
 
 fail:
-	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILED);
+	netresolve_set_state(channel, NETRESOLVE_STATE_FAILED);
 }
 
 void
-netresolve_backend_failed(netresolve_backend_t resolver)
+netresolve_backend_failed(netresolve_query_t channel)
 {
-	if (!*resolver->backend) {
+	if (!*channel->backend) {
 		error("Out of order backend callback.");
 		goto fail;
 	}
 
-	if (resolver->response.pathcount)
+	if (channel->response.pathcount)
 		error("Non-empty failed reply.");
 
-	backend_cleanup(resolver);
+	backend_cleanup(channel);
 
 	/* Restart with the next backend. */
-	if (*++resolver->backend) {
-		_netresolve_start(resolver);
+	if (*++channel->backend) {
+		netresolve_start(channel);
 		return;
 	}
 
 fail:
-	_netresolve_set_state(resolver, NETRESOLVE_STATE_FAILED);
-}
-
-void netresolve_backend_log(netresolve_backend_t resolver, int level, const char *fmt, ...)
-{
-	if (level <= resolver->log_level) {
-		va_list ap;
-
-		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
-		va_end(ap);
-	}
+	netresolve_set_state(channel, NETRESOLVE_STATE_FAILED);
 }
 
 bool
@@ -368,7 +362,7 @@ netresolve_backend_parse_path(const char *str,
 }
 
 void
-netresolve_backend_apply_hostent(netresolve_backend_t resolver,
+netresolve_backend_apply_hostent(netresolve_query_t channel,
 		const struct hostent *he,
 		int socktype, int protocol, int port,
 		int priority, int weight)
@@ -376,11 +370,11 @@ netresolve_backend_apply_hostent(netresolve_backend_t resolver,
 	char **addr;
 
 	for (addr = he->h_addr_list; *addr; addr++)
-		netresolve_backend_add_path(resolver,
+		netresolve_backend_add_path(channel,
 				he->h_addrtype, *addr, 0,
 				socktype, protocol, port,
 				priority, weight);
 
 	if (he->h_name)
-		netresolve_backend_set_canonical_name(resolver, he->h_name);
+		netresolve_backend_set_canonical_name(channel, he->h_name);
 }
