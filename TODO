@@ -24,8 +24,8 @@
 
 ## Tools, wrappers, testing and compatibility
 
- * Improve `netresolve-posix` and extend `netresolve` accordingly
-    - add support for other glibc resolver functions
+ * Improve `netresolve-libc` and extend `netresolve` accordingly
+    - add support for other libc resolver functions
     - `getaddrinfo_a()`, `gai_suspend()`, `gai_error()` and `gai_cancel()`
     - `getnameinfo()`, `gethostbyaddr()`
  * Use long options instead of arguments or environment variables for netresolve

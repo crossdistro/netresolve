@@ -50,7 +50,7 @@ The current implementation only registers *one* file descriptor with the applica
 
 ## POSIX-style API
 
-If your program doesn't need the full power of the provided API but you still want to use `netresolve` as your resolver implementation, you can simply link your program to `libnetresolve-posix.so` which overrides selected POSIX-style name resolution functions.
+If your program doesn't need the full power of the provided API but you still want to use `netresolve` as your resolver implementation, you can simply link your program to `libnetresolve-libc.so` which overrides selected POSIX-style name resolution functions.
 
 Supported functions:
 

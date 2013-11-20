@@ -33,7 +33,7 @@ include_HEADERS = \
 
 lib_LTLIBRARIES = \
 	libnetresolve.la \
-	libnetresolve-posix.la
+	libnetresolve-libc.la
 
 libnetresolve_la_SOURCES = \
 	lib/netresolve-private.h \
@@ -49,12 +49,12 @@ libnetresolve_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	-export-symbols-regex '^netresolve_'
 
-libnetresolve_posix_la_SOURCES = \
-	lib/posix.c
-libnetresolve_posix_la_LDFLAGS = \
+libnetresolve_libc_la_SOURCES = \
+	compat/libc.c
+libnetresolve_libc_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	--export-all-symbols
-libnetresolve_posix_la_LIBADD = \
+libnetresolve_libc_la_LIBADD = \
 	libnetresolve.la
 
 lib_LTLIBRARIES += \
@@ -128,7 +128,7 @@ test_bind_connect_SOURCES = tests/test-bind-connect.c
 test_bind_connect_LDADD = libnetresolve.la
 
 test_getaddrinfo_SOURCES = tests/test-getaddrinfo.c
-test_getaddrinfo_LDADD = libnetresolve-posix.la
+test_getaddrinfo_LDADD = libnetresolve-libc.la
 
 test_gethostbyname_SOURCES = tests/test-gethostbyname.c
-test_gethostbyname_LDADD = libnetresolve-posix.la
+test_gethostbyname_LDADD = libnetresolve-libc.la
