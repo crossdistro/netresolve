@@ -8,7 +8,7 @@ test_command() {
     $DIFF <(./wrapresolve ./"$@") tests/data/$1
 }
 
-for name in getaddrinfo gethostbyname{,2,_r,2_r}; do
+for name in getaddrinfo gethostbyname{,2,_r,2_r} asyncns; do
     ./test-$name
     ./wrapresolve ./test-$name
 done

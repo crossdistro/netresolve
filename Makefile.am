@@ -31,6 +31,7 @@ include_HEADERS = \
 lib_LTLIBRARIES = \
 	libnetresolve.la \
 	libnetresolve-libc.la \
+	libnetresolve-asyncns.la \
 	libnss_netresolve.la
 
 libnetresolve_la_SOURCES = \
@@ -61,6 +62,14 @@ libnetresolve_libc_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	--export-all-symbols
 libnetresolve_libc_la_LIBADD = \
+	libnetresolve.la
+
+libnetresolve_asyncns_la_SOURCES = \
+	compat/asyncns.c
+libnetresolve_asyncns_la_LDFLAGS = \
+	$(AM_LDFLAGS) \
+	--export-all-symbols
+libnetresolve_asyncns_la_LIBADD = \
 	libnetresolve.la
 
 libnss_netresolve_la_SOURCES = \
@@ -156,7 +165,8 @@ noinst_PROGRAMS = \
 	test-gethostbyname \
 	test-gethostbyname2 \
 	test-gethostbyname_r \
-	test-gethostbyname2_r
+	test-gethostbyname2_r \
+	test-asyncns
 
 test_sync_SOURCES = tests/test-sync.c tests/common.c tests/common.h
 test_sync_LDADD = libnetresolve.la
@@ -183,3 +193,6 @@ test_gethostbyname_r_CFLAGS = -DREENTRANT
 
 test_gethostbyname2_r_SOURCES = tests/test-gethostbyname.c
 test_gethostbyname2_r_CFLAGS = -DGETHOSTBYNAME2 -DREENTRANT
+
+test_asyncns_SOURCES = tests/test-asyncns.c
+test_asyncns_LDFLAGS = -lasyncns
