@@ -101,8 +101,8 @@ struct netresolve_resolver {
 		const char *service;
 		int socktype;
 		int protocol;
-		/* See `netresolve-common.h` for details. */
-		int flags;
+		/* Advanced configuration */
+		bool default_loopback;
 	} request;
 	struct netresolve_response {
 		struct netresolve_path *paths;

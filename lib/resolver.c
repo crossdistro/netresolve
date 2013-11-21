@@ -49,8 +49,7 @@ netresolve_open(void)
 
 	resolver->first_connect_timeout = -1;
 
-	if (strtob(secure_getenv("NETRESOLVE_FLAG_DEFAULT_LOOPBACK")))
-		netresolve_set_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
+	netresolve_set_default_loopback(resolver, strtob(secure_getenv("NETRESOLVE_FLAG_DEFAULT_LOOPBACK")));
 
 	return resolver;
 }
@@ -106,21 +105,9 @@ netresolve_set_log_level(netresolve_t resolver, int level)
 }
 
 void
-netresolve_set_flag(netresolve_t resolver, netresolve_flag_t flag)
+netresolve_set_default_loopback(netresolve_t resolver, bool value)
 {
-	if (flag >= _NETRESOLVE_FLAG_COUNT)
-		return;
-
-	resolver->request.flags |= (1 << flag);
-}
-
-void
-netresolve_unset_flag(netresolve_t resolver, netresolve_flag_t flag)
-{
-	if (flag >= _NETRESOLVE_FLAG_COUNT)
-		return;
-
-	resolver->request.flags &= ~(1 << flag);
+	resolver->request.default_loopback = value;
 }
 
 void
@@ -152,7 +139,7 @@ netresolve_callback_set_bind(netresolve_t resolver,
 	resolver->callbacks.on_connect = NULL;
 	resolver->callbacks.user_data_sock = user_data;
 
-	netresolve_unset_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
+	netresolve_set_default_loopback(resolver, false);
 }
 
 void
@@ -164,7 +151,7 @@ netresolve_callback_set_connect(netresolve_t resolver,
 	resolver->callbacks.on_connect = on_connect;
 	resolver->callbacks.user_data_sock = user_data;
 
-	netresolve_set_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
+	netresolve_set_default_loopback(resolver, true);
 }
 
 static struct netresolve_backend *

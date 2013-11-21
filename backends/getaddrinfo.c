@@ -71,7 +71,7 @@ start(netresolve_backend_t resolver, char **settings)
 	struct addrinfo *result;
 	int status;
 
-	if (!netresolve_backend_get_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK))
+	if (!netresolve_backend_get_default_loopback(resolver))
 		hints.ai_flags |= AI_PASSIVE;
 
 	status = getaddrinfo(node, service, &hints, &result);

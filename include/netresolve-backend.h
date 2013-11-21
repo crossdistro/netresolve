@@ -37,7 +37,7 @@ const char *netresolve_backend_get_service(netresolve_backend_t resolver);
 int netresolve_backend_get_family(netresolve_backend_t resolver);
 int netresolve_backend_get_protocol(netresolve_backend_t resolver);
 int netresolve_backend_get_socktype(netresolve_backend_t resolver);
-bool netresolve_backend_get_flag(netresolve_backend_t resolver, netresolve_flag_t flag);
+bool netresolve_backend_get_default_loopback(netresolve_backend_t resolver);
 
 /* Output */
 void netresolve_backend_add_path(netresolve_backend_t resolver,

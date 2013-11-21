@@ -59,9 +59,9 @@ netresolve_backend_get_protocol(netresolve_backend_t resolver)
 }
 
 bool
-netresolve_backend_get_flag(netresolve_backend_t resolver, netresolve_flag_t flag)
+netresolve_backend_get_default_loopback(netresolve_backend_t resolver)
 {
-	return resolver->request.flags & (1 << flag);
+	return resolver->request.default_loopback;
 }
 
 static size_t

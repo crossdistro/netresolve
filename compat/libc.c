@@ -68,10 +68,7 @@ getaddrinfo(const char *node, const char *service,
 	if (!hints)
 		hints = &default_hints;
 
-	if (hints->ai_flags & AI_PASSIVE)
-		netresolve_unset_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
-	else
-		netresolve_set_flag(resolver, NETRESOLVE_FLAG_DEFAULT_LOOPBACK);
+	netresolve_set_default_loopback(resolver, !(hints->ai_flags & AI_PASSIVE));
 
 	status = netresolve_resolve(resolver, node, service, hints->ai_family, hints->ai_socktype, hints->ai_protocol);
 

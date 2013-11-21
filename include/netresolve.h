@@ -33,8 +33,7 @@ void netresolve_close(netresolve_t resolver);
 /* Configuration API */
 void netresolve_set_log_level(netresolve_t resolver, int level);
 void netresolve_set_backend_string(netresolve_t resolver, const char *string);
-void netresolve_set_flag(netresolve_t resolver, netresolve_flag_t flag);
-void netresolve_unset_flag(netresolve_t resolver, netresolve_flag_t flag);
+void netresolve_set_default_loopback(netresolve_t resolver, bool value);
 
 /* Callback API */
 typedef void (*netresolve_callback_t)(netresolve_t resolver, void *user_data);
