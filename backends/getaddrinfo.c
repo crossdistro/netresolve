@@ -52,7 +52,8 @@ add_addresses(netresolve_backend_t response, const struct addrinfo *first)
 
 		netresolve_backend_add_path(response,
 				ai->ai_family, &address, ifindex,
-				ai->ai_socktype, ai->ai_protocol, port);
+				ai->ai_socktype, ai->ai_protocol, port,
+				0, 0);
 	}
 
 }

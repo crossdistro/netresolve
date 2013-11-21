@@ -101,7 +101,12 @@ generate_hostent(netresolve_t resolver)
 
 	for (i = 0; i < npaths; i++) {
 		int family, ifindex, socktype, protocol, port;
-		const char *address = netresolve_get_path(resolver, i, &family, &ifindex, &socktype, &protocol, &port);
+		const void *address;
+
+		netresolve_get_path(resolver, i,
+				&family, &address, &ifindex,
+				&socktype, &protocol, &port,
+				NULL, NULL);
 
 		if (family != AF_INET && family != AF_INET6)
 			continue;

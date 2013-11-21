@@ -33,6 +33,6 @@ start(netresolve_backend_t resolver, char **settings)
 		return;
 	}
 
-	netresolve_backend_add_path(resolver, AF_UNIX, node, 0, socktype, 0, 0);
+	netresolve_backend_add_path(resolver, AF_UNIX, node, 0, socktype, 0, 0, 0, 0);
 	netresolve_backend_finished(resolver);
 }

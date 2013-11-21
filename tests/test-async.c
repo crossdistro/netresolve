@@ -47,12 +47,12 @@ on_success(netresolve_t resolver, void *user_data)
 {
 	unsigned char expected_address[16] = { 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8 };
 	int family;
-	const char *address;
+	const void *address;
 	int ifindex;
 
 	assert(netresolve_get_path_count(resolver) == 1);
 
-	address = netresolve_get_path(resolver, 0, &family, &ifindex, NULL, NULL, NULL);
+	netresolve_get_path(resolver, 0, &family, &address, &ifindex, NULL, NULL, NULL, NULL, NULL);
 	assert(family = AF_INET6);
 	assert(ifindex == 999999);
 	assert(!memcmp(address, expected_address, sizeof expected_address));

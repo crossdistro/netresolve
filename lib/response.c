@@ -16,6 +16,7 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 #include <string.h>
+#include <assert.h>
 
 #include "netresolve-private.h"
 
@@ -25,15 +26,18 @@ netresolve_get_path_count(netresolve_t resolver)
 	return resolver->response.pathcount;
 }
 
-const void *
+void
 netresolve_get_path(netresolve_t resolver, size_t idx,
-		int *family, int *ifindex, int *socktype, int *protocol, int *port)
+		int *family, const void **address, int *ifindex,
+		int *socktype, int *protocol, int *port,
+		int *priority, int *weight)
 {
-	if (idx >= resolver->response.pathcount)
-		return NULL;
+	assert (idx < resolver->response.pathcount);
 
 	if (family)
 		*family = resolver->response.paths[idx].node.family;
+	if (address)
+		*address = &resolver->response.paths[idx].node.address;
 	if (ifindex)
 		*ifindex = resolver->response.paths[idx].node.ifindex;
 	if (socktype)
@@ -42,8 +46,10 @@ netresolve_get_path(netresolve_t resolver, size_t idx,
 		*protocol = resolver->response.paths[idx].service.protocol;
 	if (port)
 		*port = resolver->response.paths[idx].service.port;
-
-	return &resolver->response.paths[idx].node.address;
+	if (priority)
+		*priority = resolver->response.paths[idx].priority;
+	if (weight)
+		*weight = resolver->response.paths[idx].weight;
 }
 
 const char *
@@ -57,7 +63,9 @@ netresolve_get_path_sockaddr(netresolve_t resolver, size_t idx,
 		int *socktype, int *protocol, socklen_t *salen)
 {
 	int family, ifindex, port;
-	const void *address = netresolve_get_path(resolver, idx, &family, &ifindex, socktype, protocol, &port);
+	const void *address;
+
+	netresolve_get_path(resolver, idx, &family, &address, &ifindex, socktype, protocol, &port, NULL, NULL);
 
 	if (!address)
 		return NULL;

@@ -38,13 +38,15 @@ int netresolve_backend_get_family(netresolve_backend_t resolver);
 int netresolve_backend_get_protocol(netresolve_backend_t resolver);
 int netresolve_backend_get_socktype(netresolve_backend_t resolver);
 bool netresolve_backend_get_default_loopback(netresolve_backend_t resolver);
+bool netresolve_backend_get_dns_srv_lookup(netresolve_backend_t resolver);
 
 /* Output */
 void netresolve_backend_add_path(netresolve_backend_t resolver,
 		int family, const void *address, int ifindex,
-		int socktype, int protocol, int port);
-void netresolve_backend_add_address(netresolve_backend_t resolver,
-		int family, const void *address, int ifindex);
+		int socktype, int protocol, int port,
+		int priority, int weight);
+#define netresolve_backend_add_address(resolver, family, address, ifindex) \
+	netresolve_backend_add_path(resolver, family, address, ifindex, -1, -1, -1, 0, 0);
 void netresolve_backend_set_canonical_name(netresolve_backend_t resolver, const char *canonical_name);
 
 /* Tools */
@@ -68,7 +70,10 @@ bool netresolve_backend_parse_address(const char *string_orig,
 bool netresolve_backend_parse_path(const char *str,
 		Address *address, int *family, int *ifindex,
 		int *socktype, int *protocol, int *port);
-void netresolve_backend_apply_hostent(netresolve_backend_t resolver, const struct hostent *he, bool canonname);
+void netresolve_backend_apply_hostent(netresolve_backend_t resolver,
+		const struct hostent *he,
+		int socktype, int protocol, int port,
+		int priority, int weight);
 
 /* Backend function prototypes */
 void start(netresolve_backend_t resolver, char **settings);

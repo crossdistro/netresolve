@@ -60,8 +60,10 @@ int netresolve_dispatch(netresolve_t resolver, int fd, int events);
 
 /* Response API */
 size_t netresolve_get_path_count(const netresolve_t resolver);
-const void *netresolve_get_path(const netresolve_t resolver, size_t idx,
-		int *family, int *ifindex, int *socktype, int *protocol, int *port);
+void netresolve_get_path(const netresolve_t resolver, size_t idx,
+		int *family, const void **address, int *ifindex,
+		int *socktype, int *protocol, int *port,
+		int *priority, int *weight);
 const char *netresolve_get_canonical_name(const netresolve_t resolver);
 /* Convenient API for use with BSD socket API */
 const struct sockaddr *netresolve_get_path_sockaddr(const netresolve_t resolver, size_t n,

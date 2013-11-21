@@ -28,6 +28,8 @@ static const char *
 socktype_to_string(int socktype)
 {
 	switch (socktype) {
+	case 0:
+		return "any";
 	case SOCK_DGRAM:
 		return "dgram";
 	case SOCK_STREAM:
@@ -37,7 +39,7 @@ socktype_to_string(int socktype)
 	case SOCK_RAW:
 		return "raw";
 	default:
-		return "0";
+		return "unknown";
 	}
 }
 
@@ -45,6 +47,8 @@ static const char *
 protocol_to_string(int proto)
 {
 	switch (proto) {
+	case 0:
+		return "any";
 	case IPPROTO_UDP:
 		return "udp";
 	case IPPROTO_TCP:
@@ -52,7 +56,7 @@ protocol_to_string(int proto)
 	case IPPROTO_SCTP:
 		return "sctp";
 	default:
-		return "0";
+		return "unknown";
 	}
 }
 
@@ -74,12 +78,20 @@ bprintf(char **current, char *end, const char *fmt, ...)
 static void
 add_path(char **start, char *end, netresolve_t resolver, int i)
 {
-	int family, ifindex, socktype, protocol, port;
-	const void *address = netresolve_get_path(resolver, i, &family, &ifindex, &socktype, &protocol, &port);
+	int family, ifindex, socktype, protocol, port, priority, weight;
+	const void *address;
 	char ifname[IF_NAMESIZE] = {0};
 	char addrstr[1024] = {0};
-	const char *socktypestr = socktype_to_string(socktype);
-	const char *protocolstr = protocol_to_string(protocol);
+	const char *socktypestr;
+	const char *protocolstr;
+
+	netresolve_get_path(resolver, i,
+			&family, &address, &ifindex,
+			&socktype, &protocol, &port,
+			&priority, &weight);
+
+	socktypestr = socktype_to_string(socktype);
+	protocolstr = protocol_to_string(protocol);
 
 	if (family == AF_INET || family == AF_INET6)
 		inet_ntop(family, address, addrstr, sizeof addrstr);
@@ -89,15 +101,11 @@ add_path(char **start, char *end, netresolve_t resolver, int i)
 	else if (ifindex) {
 		if (!if_indextoname(ifindex, ifname))
 			snprintf(ifname, sizeof ifname, "%d", ifindex);
-		if (socktype || protocol || port)
-			bprintf(start, end, "path %s%%%s %s %s %d\n", addrstr, ifname, socktypestr, protocolstr, port);
-		else
-			bprintf(start, end, "address %s%%%s\n", addrstr, ifname);
+		bprintf(start, end, "path %s%%%s %s %s %d %d %d\n",
+				addrstr, ifname, socktypestr, protocolstr, port, priority, weight);
 	} else {
-		if (socktype || protocol || port)
-			bprintf(start, end, "path %s %s %s %d\n", addrstr, socktypestr, protocolstr, port);
-		else
-			bprintf(start, end, "address %s\n", addrstr);
+		bprintf(start, end, "path %s %s %s %d %d %d\n",
+				addrstr, socktypestr, protocolstr, port, priority, weight);
 	}
 }
 

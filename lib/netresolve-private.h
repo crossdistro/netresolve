@@ -62,6 +62,8 @@ struct netresolve_path {
 		int protocol;
 		int port;
 	} service;
+	int priority;
+	int weight;
 	struct {
 		enum netresolve_state state;
 		int fd;

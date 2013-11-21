@@ -70,6 +70,11 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 {
 	netresolve_backend_t resolver = arg;
 	struct priv_dns *priv = netresolve_backend_get_priv(resolver);
+	int socktype = -1;
+	int protocol = -1;
+	int port = -1;
+	int priority = 0;
+	int weight = 0;
 
 	switch (status) {
 	case ARES_EDESTRUCTION:
@@ -78,7 +83,7 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 		priv->ptfd = netresolve_backend_watch_timeout(resolver, partial_timeout, 0);
 		if (priv->ptfd == -1)
 			error("timer: %s", strerror(errno));
-		netresolve_backend_apply_hostent(resolver, he, false);
+		netresolve_backend_apply_hostent(resolver, he, socktype, protocol, port, priority, weight);
 		break;
 	default:
 		error("ares: %s\n", ares_strerror(status));

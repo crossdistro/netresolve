@@ -122,7 +122,7 @@ received_line(netresolve_backend_t resolver, struct priv_exec *priv, const char 
 	} else if (!strncmp(pathprefix, line, pathprefixlen)) {
 		if (netresolve_backend_parse_path(line + pathprefixlen,
 					&address, &family, &ifindex, &socktype, &protocol, &port))
-			netresolve_backend_add_path(resolver, family, &address, ifindex, socktype, protocol, port);
+			netresolve_backend_add_path(resolver, family, &address, ifindex, socktype, protocol, port, 0, 0);
 	}
 
 	return false;

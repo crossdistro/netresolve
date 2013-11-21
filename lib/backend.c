@@ -77,11 +77,45 @@ family_to_length(int family)
 	}
 }
 
+typedef struct {
+	netresolve_backend_t resolver;
+	int family;
+	const void *address;
+	int ifindex;
+} PathData;
+
+static void
+path_callback(int socktype, int protocol, int port, void *user_data)
+{
+	PathData *data = user_data;
+
+	netresolve_backend_add_path(data->resolver,
+			data->family, data->address, data->ifindex,
+			socktype, protocol, port,
+			0, 0);
+}
+
 void
-netresolve_backend_add_path(netresolve_backend_t resolver, int family, const void *address, int ifindex, int socktype, int protocol, int portnum)
+netresolve_backend_add_path(netresolve_backend_t resolver,
+		int family, const void *address, int ifindex,
+		int socktype, int protocol, int portnum,
+		int priority, int weight)
 {
 	struct netresolve_response *response = &resolver->response;
 	struct netresolve_path path;
+
+	if (socktype == -1 && protocol == -1 && portnum == -1) {
+		PathData data = {
+			.resolver = resolver,
+			.family = family,
+			.address = address,
+			.ifindex = ifindex,
+		};
+
+		_netresolve_get_service_info(path_callback, &data, resolver->request.service,
+				resolver->request.socktype, resolver->request.protocol);
+		return;
+	}
 
 	if (resolver->request.family != AF_UNSPEC && resolver->request.family != family)
 		return;
@@ -98,6 +132,8 @@ netresolve_backend_add_path(netresolve_backend_t resolver, int family, const voi
 	path.service.socktype = socktype;
 	path.service.protocol = protocol;
 	path.service.port = portnum;
+	path.priority = priority;
+	path.weight = weight;
 
 	response->paths = realloc(response->paths, (response->pathcount + 1) * sizeof path);
 	memcpy(&response->paths[response->pathcount++], &path, sizeof path);
@@ -106,30 +142,6 @@ netresolve_backend_add_path(netresolve_backend_t resolver, int family, const voi
 
 	if (resolver->callbacks.on_bind)
 		_netresolve_bind_path(resolver, &response->paths[response->pathcount - 1]);
-}
-
-typedef struct {
-	netresolve_backend_t resolver;
-	int family;
-	const void *address;
-	int ifindex;
-} PathData;
-
-static void
-path_callback(int socktype, int protocol, int port, void *user_data)
-{
-	PathData *data = user_data;
-
-	netresolve_backend_add_path(data->resolver, data->family, data->address, data->ifindex, socktype, protocol, port);
-}
-
-void
-netresolve_backend_add_address(netresolve_backend_t resolver, int family, const void *address, int ifindex)
-{
-	PathData data = { .resolver = resolver, .family = family, .address = address, .ifindex = ifindex };
-
-	_netresolve_get_service_info(path_callback, &data, resolver->request.service,
-			resolver->request.socktype, resolver->request.protocol);
 }
 
 void
@@ -143,7 +155,7 @@ void *
 netresolve_backend_new_priv(netresolve_backend_t resolver, size_t size)
 {
 	if ((*resolver->backend)->data) {
-		error("Backend data already present.");
+		error("Backend data already present.\n");
 		free((*resolver->backend)->data);
 	}
 
@@ -343,13 +355,19 @@ netresolve_backend_parse_path(const char *str,
 }
 
 void
-netresolve_backend_apply_hostent(netresolve_backend_t resolver, const struct hostent *he, bool canonname)
+netresolve_backend_apply_hostent(netresolve_backend_t resolver,
+		const struct hostent *he,
+		int socktype, int protocol, int port,
+		int priority, int weight)
 {
 	char **addr;
 
 	for (addr = he->h_addr_list; *addr; addr++)
-		netresolve_backend_add_address(resolver, he->h_addrtype, *addr, 0);
+		netresolve_backend_add_path(resolver,
+				he->h_addrtype, *addr, 0,
+				socktype, protocol, port,
+				priority, weight);
 
-	if (canonname)
+	if (he->h_name)
 		netresolve_backend_set_canonical_name(resolver, he->h_name);
 }
