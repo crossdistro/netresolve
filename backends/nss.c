@@ -129,10 +129,10 @@ start(netresolve_backend_t resolver, char **settings)
 		netresolve_backend_failed(resolver);
 		return;
 	}
-	try_symbol_pattern(resolver, priv, (void *) priv->gethostbyname_r, "_nss_%s_gethostbyname_r", "gethostbyname");
-	try_symbol_pattern(resolver, priv, (void *) priv->gethostbyname2_r, "_nss_%s_gethostbyname2_r", "gethostbyname2");
-	try_symbol_pattern(resolver, priv, (void *) priv->gethostbyname3_r, "_nss_%s_gethostbyname3_r", "gethostbyname3");
-	try_symbol_pattern(resolver, priv, (void *) priv->gethostbyname4_r, "_nss_%s_gethostbyname4_r", "gethostbyname4");
+	try_symbol_pattern(resolver, priv, (void *) &priv->gethostbyname_r, "_nss_%s_gethostbyname_r", "gethostbyname");
+	try_symbol_pattern(resolver, priv, (void *) &priv->gethostbyname2_r, "_nss_%s_gethostbyname2_r", "gethostbyname2");
+	try_symbol_pattern(resolver, priv, (void *) &priv->gethostbyname3_r, "_nss_%s_gethostbyname3_r", "gethostbyname3");
+	try_symbol_pattern(resolver, priv, (void *) &priv->gethostbyname4_r, "_nss_%s_gethostbyname4_r", "gethostbyname4");
 
 	/*if (priv->gethostbyname4_r) {
 		TODO

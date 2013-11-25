@@ -202,7 +202,8 @@ backend_cleanup(netresolve_backend_t resolver)
 	struct netresolve_backend *backend = *resolver->backend;
 
 	if (backend && backend->data) {
-		backend->cleanup(resolver);
+		if (backend->cleanup)
+			backend->cleanup(resolver);
 		free(backend->data);
 		backend->data = NULL;
 	}
