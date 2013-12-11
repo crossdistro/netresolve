@@ -6,7 +6,8 @@ AM_CPPFLAGS = \
 	-DSYSCONFDIR=\""$(sysconfdir)"\" \
 	-DLIBEXECDIR=\""$(libexecdir)"\" \
 	-I${top_srcdir}/include \
-	-I${top_srcdir}/lib
+	-I${top_srcdir}/lib \
+	-I${top_srcdir}/compat
 
 AM_CFLAGS = -Wall -Werror
 AM_LDFLAGS =
@@ -50,7 +51,9 @@ libnetresolve_la_LDFLAGS = \
 	-export-symbols-regex '^netresolve_'
 
 libnetresolve_libc_la_SOURCES = \
-	compat/libc.c
+	compat/libc.c \
+	compat/compat.c \
+	compat/compat.h
 libnetresolve_libc_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	--export-all-symbols
