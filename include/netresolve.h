@@ -62,7 +62,7 @@ void netresolve_set_connect_callback(netresolve_t channel,
 
 /* Query API */
 netresolve_query_t netresolve_query(netresolve_t channel, const char *node, const char *service);
-void netresolve_query_cancel(netresolve_query_t query);
+void netresolve_query_done(netresolve_query_t query);
 
 /* Query results */
 size_t netresolve_query_get_count(const netresolve_query_t query);

@@ -475,8 +475,15 @@ netresolve_dispatch_fd(netresolve_t channel, int fd, int events)
 	return true;
 }
 
+/* netresolve_query_done:
+ *
+ * Call this function when you are finished with the netresolve query and
+ * don't need to access it any more. It cancels the query if it hasn't been
+ * finished, yet, and performs internal cleanups. Don't use the query handle
+ * after calling it.
+ */
 void
-netresolve_query_cancel(netresolve_query_t query)
+netresolve_query_done(netresolve_query_t query)
 {
 	netresolve_set_state(query, NETRESOLVE_STATE_INIT);
 }
