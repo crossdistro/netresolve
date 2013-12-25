@@ -41,7 +41,7 @@ main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	query = netresolve_query_argv(channel, argv + 1);
+	query = netresolve_query_argv(channel, argv);
 	if (!query) {
 		fprintf(stderr, "netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;

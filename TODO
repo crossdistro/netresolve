@@ -29,10 +29,6 @@
     - libasyncns
     - getdns
  * Build a fake ares library to support DNS testing
- * Use long options instead of arguments or environment variables for netresolve
-    - `--host` and `--service`
-    - `--family`, `--socktype` and `--protocol`
-    - `--backends`
  * A comprehensive dualstack test plan
     - DNS: AAAA wildcard search available, only global A record set
     - DNS: AAAA record not answered, A answered (and vice versa)
