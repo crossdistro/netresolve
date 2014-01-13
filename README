@@ -100,6 +100,10 @@ When a name resolution request is ready, netresolve calls `start(resolver, setti
 
 Input data is gathered using `netresolve_backend_get_*()` functions. Internal state accross `start()` and `dispatch()` calls can be kept using `netresolve_backend_new_priv()` and `netresolve_backend_get_data()`. The backend should provide `cleanup()` function to clean up any resources. It's called by netresolve upon success/failure or when the transaction was cancelled by the application.
 
+## Known bugs
+
+The library doesn't currently sort paths according to their priority and/or RFC rules. The DNS backend doesn't prevent dual protocol search domain race condition (when search domain for one protocol is considered before global zone for other protocol). For missing features, see the `TODO` file.
+
 ## Acknowledgements and inspiration
 
  * Tore Anderson was the first who discussed name resolution issues with me and especially the reasons to suppress A or AAAA queries when global address of the respective family is not present in the system.

@@ -15,9 +15,6 @@
     - what about non-DNS protocols?
     - what about any, localhost or numeric addresses
  * Use -fvisibility=hidden and mark exported symbols explicitly
- * Support non-epoll platforms
-    - by passing multiple file descriptors to application using `watch_fd()` calls
-    - emulate timerfd file descriptors, pass a timeout to the application
 
 ## Tools, wrappers, testing and compatibility
 
@@ -28,6 +25,7 @@
  * Implement name service switch backend on top of netresolve
     - environment variables and/or a configuration file for defaults
  * Implement other network resolution APIs
+    - POSIX resolver routines
     - libasyncns
     - getdns
  * Build a fake ares library to support DNS testing
@@ -36,6 +34,7 @@
     - `--family`, `--socktype` and `--protocol`
     - `--backends`
  * A comprehensive dualstack test plan
+    - DNS: AAAA wildcard search available, only global A record set
     - DNS: AAAA record not answered, A answered (and vice versa)
     - DNS: SRV not answered, A/AAAA answered
     - TCP: IPv6/SYN not answered, IPv4 SYN answered (and vice versa)
@@ -53,6 +52,7 @@
 ## Backends
 
  * Improve the DNS backend
+    - fix undue search domain wildcard preference
     - add PTR support
     - consider MX/SSH/TLSA and other records; add DNS-only API for that
     - validation information
@@ -67,8 +67,15 @@
     - add tests
  * Implement `hostname` backend
 
+## Portability
+
+ * Support non-epoll platforms
+    - by passing multiple file descriptors to application using `watch_fd()` calls
+    - emulate timerfd file descriptors and/or pass a timeout to the application
+
 ## Documentation and non-development stuff
 
- * manpages
+ * Website
+ * Manpages
  * Provide fixes for glibc resolver
- * notes and errata on IETF standards
+ * IETF notes, errata and drafts
