@@ -27,10 +27,11 @@
 /* getaddrinfo:
  *
  * Resolve `nodename` and `servname` using `hints` into a linked list of
- * address records including both L3 and L4 information. Canonicla name,
+ * address records including both L3 and L4 information. Canonical name,
  * if requested, is present in the first address record.
  *
- * The caller is responsible for freeing the data using `freeaddrinfo()`.
+ * The caller is responsible for freeing the data using `freeaddrinfo()`. The
+ * function is reentrant, threat safe and doesn't leak memory.
  *
  * Defined in POSIX.1-2008.
  */
@@ -65,6 +66,11 @@ freeaddrinfo(struct addrinfo *ai)
 }
 
 /* gethostbyname:
+ *
+ * Caller doesn't free the result of this function. Instead, it is kept,
+ * referenced by a static pointer, until the next call of `gethostbyname()`,
+ * making `gethostbyname()` not reentrant by definition and the answer to the
+ * last request is never freed.
  *
  * Defined in POSIX.1-2001, removed in POSIX.1-2008.
  */
