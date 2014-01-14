@@ -2,10 +2,11 @@
 
 ## Core library
 
- * Return items in the right order
-    - http://tools.ietf.org/html/rfc6724
+ * Improve path ordering
     - use priority from DNS SRV
-    - randomize order using weight from DNS SRV
+    - use weight from DNS SRV for randomized ordering
+    - use rules from http://tools.ietf.org/html/rfc6724
+    - use /etc/gai.conf
  * Support multiple concurrent queries per channel
  * Support reverse lookup
  * Improve socket API and happy eyeballs

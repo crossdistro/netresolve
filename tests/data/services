@@ -1,6 +1,6 @@
 response netresolve 0.0.1
-path 0.0.0.0 stream tcp 1021 0 0
-path 0.0.0.0 dgram udp 1021 0 0
 path :: stream tcp 1021 0 0
 path :: dgram udp 1021 0 0
+path 0.0.0.0 stream tcp 1021 0 0
+path 0.0.0.0 dgram udp 1021 0 0
 

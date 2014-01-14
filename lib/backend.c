@@ -106,6 +106,17 @@ path_callback(int socktype, int protocol, int port, void *user_data)
 			0, 0);
 }
 
+static int
+path_cmp(struct netresolve_path *p1, struct netresolve_path *p2)
+{
+	if (p1->node.family == AF_INET6 && p2->node.family == AF_INET)
+		return -1;
+	if (p1->node.family == AF_INET && p2->node.family == AF_INET6)
+		return 1;
+
+	return 0;
+}
+
 void
 netresolve_backend_add_path(netresolve_query_t channel,
 		int family, const void *address, int ifindex,
@@ -114,6 +125,7 @@ netresolve_backend_add_path(netresolve_query_t channel,
 {
 	struct netresolve_response *response = &channel->response;
 	struct netresolve_path path;
+	int i;
 
 	if (family == AF_UNIX && socktype == -1) {
 		netresolve_backend_add_path(channel, family, address, 0, SOCK_STREAM, 0, 0, 0, 0);
@@ -152,8 +164,14 @@ netresolve_backend_add_path(netresolve_query_t channel,
 	path.priority = priority;
 	path.weight = weight;
 
+	for (i = 0; i < response->pathcount; i++)
+		if (path_cmp(&path, &response->paths[i]) < 0)
+			break;
+
 	response->paths = realloc(response->paths, (response->pathcount + 1) * sizeof path);
-	memcpy(&response->paths[response->pathcount++], &path, sizeof path);
+	memmove(&response->paths[i+1], &response->paths[i],
+			(response->pathcount++ - i) * sizeof *response->paths);
+	memcpy(&response->paths[i], &path, sizeof path);
 
 	debug("added path: %s", netresolve_get_path_string(channel, response->pathcount - 1));
 
