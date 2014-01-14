@@ -48,8 +48,8 @@
 ## Backends
 
  * Improve the DNS backend
-    - fix undue search domain wildcard preference
     - add PTR support
+    - add domain search support (while still prioritizing non-searched results)
     - consider MX/SSH/TLSA and other records; add DNS-only API for that
     - validation information
     - `ai_addrconfig`-like functionality

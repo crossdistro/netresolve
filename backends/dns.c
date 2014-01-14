@@ -203,6 +203,11 @@ void
 start(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv = netresolve_backend_new_priv(query, sizeof *priv);
+	/* ares doesn't seem to accept const options */
+	static struct ares_options options = {
+		.flags = ARES_FLAG_NOSEARCH | ARES_FLAG_NOALIASES,
+		.lookups = "b"
+	};
 	int status;
 
 	if (!priv)
@@ -216,7 +221,8 @@ start(netresolve_query_t query, char **settings)
 	status = ares_library_init(ARES_LIB_INIT_ALL);
 	if (status != ARES_SUCCESS)
 		goto fail_ares;
-	status = ares_init(&priv->query);
+	status = ares_init_options(&priv->query, &options,
+			ARES_OPT_FLAGS | ARES_OPT_LOOKUPS);
 	if (status != ARES_SUCCESS)
 		goto fail_ares;
 

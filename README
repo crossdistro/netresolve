@@ -102,7 +102,7 @@ Input data is gathered using `netresolve_backend_get_*()` functions. Internal st
 
 ## Known bugs
 
-The library doesn't currently sort paths according to their priority and/or RFC rules. The DNS backend doesn't prevent dual protocol search domain race condition (when search domain for one protocol is considered before global zone for other protocol). For missing features, see the `TODO` file.
+The library doesn't currently sort paths according to their priority and/or RFC rules. The DNS backend doesn't support search domains. For more information, see the `TODO` file.
 
 ## Acknowledgements and inspiration
 
