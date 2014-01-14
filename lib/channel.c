@@ -25,7 +25,6 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
-#include <dlfcn.h>
 #include <poll.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
@@ -60,195 +59,16 @@ netresolve_open(void)
 	return channel;
 }
 
-static void
-free_backend(struct netresolve_backend *backend)
-{
-	char **p;
-
-	if (!backend)
-		return;
-	if (backend->settings) {
-		for (p = backend->settings; *p; p++)
-			free(*p);
-		free(backend->settings);
-	}
-	if (backend->dl_handle)
-		dlclose(backend->dl_handle);
-	free(backend);
-}
-
-static void
-clear_backends(netresolve_t channel)
-{
-	struct netresolve_backend **backend;
-
-	if (!channel->backends)
-		return;
-
-	for (backend = channel->backends; *backend; backend++)
-		free_backend(*backend);
-	free(channel->backends);
-	channel->backends = NULL;
-}
-
 void
 netresolve_close(netresolve_t channel)
 {
 	if (!channel)
 		return;
 	netresolve_set_state(channel, NETRESOLVE_STATE_INIT);
+	netresolve_set_backend_string(channel, "");
 	close(channel->epoll_fd);
-	free(channel->backend_string);
-	clear_backends(channel);
 	memset(channel, 0, sizeof *channel);
 	free(channel);
-}
-
-void
-netresolve_set_default_loopback(netresolve_t channel, bool value)
-{
-	channel->request.default_loopback = value;
-}
-
-void
-netresolve_set_dns_srv_lookup(netresolve_t channel, bool value)
-{
-	channel->request.dns_srv_lookup = value;
-}
-
-void
-netresolve_set_family(netresolve_t channel, int family)
-{
-	channel->request.family = family;
-}
-
-void
-netresolve_set_socktype(netresolve_t channel, int socktype)
-{
-	channel->request.socktype = socktype;
-}
-
-void
-netresolve_set_protocol(netresolve_t channel, int protocol)
-{
-	channel->request.protocol = protocol;
-}
-
-void
-netresolve_set_success_callback(netresolve_t channel,
-		netresolve_callback_t on_success, void *user_data)
-{
-	channel->callbacks.on_success = on_success;
-	channel->callbacks.user_data = user_data;
-}
-
-void
-netresolve_set_fd_callback(netresolve_t channel,
-		netresolve_fd_callback_t watch_fd,
-		void *user_data)
-{
-	channel->callbacks.watch_fd = watch_fd;
-	channel->callbacks.user_data_fd = user_data;
-}
-
-void
-netresolve_set_bind_callback(netresolve_t channel,
-		netresolve_socket_callback_t on_bind,
-		void *user_data)
-{
-	channel->callbacks.on_bind = on_bind;
-	channel->callbacks.on_connect = NULL;
-	channel->callbacks.user_data_sock = user_data;
-
-	netresolve_set_default_loopback(channel, false);
-}
-
-void
-netresolve_set_connect_callback(netresolve_t channel,
-		netresolve_socket_callback_t on_connect,
-		void *user_data)
-{
-	channel->callbacks.on_bind = NULL;
-	channel->callbacks.on_connect = on_connect;
-	channel->callbacks.user_data_sock = user_data;
-
-	netresolve_set_default_loopback(channel, true);
-}
-
-static struct netresolve_backend *
-load_backend(char **take_settings)
-{
-	struct netresolve_backend *backend = calloc(1, sizeof *backend);
-	const char *name;
-	char filename[1024];
-
-	if (!backend)
-		return NULL;
-	if (!take_settings || !*take_settings)
-		goto fail;
-
-	name = *take_settings;
-	if (*name == '+') {
-		backend->mandatory = true;
-		name++;
-	}
-
-	backend->settings = take_settings;
-	snprintf(filename, sizeof filename, "libnetresolve-backend-%s.so", name);
-	backend->dl_handle = dlopen(filename, RTLD_NOW);
-	if (!backend->dl_handle) {
-		error("%s\n", dlerror());
-		goto fail;
-	}
-
-	backend->start = dlsym(backend->dl_handle, "start");
-	backend->dispatch = dlsym(backend->dl_handle, "dispatch");
-	backend->cleanup = dlsym(backend->dl_handle, "cleanup");
-
-	if (!backend->start)
-		goto fail;
-
-	return backend;
-fail:
-	free_backend(backend);
-	return NULL;
-}
-
-void
-netresolve_set_backend_string(netresolve_t channel, const char *string)
-{
-	const char *start, *end;
-	char **settings = NULL;
-	int nsettings = 0;
-	int nbackends = 0;
-
-	/* Default. */
-	if (string == NULL)
-		string = "unix,any,loopback,numerichost,hosts,dns";
-
-	/* Install new set of backends. */
-	clear_backends(channel);
-	for (start = end = string; true; end++) {
-		if (*end == ':' || *end == ',' || *end == '\0') {
-			settings = realloc(settings, (nsettings + 2) * sizeof *settings);
-			settings[nsettings++] = strndup(start, end - start);
-			settings[nsettings] = NULL;
-			start = end + 1;
-		}
-		if (*end == ',' || *end == '\0') {
-			channel->backends = realloc(channel->backends, (nbackends + 2) * sizeof *channel->backends);
-			channel->backends[nbackends] = load_backend(settings);
-			if (channel->backends[nbackends]) {
-				nbackends++;
-				channel->backends[nbackends] = NULL;
-			}
-			nsettings = 0;
-			settings = NULL;
-		}
-		if (*end == '\0') {
-			break;
-		}
-	}
 }
 
 static const char *
@@ -479,7 +299,7 @@ netresolve_dispatch_fd(netresolve_t channel, int fd, int events)
  *
  * Call this function when you are finished with the netresolve query and
  * don't need to access it any more. It cancels the query if it hasn't been
- * finished, yet, and performs internal cleanups. Don't use the query handle
+ * finished yet, and performs internal cleanups. Don't use the query handle
  * after calling it.
  */
 void

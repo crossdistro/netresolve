@@ -28,25 +28,18 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
+/* Channels and queries */
 typedef struct netresolve_channel *netresolve_t;
 typedef struct netresolve_channel *netresolve_query_t;
 
-/* Channel API */
 netresolve_t netresolve_open(void);
 void netresolve_close(netresolve_t channel);
 bool netresolve_dispatch_fd(netresolve_t channel, int fd, int events);
 
-/* Node/service resolution options */
-void netresolve_set_family(netresolve_t channel, int family);
-void netresolve_set_socktype(netresolve_t channel, int socktype);
-void netresolve_set_protocol(netresolve_t channel, int protocol);
-void netresolve_set_default_loopback(netresolve_t channel, bool value);
-void netresolve_set_dns_srv_lookup(netresolve_t channel, bool value);
+netresolve_query_t netresolve_query(netresolve_t channel, const char *node, const char *service);
+void netresolve_query_done(netresolve_query_t query);
 
-/* Advanced configuration */
-void netresolve_set_backend_string(netresolve_t channel, const char *string);
-
-/* Channel callbacks */
+/* Callbacks */
 typedef void (*netresolve_callback_t)(netresolve_query_t query, void *user_data);
 typedef void (*netresolve_fd_callback_t)(netresolve_query_t query, int fd, int events, void *user_data);
 typedef void (*netresolve_socket_callback_t)(netresolve_query_t query, int idx, int sock, void *user_data);
@@ -60,11 +53,17 @@ void netresolve_set_bind_callback(netresolve_t channel,
 void netresolve_set_connect_callback(netresolve_t channel,
 		netresolve_socket_callback_t on_connect, void *user_data);
 
-/* Query API */
-netresolve_query_t netresolve_query(netresolve_t channel, const char *node, const char *service);
-void netresolve_query_done(netresolve_query_t query);
+/* Configuration */
+void netresolve_set_backend_string(netresolve_t channel, const char *string);
 
-/* Query results */
+/* Input */
+void netresolve_set_family(netresolve_t channel, int family);
+void netresolve_set_socktype(netresolve_t channel, int socktype);
+void netresolve_set_protocol(netresolve_t channel, int protocol);
+void netresolve_set_default_loopback(netresolve_t channel, bool value);
+void netresolve_set_dns_srv_lookup(netresolve_t channel, bool value);
+
+/* Output */
 size_t netresolve_query_get_count(const netresolve_query_t query);
 void netresolve_query_get_address_info(const netresolve_query_t query, size_t idx,
 		int *family, const void **address,  int *ifindex);

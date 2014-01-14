@@ -78,7 +78,6 @@ struct netresolve_channel {
 	enum netresolve_state state;
 	int epoll_fd;
 	int epoll_count;
-	char *backend_string;
 	struct netresolve_backend **backends, **backend;
 	int first_connect_timeout;
 	struct {

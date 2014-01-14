@@ -37,11 +37,12 @@ libnetresolve_la_SOURCES = \
 	lib/netresolve-backend.h \
 	lib/netresolve-string.h \
 	lib/netresolve-cli.h \
-	lib/resolver.c \
+	lib/channel.c \
+	lib/input.c \
+	lib/output.c \
 	lib/logging.c \
 	lib/backend.c \
 	lib/services.c \
-	lib/response.c \
 	lib/socket.c \
 	lib/utils.c \
 	lib/string.c \
