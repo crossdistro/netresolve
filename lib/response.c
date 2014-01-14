@@ -81,7 +81,7 @@ netresolve_query_get_canonical_name(const netresolve_query_t query)
 }
 
 const struct sockaddr *
-netresolve_query_get_path_sockaddr(netresolve_query_t query, size_t idx,
+netresolve_query_get_sockaddr(netresolve_query_t query, size_t idx,
 		socklen_t *salen, int *socktype, int *protocol)
 {
 	int family, ifindex, port;

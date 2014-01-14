@@ -65,7 +65,7 @@ netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **re
 	for (i = 0; i < npaths; i++) {
 		int socktype, protocol;
 		socklen_t salen;
-		const struct sockaddr *sa = netresolve_query_get_path_sockaddr(query, i, &salen, &socktype, &protocol);
+		const struct sockaddr *sa = netresolve_query_get_sockaddr(query, i, &salen, &socktype, &protocol);
 
 		ai = ai->ai_next = calloc(1, sizeof *ai + salen);
 		if (!ai) {

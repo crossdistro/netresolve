@@ -75,7 +75,7 @@ void netresolve_query_get_aux_info(const netresolve_query_t query, size_t idx,
 const char *netresolve_query_get_canonical_name(const netresolve_query_t query);
 
 /* BSD socket API compatibility */
-const struct sockaddr *netresolve_query_get_path_sockaddr(const netresolve_query_t query, size_t idx,
+const struct sockaddr *netresolve_query_get_sockaddr(const netresolve_query_t query, size_t idx,
 		socklen_t *salen, int *socktype, int *protocol);
 
 /* Logging */
