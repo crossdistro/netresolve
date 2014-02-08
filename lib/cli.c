@@ -84,6 +84,7 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 		{ "help", 0, 0, 'h' },
 		{ "verbose", 0, 0, 'v' },
 		{ "node", 1, 0, 'n' },
+		{ "host", 1, 0, 'n' },
 		{ "service", 1, 0, 's' },
 		{ "family", 1, 0, 'f' },
 		{ "socktype", 1, 0, 't' },
