@@ -91,6 +91,7 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 		{ "protocol", 1, 0, 'p' },
 		{ "backends", 1, 0, 'b' },
 		{ "srv", 0, 0, 'S' },
+		{ NULL, 0, 0, 0 }
 	};
 	static const char *opts = "hvn::s:f:t:p:b:S";
 	int opt, idx = 0;
@@ -136,7 +137,7 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 			netresolve_set_dns_srv_lookup(channel, true);
 			break;
 		default:
-			abort();
+			exit(EXIT_FAILURE);
 		}
 	}
 
