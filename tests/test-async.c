@@ -96,6 +96,8 @@ main(int argc, char **argv)
 	/* Set callbacks. */
 	netresolve_set_fd_callback(channel, watch_fd, &epoll_fd);
 	netresolve_set_success_callback(channel, on_success, &finished);
+
+	/* Resolver configuration. */
 	netresolve_set_family(channel, family);
 	netresolve_set_socktype(channel, socktype);
 	netresolve_set_protocol(channel, protocol);
