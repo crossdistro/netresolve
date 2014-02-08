@@ -79,7 +79,8 @@ add_service(int protocol, int port, const char *name)
 	memset(&service, 0, sizeof service);
 	service.protocol = protocol;
 	service.port = port;
-	service.name = strdup(name);
+	if (name)
+		service.name = strdup(name);
 
 	if (servicecount == servicereservedcount) {
 		if (!servicereservedcount)
@@ -155,7 +156,7 @@ read_services(void)
 	}
 out:
 	close(fd);
-	add_service(0, 0, "");
+	add_service(0, 0, NULL);
 	servicereservedcount = servicecount;
 	services = realloc(services, servicereservedcount * sizeof *services);
 }
