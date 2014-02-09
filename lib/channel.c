@@ -46,6 +46,7 @@ netresolve_open(void)
 	if (!channel)
 		return NULL;
 
+	channel->channel = channel;
 	channel->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
 	if (channel->epoll_fd == -1) {
 		free(channel);

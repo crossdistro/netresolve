@@ -74,6 +74,7 @@ struct netresolve_path {
 };
 
 struct netresolve_channel {
+	struct netresolve_channel *channel;
 	int log_level;
 	enum netresolve_state state;
 	int epoll_fd;
@@ -131,7 +132,9 @@ void netresolve_watch_fd(netresolve_t channel, int fd, int events);
 int netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec);
 void netresolve_remove_timeout(netresolve_t channel, int fd);
 
-void netresolve_bind_path(netresolve_t channel, struct netresolve_path *path);
+void netresolve_query_bind(netresolve_t query, size_t idx);
+void netresolve_query_connect(netresolve_t query, size_t idx);
+
 void netresolve_connect_start(netresolve_t channel);
 bool netresolve_connect_dispatch(netresolve_t channel, int fd, int events);
 void netresolve_connect_cleanup(netresolve_t channel);

@@ -28,14 +28,13 @@
 #define FIRST_CONNECT_TIMEOUT 1
 
 void
-netresolve_bind_path(netresolve_query_t query, struct netresolve_path *path)
+netresolve_query_bind(netresolve_query_t query, size_t idx)
 {
 	int flags = O_NONBLOCK;
 	int socktype;
 	int protocol;
 	const struct sockaddr *sa;
 	socklen_t salen;
-	int idx = path - query->response.paths;
 	int sock;
 
 	sa = netresolve_query_get_sockaddr(query, idx, &salen, &socktype, &protocol);
@@ -52,14 +51,15 @@ netresolve_bind_path(netresolve_query_t query, struct netresolve_path *path)
 	query->callbacks.on_bind(query, idx, sock, query->callbacks.user_data_sock);
 }
 
-static void
-connect_path(netresolve_query_t query, struct netresolve_path *path)
+void
+netresolve_query_connect(netresolve_query_t query, size_t idx)
 {
 	static const int flags = O_NONBLOCK;
 	int socktype;
 	int protocol;
 	const struct sockaddr *sa;
 	socklen_t salen;
+	struct netresolve_path *path = &query->response.paths[idx];
 
 	if (path->socket.state != NETRESOLVE_STATE_INIT)
 		return;
@@ -125,7 +125,7 @@ connect_failed(netresolve_query_t query, struct netresolve_path *path)
 
 	while (path < query->response.paths + query->response.pathcount)
 		if (path->node.family == family)
-			connect_path(query, path);
+			netresolve_query_connect(query, path - query->response.paths);
 
 	connect_check(query);
 }
@@ -143,11 +143,11 @@ netresolve_connect_start(netresolve_query_t query)
 		struct netresolve_path *path = &query->response.paths[i];
 
 		if (!ip4 && path->node.family == AF_INET && path->socket.state == NETRESOLVE_STATE_INIT) {
-			connect_path(query, path);
+			netresolve_query_connect(query, path - query->response.paths);
 			ip4 = true;
 		}
 		if (!ip6 && path->node.family == AF_INET6 && path->socket.state == NETRESOLVE_STATE_INIT) {
-			connect_path(query, path);
+			netresolve_query_connect(query, path - query->response.paths);
 			ip6 = true;
 		}
 	}

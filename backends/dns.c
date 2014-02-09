@@ -104,7 +104,7 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 	case ARES_EDESTRUCTION:
 		break;
 	case ARES_SUCCESS:
-		priv->ptfd = netresolve_backend_watch_timeout(query, partial_timeout, 0);
+		priv->ptfd = netresolve_backend_add_timeout(query, partial_timeout, 0);
 		if (priv->ptfd == -1)
 			error("timer: %s", strerror(errno));
 		netresolve_backend_apply_hostent(query, he, socktype, protocol, port, priority, weight);
@@ -271,7 +271,7 @@ cleanup(netresolve_query_t query)
 	}
 
 	if (priv->ptfd != -1)
-		netresolve_backend_drop_timeout(query, priv->ptfd);
+		netresolve_backend_remove_timeout(query, priv->ptfd);
 	if (priv->srv_reply)
 		ares_free_data(priv->srv_reply);
 
