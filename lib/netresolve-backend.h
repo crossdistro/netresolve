@@ -33,7 +33,7 @@
 #include <netdb.h>
 #include <poll.h>
 
-typedef struct netresolve_channel *netresolve_query_t;
+typedef struct netresolve_query *netresolve_query_t;
 
 /* Input */
 const char *netresolve_backend_get_node(netresolve_query_t query);

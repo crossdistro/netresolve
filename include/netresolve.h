@@ -30,7 +30,7 @@
 
 /* Channels and queries */
 typedef struct netresolve_channel *netresolve_t;
-typedef struct netresolve_channel *netresolve_query_t;
+typedef struct netresolve_query *netresolve_query_t;
 
 netresolve_t netresolve_open(void);
 void netresolve_close(netresolve_t channel);

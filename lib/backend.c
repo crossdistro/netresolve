@@ -175,7 +175,7 @@ netresolve_backend_add_path(netresolve_query_t query,
 
 	debug("added path: %s", netresolve_get_path_string(query, response->pathcount - 1));
 
-	if (query->callbacks.on_bind)
+	if (query->channel->callbacks.on_bind)
 		netresolve_query_bind(query, response->pathcount - 1);
 }
 
@@ -251,21 +251,21 @@ netresolve_backend_finished(netresolve_query_t query)
 	/* Restart with the next *mandatory* backend. */
 	while (*++query->backend) {
 		if ((*query->backend)->mandatory) {
-			netresolve_start(query);
+			netresolve_query_start(query);
 			return;
 		}
 	}
 
-	if (query->callbacks.on_connect) {
+	if (query->channel->callbacks.on_connect) {
 		netresolve_connect_start(query);
 		return;
 	}
 
-	netresolve_set_state(query, NETRESOLVE_STATE_FINISHED);
+	netresolve_query_set_state(query, NETRESOLVE_STATE_FINISHED);
 	return;
 
 fail:
-	netresolve_set_state(query, NETRESOLVE_STATE_FAILED);
+	netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
 }
 
 void
@@ -283,12 +283,12 @@ netresolve_backend_failed(netresolve_query_t query)
 
 	/* Restart with the next backend. */
 	if (*++query->backend) {
-		netresolve_start(query);
+		netresolve_query_start(query);
 		return;
 	}
 
 fail:
-	netresolve_set_state(query, NETRESOLVE_STATE_FAILED);
+	netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
 }
 
 bool

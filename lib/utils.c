@@ -29,7 +29,7 @@
 #include <netresolve-utils.h>
 
 static void
-on_socket(netresolve_t channel, int idx, int sock, void *user_data)
+on_socket(netresolve_query_t query, int idx, int sock, void *user_data)
 {
 	int *psock = user_data;
 

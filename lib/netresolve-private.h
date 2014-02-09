@@ -43,9 +43,9 @@ struct netresolve_backend {
 	bool mandatory;
 	char **settings;
 	void *dl_handle;
-	void (*start)(netresolve_t channel, char **settings);
-	void (*dispatch)(netresolve_t channel, int fd, int revents);
-	void (*cleanup)(netresolve_t channel);
+	void (*start)(netresolve_query_t query, char **settings);
+	void (*dispatch)(netresolve_query_t query, int fd, int revents);
+	void (*cleanup)(netresolve_query_t query);
 	void *data;
 };
 
@@ -74,13 +74,10 @@ struct netresolve_path {
 };
 
 struct netresolve_channel {
-	struct netresolve_channel *channel;
 	int log_level;
-	enum netresolve_state state;
 	int epoll_fd;
 	int epoll_count;
-	struct netresolve_backend **backends, **backend;
-	int first_connect_timeout;
+	struct netresolve_backend **backends;
 	struct {
 		netresolve_callback_t on_success;
 		netresolve_callback_t on_failure;
@@ -110,6 +107,16 @@ struct netresolve_channel {
 		bool default_loopback;
 		bool dns_srv_lookup;
 	} request;
+	/* TODO: A list of queries will be used. */
+	struct netresolve_query *query;
+};
+
+struct netresolve_query {
+	struct netresolve_channel *channel;
+	enum netresolve_state state;
+	int first_connect_timeout;
+	struct netresolve_backend **backend;
+	struct netresolve_request request;
 	struct netresolve_response {
 		struct netresolve_path *paths;
 		size_t pathcount;
@@ -124,20 +131,20 @@ struct netresolve_channel {
 	char buffer[1024];
 };
 
-void netresolve_set_state(netresolve_t channel, enum netresolve_state state);
+void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
 
-void netresolve_start(netresolve_t channel);
+void netresolve_query_start(netresolve_query_t channel);
 void netresolve_epoll(netresolve_t channel, int timeout);
 void netresolve_watch_fd(netresolve_t channel, int fd, int events);
 int netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec);
 void netresolve_remove_timeout(netresolve_t channel, int fd);
 
-void netresolve_query_bind(netresolve_t query, size_t idx);
-void netresolve_query_connect(netresolve_t query, size_t idx);
+void netresolve_query_bind(netresolve_query_t query, size_t idx);
+void netresolve_query_connect(netresolve_query_t query, size_t idx);
 
-void netresolve_connect_start(netresolve_t channel);
-bool netresolve_connect_dispatch(netresolve_t channel, int fd, int events);
-void netresolve_connect_cleanup(netresolve_t channel);
+void netresolve_connect_start(netresolve_query_t query);
+bool netresolve_connect_dispatch(netresolve_query_t query, int fd, int events);
+void netresolve_connect_cleanup(netresolve_query_t query);
 
 void netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,
 		const char *request_service, int socktype, int protocol);

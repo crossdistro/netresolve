@@ -64,7 +64,7 @@ read_and_write(int rfd, int wfd)
 }
 
 static void
-on_connect(netresolve_t channel, int idx, int sock, void *user_data)
+on_connect(netresolve_query_t channel, int idx, int sock, void *user_data)
 {
 	*(int *) user_data = sock;
 }

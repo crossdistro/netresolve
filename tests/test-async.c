@@ -32,7 +32,7 @@
 #include <netresolve.h>
 
 static void
-watch_fd(netresolve_t channel, int fd, int events, void *user_data)
+watch_fd(netresolve_query_t query, int fd, int events, void *user_data)
 {
 	int epoll_fd = *(int *) user_data;
 
