@@ -25,7 +25,13 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-typedef struct {
+struct hosts_list {
+	struct hosts_item *items;
+	int count;
+	int reserved;
+};
+
+struct hosts_item {
 	char *name;
 	int family;
 	union {
@@ -33,10 +39,7 @@ typedef struct {
 		struct in6_addr address6;
 	} address;
 	int ifindex;
-} Node;
-
-static Node *nodes = NULL;
-static int nodecount = 0, nodereservedcount = 0;
+};
 
 static size_t
 family_to_length(int family)
@@ -52,30 +55,30 @@ family_to_length(int family)
 }
 
 static void
-add_node(const char *name, int family, void *address, int ifindex)
+add_node(struct hosts_list *list, const char *name, int family, void *address, int ifindex)
 {
-	Node node;
+	struct hosts_item item;
 
-	memset(&node, 0, sizeof node);
+	memset(&item, 0, sizeof item);
 	if (name)
-		node.name = strdup(name);
-	node.family = family;
+		item.name = strdup(name);
+	item.family = family;
 	if (address)
-		memcpy(&node.address, address, family_to_length(family));
+		memcpy(&item.address, address, family_to_length(family));
 
-	if (nodecount == nodereservedcount) {
-		if (!nodereservedcount)
-			nodereservedcount = 256;
+	if (list->count == list->reserved) {
+		if (!list->reserved)
+			list->reserved = 256;
 		else
-			nodereservedcount *= 2;
-		nodes = realloc(nodes, nodereservedcount * sizeof node);
+			list->reserved *= 2;
+		list->items = realloc(list->items, list->reserved * sizeof item);
 	}
 
-	memcpy(&nodes[nodecount++], &node, sizeof node);
+	memcpy(&list->items[list->count++], &item, sizeof item);
 }
 
 static void
-read_node(char *line)
+read_item(struct hosts_list *list, char *line)
 {
 	const char *name;
 	Address address;
@@ -85,17 +88,17 @@ read_node(char *line)
 	if (!(netresolve_backend_parse_address(strtok(line, " \t"), &address, &family, &ifindex)))
 		return;
 	while ((name = strtok(NULL, " \t")))
-		add_node(name, family, &address, ifindex);
+		add_node(list, name, family, &address, ifindex);
 }
 
 #define HOSTS_FILE "/etc/hosts"
-#define SIZE 1024
+#define BUFFER_SIZE 1024
 
 static void
-read_nodes(void)
+read_list(struct hosts_list *list)
 {
 	int fd = open(HOSTS_FILE, O_RDONLY);
-	char buffer[SIZE];
+	char buffer[BUFFER_SIZE];
 	char *current = buffer;
 	char *end = buffer + sizeof buffer;
 	char *new;
@@ -125,33 +128,37 @@ read_nodes(void)
 			/* New line */
 			if (*new == '\n') {
 				*new++ = '\0';
-				read_node(buffer);
+				read_item(list, buffer);
 				memmove(buffer, new, current - new);
 				current = buffer + (current - new);
 				new = buffer - 1;
 			}
 		}
+		
 	}
 out:
 	close(fd);
-	add_node(NULL, 0, NULL, 0);
-	nodereservedcount = nodecount;
-	nodes = realloc(nodes, nodereservedcount * sizeof *nodes);
+	add_node(list, NULL, 0, NULL, 0);
+	list->reserved = list->count;
+	list->items = realloc(list->items, list->reserved * sizeof *list->items);
 }
 
 void
 start(netresolve_query_t query, char **settings)
 {
 	const char *request_node = netresolve_backend_get_nodename(query);
-	const Node *node;
+	struct hosts_list list;
+	struct hosts_item *item;
 	int count = 0;
 
-	if (!nodes)
-		read_nodes();
-	for (node = nodes; node->name; node++) {
-		if (request_node && strcmp(request_node, node->name))
+	/* TODO: Would be nice to read the hosts once in a thread-safe way and with timestamp checking. */
+	memset(&list, 0, sizeof list);
+	read_list(&list);
+
+	for (item = list.items; item->name; item++) {
+		if (request_node && strcmp(request_node, item->name))
 			continue;
-		netresolve_backend_add_address(query, node->family, &node->address, node->ifindex);
+		netresolve_backend_add_address(query, item->family, &item->address, item->ifindex);
 		count++;
 	}
 
@@ -159,4 +166,6 @@ start(netresolve_query_t query, char **settings)
 		netresolve_backend_finished(query);
 	else
 		netresolve_backend_failed(query);
+
+	free(list.items);
 }
