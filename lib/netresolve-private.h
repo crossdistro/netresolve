@@ -107,8 +107,9 @@ struct netresolve_channel {
 		bool default_loopback;
 		bool dns_srv_lookup;
 	} request;
-	/* TODO: A list of queries will be used. */
-	struct netresolve_query *query;
+	/* A list of queries */
+	netresolve_query_t *queries;
+	size_t nqueries;
 };
 
 struct netresolve_query {
@@ -134,7 +135,7 @@ struct netresolve_query {
 void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
 
 void netresolve_query_start(netresolve_query_t channel);
-void netresolve_epoll(netresolve_t channel, int timeout);
+bool netresolve_epoll(netresolve_t channel, int timeout);
 void netresolve_watch_fd(netresolve_t channel, int fd, int events);
 int netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec);
 void netresolve_remove_timeout(netresolve_t channel, int fd);

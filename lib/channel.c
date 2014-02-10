@@ -59,12 +59,14 @@ netresolve_open(void)
 void
 netresolve_close(netresolve_t channel)
 {
+	int i;
+
 	if (!channel)
 		return;
 
-	/* TODO: Loop through queries when they're decoupled from the channel. */
-	if (channel->query)
-		netresolve_query_done(channel->query);
+	for (i = 0; i < channel->nqueries; i++)
+		netresolve_query_done(channel->queries[i]);
+	free(channel->queries);
 
 	netresolve_set_backend_string(channel, "");
 	close(channel->epoll_fd);
@@ -147,20 +149,28 @@ netresolve_query_start(netresolve_query_t query)
 static bool
 dispatch_fd(netresolve_t channel, int fd, int events)
 {
-	struct netresolve_backend *backend = *channel->query->backend;
+	int i;
 
-	if (!backend && netresolve_connect_dispatch(channel->query, fd, events))
-		return true;
+	for (i = 0; i < channel->nqueries; i++) {
+		netresolve_query_t query = channel->queries[i];
+		struct netresolve_backend *backend = *query->backend;
 
-	if (backend && backend->dispatch) {
-		backend->dispatch(channel->query, fd, events);
-		return true;
+		if (query->state != NETRESOLVE_STATE_WAITING)
+			continue;
+
+		if (!backend && netresolve_connect_dispatch(query, fd, events))
+			return true;
+
+		if (backend && backend->dispatch) {
+			backend->dispatch(query, fd, events);
+			return true;
+		}
 	}
 
 	return false;
 }
 
-void
+bool
 netresolve_epoll(netresolve_t channel, int timeout)
 {
 	static const int maxevents = 1;
@@ -168,19 +178,15 @@ netresolve_epoll(netresolve_t channel, int timeout)
 	int nevents;
 	int i;
 
-	/* Sanity check number of descriptors. */
-	if (channel->epoll_count <= 0) {
-		netresolve_query_set_state(channel->query, NETRESOLVE_STATE_FAILED);
-		return;
-	}
+	assert(channel->epoll_count > 0);
 
 	nevents = epoll_wait(channel->epoll_fd, events, maxevents, channel->callbacks.watch_fd ? 0 : -1);
-	if (nevents == -1) {
-		netresolve_query_set_state(channel->query, NETRESOLVE_STATE_FAILED);
-		return;
-	}
-	for (i = 0; channel->query->state == NETRESOLVE_STATE_WAITING && i < nevents; i++)
+	if (nevents == -1)
+		return false;
+	for (i = 0; i < nevents; i++)
 		dispatch_fd(channel, events[i].data.fd, events[i].events);
+
+	return true;
 }
 
 void
@@ -189,9 +195,6 @@ netresolve_watch_fd(netresolve_t channel, int fd, int events)
 	struct epoll_event event = { .events = events, .data = { .fd = fd} };
 
 	debug("watching file descriptor: %d %d\n", fd, events);
-
-	if (!channel->query->backend || channel->epoll_fd == -1)
-		abort();
 
 	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_DEL, fd, &event) != -1)
 		channel->epoll_count--;
@@ -251,40 +254,55 @@ state_to_errno(enum netresolve_state state)
 }
 
 netresolve_query_t
-netresolve_query(netresolve_t channel, const char *node, const char *service)
+netresolve_query_new(netresolve_t channel, const char *nodename, const char *servname)
 {
+	netresolve_query_t query;
+	netresolve_query_t *queries;
+
 	if (!channel->backends)
 		netresolve_set_backend_string(channel, secure_getenv("NETRESOLVE_BACKENDS"));
 	if (!channel->backends) {
 		errno = ENODATA;
 		return NULL;
 	}
-
-        /* TODO: A list of queries will be used. */
-	if (channel->query)
+	if (!(query = calloc(1, sizeof *query)))
 		return NULL;
-	channel->query = calloc(1, sizeof *channel->query);
-	if (!channel->query)
+	if (!(queries = realloc(channel->queries, ++channel->nqueries * sizeof *queries)))
+		goto fail_queries;
+
+	channel->queries = queries;
+	channel->queries[channel->nqueries - 1] = query;
+
+	query->channel = channel;
+	query->first_connect_timeout = -1;
+	query->backend = channel->backends;
+	memcpy(&query->request, &channel->request, sizeof channel->request);
+	query->request.nodename = nodename;
+	query->request.servname = servname;
+
+	netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
+	
+	return query;
+fail_queries:
+	free(query);
+	return NULL;
+}
+
+netresolve_query_t
+netresolve_query(netresolve_t channel, const char *nodename, const char *servname)
+{
+	netresolve_query_t query = netresolve_query_new(channel, nodename, servname);
+
+	if (!query)
 		return NULL;
-	channel->query->channel = channel;
-	channel->query->first_connect_timeout = -1;
-
-	netresolve_query_set_state(channel->query, NETRESOLVE_STATE_INIT);
-	channel->query->backend = channel->backends;
-
-	memcpy(&channel->query->request, &channel->request, sizeof channel->request);
-	channel->query->request.nodename = node;
-	channel->query->request.servname = service;
-
-	netresolve_query_set_state(channel->query, NETRESOLVE_STATE_WAITING);
 
 	/* Blocking mode. */
 	if (!channel->callbacks.watch_fd)
-		while (channel->query->state == NETRESOLVE_STATE_WAITING)
+		while (query->state == NETRESOLVE_STATE_WAITING)
 			netresolve_epoll(channel, -1);
 
-	errno = state_to_errno(channel->query->state);
-	return channel->query;
+	errno = state_to_errno(query->state);
+	return query;
 }
 
 bool
@@ -299,8 +317,7 @@ netresolve_dispatch_fd(netresolve_t channel, int fd, int events)
 		return false;
 	}
 
-	netresolve_epoll(channel, 0);
-	return true;
+	return netresolve_epoll(channel, 0);
 }
 
 /* netresolve_query_done:
@@ -313,9 +330,18 @@ netresolve_dispatch_fd(netresolve_t channel, int fd, int events)
 void
 netresolve_query_done(netresolve_query_t query)
 {
+	netresolve_t channel = query->channel;
+	int i;
+
 	netresolve_query_set_state(query, NETRESOLVE_STATE_INIT);
 
-	/* TODO: Will be removed propery from a query list. */
-	query->channel->query = NULL;
+	for (i = 0; i < channel->nqueries; i++)
+		if (channel->queries[i] == query)
+			break;
+	assert(i < channel->nqueries);
+
+	memmove(&channel->queries[i], &channel->queries[i+1], --channel->nqueries - i);
+	channel->queries = realloc(channel->queries, channel->nqueries * sizeof *channel->queries);
+
 	free(query);
 }
