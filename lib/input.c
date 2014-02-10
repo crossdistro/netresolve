@@ -127,6 +127,13 @@ netresolve_set_backend_string(netresolve_t channel, const char *string)
 	}
 }
 
+
+void
+netresolve_set_user_data(netresolve_t channel, void *user_data)
+{
+	channel->request.user_data = user_data;
+}
+
 void
 netresolve_set_default_loopback(netresolve_t channel, bool value)
 {

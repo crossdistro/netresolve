@@ -26,6 +26,12 @@
 
 #include "netresolve-private.h"
 
+void *
+netresolve_query_get_user_data(netresolve_query_t query)
+{
+	return query->request.user_data;
+}
+
 size_t
 netresolve_query_get_count(netresolve_query_t query)
 {

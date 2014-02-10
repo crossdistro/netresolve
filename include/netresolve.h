@@ -57,6 +57,7 @@ void netresolve_set_connect_callback(netresolve_t channel,
 void netresolve_set_backend_string(netresolve_t channel, const char *string);
 
 /* Input */
+void netresolve_set_user_data(netresolve_t channel, void *data);
 void netresolve_set_family(netresolve_t channel, int family);
 void netresolve_set_socktype(netresolve_t channel, int socktype);
 void netresolve_set_protocol(netresolve_t channel, int protocol);
@@ -64,6 +65,7 @@ void netresolve_set_default_loopback(netresolve_t channel, bool value);
 void netresolve_set_dns_srv_lookup(netresolve_t channel, bool value);
 
 /* Output */
+void *netresolve_query_get_user_data(netresolve_query_t query);
 size_t netresolve_query_get_count(const netresolve_query_t query);
 void netresolve_query_get_address_info(const netresolve_query_t query, size_t idx,
 		int *family, const void **address,  int *ifindex);

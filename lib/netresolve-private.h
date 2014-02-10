@@ -89,6 +89,7 @@ struct netresolve_channel {
 		void *user_data_sock;
 	} callbacks;
 	struct netresolve_request {
+		void *user_data;
 		/* Perform L3 address resolution using 'nodename' if not NULL. Use
 		 * 'family' to chose between IPv4, IPv6 and mixed IPv4/IPv6
 		 * resolution and additional flags to further tweak nodename name
