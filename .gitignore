@@ -2,8 +2,10 @@
 *.he
 *.la
 *.lo
+*.log
 *.o
 *.so
+*.trs
 *~
 .deps
 .dirstamp
@@ -18,6 +20,7 @@ stamp-h1
 /test-bind-connect
 /test-getaddrinfo
 /test-gethostbyname
+/test-sync
 
 /netresolve-*.*.*
 
