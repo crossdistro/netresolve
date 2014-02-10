@@ -93,6 +93,7 @@ netconnect_LDADD = libnetresolve.la
 
 TESTS = \
 	tests/test-netresolve.sh \
+	test-sync \
 	test-async \
 	test-bind-connect \
 	test-getaddrinfo \
@@ -120,12 +121,16 @@ EXTRA_DIST = \
 	tests/data/unix-dgram \
 	tests/data/empty
 noinst_PROGRAMS = \
+	test-sync \
 	test-async \
 	test-bind-connect \
 	test-getaddrinfo \
 	test-gethostbyname
 
-test_async_SOURCES = tests/test-async.c
+test_sync_SOURCES = tests/test-sync.c tests/common.c tests/common.h
+test_sync_LDADD = libnetresolve.la
+
+test_async_SOURCES = tests/test-async.c tests/common.c tests/common.h
 test_async_LDADD = libnetresolve.la
 
 test_bind_connect_SOURCES = tests/test-bind-connect.c

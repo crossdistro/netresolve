@@ -21,28 +21,33 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <assert.h>
-#include <unistd.h>
-#include <errno.h>
 #include <sys/epoll.h>
 
-#include <netresolve.h>
+#include "common.h"
+
+struct event_loop {
+	int epoll_fd;
+	int epoll_count;
+};
 
 static void
 watch_fd(netresolve_query_t query, int fd, int events, void *user_data)
 {
-	int epoll_fd = *(int *) user_data;
+	struct event_loop *loop = user_data;
 
 	struct epoll_event event = { .events = events, .data = { .fd = fd} };
 
-	if (epoll_ctl(epoll_fd, EPOLL_CTL_DEL, fd, &event) == -1 && errno != ENOENT) {
+	if (epoll_ctl(loop->epoll_fd, EPOLL_CTL_DEL, fd, &event) != -1)
+		loop->epoll_count--;
+	else if (errno != ENOENT) {
 		perror("epoll_ctl");
 		abort();
 	}
-	if (events && epoll_ctl(epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1) {
+	if (!events)
+		return;
+	if (epoll_ctl(loop->epoll_fd, EPOLL_CTL_ADD, fd, &event) != -1)
+		loop->epoll_count++;
+	else {
 		perror("epoll_ctl");
 		abort();
 	}
@@ -51,40 +56,46 @@ watch_fd(netresolve_query_t query, int fd, int events, void *user_data)
 static void
 on_success(netresolve_query_t query, void *user_data)
 {
-	unsigned char expected_address[16] = { 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8 };
-	int family;
-	const void *address;
-	int ifindex;
+	int which = *(int *) netresolve_query_get_user_data(query);
+	int *count = user_data;
 
-	assert(netresolve_query_get_count(query) == 1);
+	switch (which) {
+	case 1:
+		check_address(query, AF_INET6, "1:2:3:4:5:6:7:8", 999999);
+		break;
+	case 2:
+		check_address(query, AF_INET, "1.2.3.4", 999999);
+		break;
+	default:
+		abort();
+	}
 
-	netresolve_query_get_address_info(query, 0, &family, &address, &ifindex);
-	assert(family = AF_INET6);
-	assert(ifindex == 999999);
-	assert(!memcmp(address, expected_address, sizeof expected_address));
-
-	*(bool *) user_data = true;
+	(*count)++;
 }
 
 int
 main(int argc, char **argv)
 {
+	struct event_loop loop;
 	netresolve_t channel;
-	netresolve_query_t query;
-	int epoll_fd;
-	bool finished = false;
-	const char *node = "1:2:3:4:5:6:7:8%999999";
+	netresolve_query_t query1, query2;
+	int finished = 0;
+	const char *node1 = "1:2:3:4:5:6:7:8%999999";
+	const char *node2 = "1.2.3.4%999999";
+	int data1 = 1;
+	int data2 = 2;
 	const char *service = "80";
 	int family = AF_UNSPEC;
 	int socktype = 0;
 	int protocol = IPPROTO_TCP;
 
 	/* Create epoll file descriptor. */
-	epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-	if (epoll_fd == -1) {
+	loop.epoll_fd = epoll_create1(EPOLL_CLOEXEC);
+	if (loop.epoll_fd == -1) {
 		perror("epoll_create1");
 		abort();
 	}
+	loop.epoll_count = 0;
 
 	/* Create a channel. */
 	channel = netresolve_open();
@@ -94,7 +105,7 @@ main(int argc, char **argv)
 	}
 
 	/* Set callbacks. */
-	netresolve_set_fd_callback(channel, watch_fd, &epoll_fd);
+	netresolve_set_fd_callback(channel, watch_fd, &loop);
 	netresolve_set_success_callback(channel, on_success, &finished);
 
 	/* Resolver configuration. */
@@ -103,17 +114,23 @@ main(int argc, char **argv)
 	netresolve_set_protocol(channel, protocol);
 
 	/* Start name resolution. */
-	query = netresolve_query(channel, node, service);
-	assert(query);
+	netresolve_set_user_data(channel, &data1);
+	query1 = netresolve_query(channel, node1, service);
+	netresolve_set_user_data(channel, &data2);
+	query2 = netresolve_query(channel, node2, service);
+
+	assert(query1 && query2);
+	assert(netresolve_query_get_user_data(query1) == &data1);
+	assert(netresolve_query_get_user_data(query2) == &data2);
 
 	/* Run the main loop. */
-	while (!finished) {
+	while (loop.epoll_count > 0) {
 		static const int maxevents = 10;
 		struct epoll_event events[maxevents];
 		int nevents;
 		int i;
 
-		nevents = epoll_wait(epoll_fd, events, maxevents, -1);
+		nevents = epoll_wait(loop.epoll_fd, events, maxevents, -1);
 		if (nevents == -1) {
 			perror("epoll_wait");
 			abort();
@@ -123,9 +140,13 @@ main(int argc, char **argv)
 			netresolve_dispatch_fd(channel, events[i].data.fd, events[i].events);
 	}
 
+	assert(finished == 2);
+
 	/* Clean up. */
 	netresolve_close(channel);
-	close(epoll_fd);
+	close(loop.epoll_fd);
+
+	assert(loop.epoll_count == 0);
 
 	exit(EXIT_SUCCESS);
 }
