@@ -119,7 +119,7 @@ start_address_lookup(netresolve_query_t query, struct ares_srv_reply *srv)
 {
 	struct priv_dns *priv = netresolve_backend_get_priv(query);
 	int family = netresolve_backend_get_family(query);
-	const char *node = netresolve_backend_get_node(query);
+	const char *node = netresolve_backend_get_nodename(query);
 	struct priv_address_lookup *lookup_data = calloc(1, sizeof *lookup_data);
 
 	if (!lookup_data) {
@@ -188,9 +188,9 @@ start_srv_lookup(netresolve_query_t query)
 	char *name;
 
 	if (asprintf(&name, "_%s._%s.%s",
-			netresolve_backend_get_service(query),
+			netresolve_backend_get_servname(query),
 			protocol_to_string(netresolve_backend_get_protocol(query)),
-			netresolve_backend_get_node(query)) == -1) {
+			netresolve_backend_get_nodename(query)) == -1) {
 		netresolve_backend_failed(query);
 		return;
 	}

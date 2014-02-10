@@ -30,7 +30,7 @@ static struct in_addr inaddr_any = { 0 };
 void
 start(netresolve_query_t query, char **settings)
 {
-	const char *node = netresolve_backend_get_node(query);
+	const char *node = netresolve_backend_get_nodename(query);
 
 	/* Fail for non-NULL node name and when defaulting to loopback is requested. */
 	if (netresolve_backend_get_default_loopback(query) || (node && *node)) {

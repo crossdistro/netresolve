@@ -114,7 +114,7 @@ void
 start(netresolve_query_t query, char **settings)
 {
 	struct priv_nss *priv = netresolve_backend_new_priv(query, sizeof *priv);
-	const char *node = netresolve_backend_get_node(query);
+	const char *node = netresolve_backend_get_nodename(query);
 	int family = netresolve_backend_get_family(query);
 	int status = NSS_STATUS_UNAVAIL;
 

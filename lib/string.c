@@ -116,8 +116,8 @@ add_path(char **start, char *end, netresolve_query_t query, int i)
 const char *
 netresolve_get_request_string(netresolve_query_t query)
 {
-	const char *node = netresolve_backend_get_node(query);
-	const char *service = netresolve_backend_get_service(query);
+	const char *node = netresolve_backend_get_nodename(query);
+	const char *service = netresolve_backend_get_servname(query);
 	char *start = query->buffer;
 	char *end = query->buffer + sizeof query->buffer;
 

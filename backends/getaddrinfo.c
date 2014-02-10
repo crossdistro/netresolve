@@ -66,8 +66,8 @@ add_addresses(netresolve_query_t query, const struct addrinfo *first)
 void
 start(netresolve_query_t query, char **settings)
 {
-	const char *node = netresolve_backend_get_node(query);
-	const char *service = netresolve_backend_get_service(query);
+	const char *node = netresolve_backend_get_nodename(query);
+	const char *service = netresolve_backend_get_servname(query);
 	struct addrinfo hints = {
 		.ai_family = netresolve_backend_get_family(query),
 		.ai_socktype = netresolve_backend_get_socktype(query),

@@ -273,8 +273,8 @@ netresolve_query(netresolve_t channel, const char *node, const char *service)
 	channel->query->backend = channel->backends;
 
 	memcpy(&channel->query->request, &channel->request, sizeof channel->request);
-	channel->query->request.node = node;
-	channel->query->request.service = service;
+	channel->query->request.nodename = node;
+	channel->query->request.servname = service;
 
 	netresolve_query_set_state(channel->query, NETRESOLVE_STATE_WAITING);
 

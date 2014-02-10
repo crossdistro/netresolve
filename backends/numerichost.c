@@ -26,7 +26,7 @@
 void
 start(netresolve_query_t query, char **settings)
 {
-	const char *request_node = netresolve_backend_get_node(query);
+	const char *request_node = netresolve_backend_get_nodename(query);
 	Address address;
 	int family;
 	int ifindex;

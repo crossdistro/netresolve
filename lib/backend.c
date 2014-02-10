@@ -34,15 +34,15 @@
 #include "netresolve-private.h"
 
 const char *
-netresolve_backend_get_node(netresolve_query_t query)
+netresolve_backend_get_nodename(netresolve_query_t query)
 {
-	return query->request.node;
+	return query->request.nodename;
 }
 
 const char *
-netresolve_backend_get_service(netresolve_query_t query)
+netresolve_backend_get_servname(netresolve_query_t query)
 {
-	return query->request.service;
+	return query->request.servname;
 }
 
 int
@@ -141,7 +141,7 @@ netresolve_backend_add_path(netresolve_query_t query,
 			.ifindex = ifindex,
 		};
 
-		netresolve_get_service_info(path_callback, &data, query->request.service,
+		netresolve_get_service_info(path_callback, &data, query->request.servname,
 				query->request.socktype, query->request.protocol);
 		return;
 	}

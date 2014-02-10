@@ -37,7 +37,7 @@ static const struct in_addr inaddr_loopback = { 0x0100007f };
 void
 start(netresolve_query_t query, char **settings)
 {
-	const char *node = netresolve_backend_get_node(query);
+	const char *node = netresolve_backend_get_nodename(query);
 	bool ipv4 = !node || !*node || !strcmp(node, "localhost") || !strcmp(node, "localhost4");
 	bool ipv6 = !node || !*node || !strcmp(node, "localhost") || !strcmp(node, "localhost6");
 

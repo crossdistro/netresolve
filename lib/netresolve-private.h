@@ -89,18 +89,18 @@ struct netresolve_channel {
 		void *user_data_sock;
 	} callbacks;
 	struct netresolve_request {
-		/* Perform L3 address resolution using 'node' if not NULL. Use
+		/* Perform L3 address resolution using 'nodename' if not NULL. Use
 		 * 'family' to chose between IPv4, IPv6 and mixed IPv4/IPv6
-		 * resolution and additional flags to further tweak node name
+		 * resolution and additional flags to further tweak nodename name
 		 * resolution.
 		 */
-		const char *node;
+		const char *nodename;
 		int family;
-		/* Perform L4 port resolution using 'service' if not NULL. Use
+		/* Perform L4 port resolution using 'servname' if not NULL. Use
 		 * 'socktype' and 'protocol' to limit the possible options and
-		 * additional flags to further tweak service name resolution.
+		 * additional flags to further tweak servname name resolution.
 		 */
-		const char *service;
+		const char *servname;
 		int socktype;
 		int protocol;
 		/* Advanced configuration */

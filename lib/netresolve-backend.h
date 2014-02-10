@@ -36,8 +36,8 @@
 typedef struct netresolve_query *netresolve_query_t;
 
 /* Input */
-const char *netresolve_backend_get_node(netresolve_query_t query);
-const char *netresolve_backend_get_service(netresolve_query_t query);
+const char *netresolve_backend_get_nodename(netresolve_query_t query);
+const char *netresolve_backend_get_servname(netresolve_query_t query);
 int netresolve_backend_get_family(netresolve_query_t query);
 int netresolve_backend_get_protocol(netresolve_query_t query);
 int netresolve_backend_get_socktype(netresolve_query_t query);
