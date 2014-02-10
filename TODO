@@ -7,7 +7,6 @@
     - use weight from DNS SRV for randomized ordering
     - use rules from http://tools.ietf.org/html/rfc6724
     - use /etc/gai.conf
- * Support multiple concurrent queries per channel
  * Support reverse lookup
  * Improve socket API and happy eyeballs
     - support TCP application layer happy eyeballs
@@ -16,6 +15,8 @@
     - what about non-DNS protocols?
     - what about any, localhost or numeric addresses
  * Use -fvisibility=hidden and mark exported symbols explicitly
+ * Allow backend setting at any time
+ * Make /etc/services reading thread safe
 
 ## Tools, wrappers, testing and compatibility
 

@@ -30,7 +30,7 @@ The application creates a channel using `netresolve_open()` and  optionally perf
 
 When you're finished, call `netresolve_close()` to free the channel and the related query objects.
 
-## Nonlocking API
+## Nonblocking API
 
 Before calling `netresolve_query()` the application can register a file descriptor callback to provide netresolve a means to register and unregister file descriptors and their associated events. That is done using `netresolve_set_fd_callback()` and has a side effect of turning `netresolve_query()` into a nonblocking call.
 
@@ -40,12 +40,16 @@ After `netresolve_query()`, at least one file descriptor is registered with the 
 
 Limitations:
 
- * You can currently only run one query at a time on one channel.
+ * The implementation requires additional features like epoll and timerfd.
  * There's no real error reporting, yet.
- * The API requires nonstandard OS features such as timerfd.
- * The implementation requires additional features like epoll.
 
-Implementation notes: The current implementation only registers *one* file descriptor with the application. The file descriptor is an *epoll* file descripter and the associated event is allways `POLLIN`. It's used for tracking the file descriptors that are attached to it and can be used with `select()`, `poll()` as well as `epoll()`.
+Thread safety notes:
+
+Don't share channel/query objects across threads.
+
+Implementation notes:
+
+The current implementation only registers *one* file descriptor with the application. The file descriptor is an *epoll* file descripter and the associated event is allways `POLLIN`. It's used for tracking the file descriptors that are attached to it and can be used with `select()`, `poll()` as well as `epoll()`.
 
 ## Classic API (POSIX and some nonstandard libc APIs)
 
