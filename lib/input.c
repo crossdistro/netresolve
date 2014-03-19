@@ -91,7 +91,7 @@ netresolve_set_backend_string(netresolve_t channel, const char *string)
 
 	/* Default */
 	if (string == NULL)
-		string = "unix,any,loopback,numerichost,hosts,dns";
+		string = "unix,any,loopback,numerichost,hosts,aresdns";
 
 	/* Clear old backends */
 	if (channel->backends) {
