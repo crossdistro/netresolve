@@ -112,12 +112,15 @@ netresolve_set_backend_string(netresolve_t channel, const char *string)
 			start = end + 1;
 		}
 		if (*end == ',' || *end == '\0') {
-			channel->backends = realloc(channel->backends, (nbackends + 2) * sizeof *channel->backends);
-			channel->backends[nbackends] = load_backend(settings);
-			if (channel->backends[nbackends]) {
-				nbackends++;
-				channel->backends[nbackends] = NULL;
-			}
+			if (settings && *settings && **settings) {
+				channel->backends = realloc(channel->backends, (nbackends + 2) * sizeof *channel->backends);
+				channel->backends[nbackends] = load_backend(settings);
+				if (channel->backends[nbackends]) {
+					nbackends++;
+					channel->backends[nbackends] = NULL;
+				}
+			} else
+				free(settings);
 			nsettings = 0;
 			settings = NULL;
 		}

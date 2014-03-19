@@ -259,21 +259,24 @@ netresolve_query_new(netresolve_t channel, const char *nodename, const char *ser
 	netresolve_query_t query;
 	netresolve_query_t *queries;
 
-	if (!channel->backends)
-		netresolve_set_backend_string(channel, secure_getenv("NETRESOLVE_BACKENDS"));
-	if (!channel->backends) {
-		errno = ENODATA;
-		return NULL;
-	}
 	if (!(query = calloc(1, sizeof *query)))
 		return NULL;
-	if (!(queries = realloc(channel->queries, ++channel->nqueries * sizeof *queries)))
-		goto fail_queries;
+	if (!(queries = realloc(channel->queries, ++channel->nqueries * sizeof *queries))) {
+		free(query);
+		return NULL;
+	}
 
+	query->channel = channel;
 	channel->queries = queries;
 	channel->queries[channel->nqueries - 1] = query;
 
-	query->channel = channel;
+	if (!channel->backends)
+		netresolve_set_backend_string(channel, secure_getenv("NETRESOLVE_BACKENDS"));
+	if (!channel->backends || !*channel->backends) {
+		netresolve_query_set_state(query, NETRESOLVE_STATE_FINISHED);
+		return query;
+	}
+
 	query->first_connect_timeout = -1;
 	query->backend = channel->backends;
 	memcpy(&query->request, &channel->request, sizeof channel->request);
@@ -281,11 +284,8 @@ netresolve_query_new(netresolve_t channel, const char *nodename, const char *ser
 	query->request.servname = servname;
 
 	netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
-	
+
 	return query;
-fail_queries:
-	free(query);
-	return NULL;
 }
 
 netresolve_query_t
