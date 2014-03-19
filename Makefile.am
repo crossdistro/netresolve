@@ -68,6 +68,7 @@ lib_LTLIBRARIES += \
 	libnetresolve-backend-numerichost.la \
 	libnetresolve-backend-hosts.la \
 	libnetresolve-backend-dns.la \
+	libnetresolve-backend-ubdns.la \
 	libnetresolve-backend-getaddrinfo.la \
 	libnetresolve-backend-nss.la \
 	libnetresolve-backend-exec.la
@@ -79,6 +80,8 @@ libnetresolve_backend_hosts_la_SOURCES = backends/hosts.c
 libnetresolve_backend_dns_la_SOURCES = backends/dns.c
 libnetresolve_backend_dns_la_CPPFLAGS = $(AM_CPPFLAGS) $(ARES_CFLAGS)
 libnetresolve_backend_dns_la_LDFLAGS = $(AM_LDFLAGS) $(ARES_LIBS)
+libnetresolve_backend_ubdns_la_SOURCES = backends/ubdns.c
+libnetresolve_backend_ubdns_la_LDFLAGS = $(AM_LDFLAGS) -lunbound
 libnetresolve_backend_getaddrinfo_la_SOURCES = backends/getaddrinfo.c
 libnetresolve_backend_nss_la_SOURCES = backends/nss.c
 libnetresolve_backend_exec_la_SOURCES = backends/exec.c
