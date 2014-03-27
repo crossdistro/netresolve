@@ -38,11 +38,18 @@ enum netresolve_state {
 	NETRESOLVE_STATE_FAILED
 };
 
+enum netresolve_request_type {
+	NETRESOLVE_REQUEST_FORWARD,
+	NETRESOLVE_REQUEST_REVERSE,
+	NETRESOLVE_REQUEST_DNS,
+	_NETRSOLVE_REQUEST_TYPES
+};
+
 struct netresolve_backend {
 	bool mandatory;
 	char **settings;
 	void *dl_handle;
-	void (*setup)(netresolve_query_t query, char **settings);
+	void (*setup[_NETRSOLVE_REQUEST_TYPES])(netresolve_query_t query, char **settings);
 	void (*dispatch)(netresolve_query_t query, int fd, int revents);
 	void (*cleanup)(netresolve_query_t query);
 	void *data;
@@ -89,6 +96,7 @@ struct netresolve_channel {
 	} callbacks;
 	struct netresolve_request {
 		void *user_data;
+		enum netresolve_request_type type;
 		/* Perform L3 address resolution using 'nodename' if not NULL. Use
 		 * 'family' to chose between IPv4, IPv6 and mixed IPv4/IPv6
 		 * resolution and additional flags to further tweak nodename name
@@ -106,6 +114,16 @@ struct netresolve_channel {
 		/* Advanced configuration */
 		bool default_loopback;
 		bool dns_srv_lookup;
+		/* Reverse query */
+		union {
+			char address[1024];
+			struct in_addr address4;
+			struct in6_addr address6;
+		};
+		/* DNS data query */
+		char *dns_name;
+		int dns_class;
+		int dns_type;
 	} request;
 	struct netresolve_config {
 		int force_family;
@@ -125,6 +143,10 @@ struct netresolve_query {
 		struct netresolve_path *paths;
 		size_t pathcount;
 		char *canonname;
+		struct {
+			void *answer;
+			size_t length;
+		} dns;
 	} response;
 
 	union {

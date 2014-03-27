@@ -57,14 +57,12 @@ family_to_length(int family)
 static void
 add_node(struct hosts_list *list, const char *name, int family, void *address, int ifindex)
 {
-	struct hosts_item item;
+	struct hosts_item item = {
+		.family = family,
+		.name = name ? strdup(name) : NULL
+	};
 
-	memset(&item, 0, sizeof item);
-	if (name)
-		item.name = strdup(name);
-	item.family = family;
-	if (address)
-		memcpy(&item.address, address, family_to_length(family));
+	memcpy(&item.address, address, family_to_length(family));
 
 	if (list->count == list->reserved) {
 		if (!list->reserved)
@@ -74,6 +72,7 @@ add_node(struct hosts_list *list, const char *name, int family, void *address, i
 		list->items = realloc(list->items, list->reserved * sizeof item);
 	}
 
+	debug("hosts: adding item %s family %d\n", item.name, item.family);
 	memcpy(&list->items[list->count++], &item, sizeof item);
 }
 
@@ -147,7 +146,7 @@ void
 setup_forward(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
-	struct hosts_list list;
+	struct hosts_list list = { 0 };
 	struct hosts_item *item;
 	int count = 0;
 
@@ -157,7 +156,6 @@ setup_forward(netresolve_query_t query, char **settings)
 	}
 
 	/* TODO: Would be nice to read the hosts once in a thread-safe way and with timestamp checking. */
-	memset(&list, 0, sizeof list);
 	read_list(&list);
 
 	for (item = list.items; item->name; item++) {
@@ -172,5 +170,33 @@ setup_forward(netresolve_query_t query, char **settings)
 	else
 		netresolve_backend_failed(query);
 
+	free(list.items);
+}
+
+void
+setup_reverse(netresolve_query_t query, char **settings)
+{
+	int family = netresolve_backend_get_family(query);
+	const void *address = netresolve_backend_get_address(query);
+	struct hosts_list list = { 0 };
+	struct hosts_item *item;
+
+	/* TODO: Would be nice to read the hosts once in a thread-safe way and with timestamp checking. */
+	read_list(&list);
+
+	for (item = list.items; item->name; item++) {
+		if (family != item->family)
+			continue;
+		if (memcmp(address, &item->address, family_to_length(family)))
+			continue;
+		/* FIXME: we only support one name as a result */
+		netresolve_backend_set_canonical_name(query, item->name);
+		netresolve_backend_finished(query);
+		goto out;
+	}
+
+	netresolve_backend_failed(query);
+
+out:
 	free(list.items);
 }

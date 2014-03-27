@@ -25,6 +25,8 @@
 #include <stdio.h>
 #include <getopt.h>
 #include <string.h>
+#include <arpa/nameser.h>
+#include <ldns/ldns.h>
 
 #include "netresolve-private.h"
 
@@ -53,11 +55,17 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 		{ "protocol", 1, 0, 'p' },
 		{ "backends", 1, 0, 'b' },
 		{ "srv", 0, 0, 'S' },
+		{ "address", 1, 0, 'a' },
+		{ "port", 1, 0, 'P' },
+		{ "class", 1, 0, 'C' },
+		{ "type", 1, 0, 'T' },
 		{ NULL, 0, 0, 0 }
 	};
-	static const char *opts = "hvn::s:f:t:p:b:S";
+	static const char *opts = "hvn::s:f:t:p:b:Sa:P:";
 	int opt, idx = 0;
 	char *node = NULL, *service = NULL;
+	char *address_str = NULL, *port_str = NULL;
+	int cls = ns_c_in, type = 0;
 	netresolve_query_t query;
 
 	while ((opt = getopt_long(count_argv(argv), argv, opts, longopts, &idx)) != -1) {
@@ -72,7 +80,11 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 					"-t,--socktype any|stream|dgram|seqpacket -- socket type\n"
 					"-p,--protocol any|tcp|udp|sctp -- transport protocol\n"
 					"-b,--backends <backends> -- comma-separated list of backends\n"
-					"-S,--srv -- resolve DNS SRV record\n");
+					"-S,--srv -- resolve DNS SRV record\n"
+					"-a,--address -- IPv4/IPv6 address (reverse query)\n"
+					"-P,--port -- TCP/UDP port\n"
+					"-C,--class -- DNS record class\n"
+					"-T,--type -- DNS record type\n");
 			exit(EXIT_SUCCESS);
 		case 'n':
 			node = optarg;
@@ -98,6 +110,18 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 		case 'S':
 			netresolve_set_dns_srv_lookup(channel, true);
 			break;
+		case 'a':
+			address_str = optarg;
+			break;
+		case 'P':
+			port_str = optarg;
+			break;
+		case 'C':
+			cls = ldns_get_rr_class_by_name(optarg);
+			break;
+		case 'T':
+			type = ldns_get_rr_type_by_name(optarg);
+			break;
 		default:
 			exit(EXIT_FAILURE);
 		}
@@ -106,7 +130,16 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 	if (argv[optind])
 		abort();
 
-	query = netresolve_query(channel, node, service);
+	if (type)
+		query = netresolve_query_dns(channel, node, cls, type);
+	else if (address_str || port_str) {
+		Address address;
+		int family, ifindex;
+
+		netresolve_backend_parse_address(address_str, &address, &family, &ifindex);
+		query = netresolve_query_reverse(channel, family, &address, ifindex, port_str ? strtol(port_str, NULL, 10) : 0);
+	} else
+		query = netresolve_query(channel, node, service);
 
 	debug("%s", netresolve_get_request_string(query));
 

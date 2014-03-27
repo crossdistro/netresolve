@@ -32,6 +32,10 @@ setup_forward(netresolve_query_t query, char **settings)
 	int status;
 	struct addrinfo *result;
 
-	status = getaddrinfo(node, service, &hints, &result);
+	if ((status = getaddrinfo(node, service, &hints, &result))) {
+		netresolve_backend_failed(query);
+		return;
+	}
+
 	netresolve_backend_apply_addrinfo(query, status, result, 0);
 }

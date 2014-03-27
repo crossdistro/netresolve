@@ -116,6 +116,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 	/* Entering state... */
 	switch (state) {
 	case NETRESOLVE_STATE_INIT:
+		free(query->request.dns_name);
 		free(query->response.paths);
 		free(query->response.canonname);
 		memset(&query->response, 0, sizeof query->response);
@@ -127,6 +128,8 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		netresolve_query_start(query);
 		break;
 	case NETRESOLVE_STATE_FINISHED:
+		if (!query->response.canonname)
+			query->response.canonname = query->request.nodename ? strdup(query->request.nodename) : strdup("localhost");
 		if (query->channel->callbacks.on_connect)
 			netresolve_connect_cleanup(query);
 		if (query->channel->callbacks.on_success)
@@ -143,8 +146,14 @@ void
 netresolve_query_start(netresolve_query_t query)
 {
 	struct netresolve_backend *backend = *query->backend;
+	void (*setup)(netresolve_query_t query, char **settings);
 
-	backend->setup(query, backend->settings+1);
+	debug("starting backend: %s\n", backend->settings[0]);
+	setup = backend->setup[query->request.type];
+	if (setup)
+		setup(query, backend->settings + 1);
+	else
+		netresolve_backend_failed(query);
 }
 
 static bool
@@ -255,7 +264,7 @@ state_to_errno(enum netresolve_state state)
 }
 
 netresolve_query_t
-netresolve_query_new(netresolve_t channel, const char *nodename, const char *servname)
+netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
 {
 	netresolve_query_t query;
 	netresolve_query_t *queries;
@@ -281,24 +290,18 @@ netresolve_query_new(netresolve_t channel, const char *nodename, const char *ser
 	query->first_connect_timeout = -1;
 	query->backend = channel->backends;
 	memcpy(&query->request, &channel->request, sizeof channel->request);
-	query->request.nodename = nodename;
-	query->request.servname = servname;
 
-	if (channel->config.force_family)
-		query->request.family = channel->config.force_family;
-
-	netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
+	query->request.type = type;
 
 	return query;
 }
 
-netresolve_query_t
-netresolve_query(netresolve_t channel, const char *nodename, const char *servname)
+static netresolve_query_t
+netresolve_query_run(netresolve_query_t query)
 {
-	netresolve_query_t query = netresolve_query_new(channel, nodename, servname);
+	netresolve_t channel = query->channel;
 
-	if (!query)
-		return NULL;
+	netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
 
 	/* Blocking mode. */
 	if (!channel->callbacks.watch_fd)
@@ -307,6 +310,50 @@ netresolve_query(netresolve_t channel, const char *nodename, const char *servnam
 
 	errno = state_to_errno(query->state);
 	return query;
+}
+
+netresolve_query_t
+netresolve_query(netresolve_t channel, const char *nodename, const char *servname)
+{
+	netresolve_query_t query = netresolve_query_new(channel, NETRESOLVE_REQUEST_FORWARD);
+
+	if (!query)
+		return NULL;
+
+	query->request.nodename = nodename;
+	query->request.servname = servname;
+
+	return netresolve_query_run(query);
+}
+
+netresolve_query_t
+netresolve_query_reverse(netresolve_t channel, int family, const void *address, int ifindex, int port)
+{
+	netresolve_query_t query = netresolve_query_new(channel, NETRESOLVE_REQUEST_REVERSE);
+	size_t size = family == AF_INET ? 4 : 16;
+
+	if (!query)
+		return NULL;
+
+	query->request.family = family;
+	memcpy(query->request.address, address, size);
+
+	return netresolve_query_run(query);
+}
+
+netresolve_query_t
+netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type)
+{
+	netresolve_query_t query = netresolve_query_new(channel, NETRESOLVE_REQUEST_DNS);
+
+	if (!query)
+		return NULL;
+
+	query->request.dns_name = strdup(dname);
+	query->request.dns_class = cls;
+	query->request.dns_type = type;
+
+	return netresolve_query_run(query);
 }
 
 bool

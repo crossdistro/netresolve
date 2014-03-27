@@ -68,7 +68,9 @@ load_backend(char **take_settings)
 		goto fail;
 	}
 
-	backend->setup = dlsym(backend->dl_handle, "setup_forward");
+	backend->setup[NETRESOLVE_REQUEST_FORWARD] = dlsym(backend->dl_handle, "setup_forward");
+	backend->setup[NETRESOLVE_REQUEST_REVERSE] = dlsym(backend->dl_handle, "setup_reverse");
+	backend->setup[NETRESOLVE_REQUEST_DNS] = dlsym(backend->dl_handle, "setup_dns");
 	backend->dispatch = dlsym(backend->dl_handle, "dispatch");
 	backend->cleanup = dlsym(backend->dl_handle, "cleanup");
 

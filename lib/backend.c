@@ -35,7 +35,10 @@
 const char *
 netresolve_backend_get_nodename(netresolve_query_t query)
 {
-	return query->request.nodename;
+	if (query->request.dns_name)
+		return query->request.dns_name;
+	else
+		return query->request.nodename;
 }
 
 const char *
@@ -72,6 +75,20 @@ bool
 netresolve_backend_get_dns_srv_lookup(netresolve_query_t query)
 {
 	return query->request.dns_srv_lookup;
+}
+
+void *
+netresolve_backend_get_address(netresolve_query_t query)
+{
+	return query->request.address;
+}
+
+const char *
+netresolve_backend_get_dns_query(netresolve_query_t query, int *cls, int *type)
+{
+	*cls = query->request.dns_class;
+	*type = query->request.dns_type;
+	return query->request.dns_name;
 }
 
 struct addrinfo
@@ -209,6 +226,14 @@ netresolve_backend_set_canonical_name(netresolve_query_t query, const char *cano
 	query->response.canonname = strdup(canonical_name);
 }
 
+void
+netresolve_backend_set_dns_answer(netresolve_query_t query, void *answer, size_t length)
+{
+	query->response.dns.answer = malloc(length);
+	memcpy(query->response.dns.answer, answer, length);
+	query->response.dns.length = length;
+}
+
 void *
 netresolve_backend_new_priv(netresolve_query_t query, size_t size)
 {
@@ -302,6 +327,7 @@ netresolve_backend_failed(netresolve_query_t query)
 	if (query->response.pathcount)
 		error("Non-empty failed reply.");
 
+	debug("failed\n");
 	backend_cleanup(query);
 
 	/* Restart with the next backend. */

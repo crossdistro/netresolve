@@ -50,7 +50,8 @@ libnetresolve_la_SOURCES = \
 	lib/cli.c
 libnetresolve_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
-	-export-symbols-regex '^netresolve_'
+	-export-symbols-regex '^netresolve_' \
+	-lldns
 
 libnetresolve_libc_la_SOURCES = \
 	compat/netresolve-compat.h \

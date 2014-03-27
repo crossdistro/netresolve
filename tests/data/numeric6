@@ -1,3 +1,4 @@
 response netresolve 0.0.1
+name 1:2:3:4:5:6:7:8
 ip 1:2:3:4:5:6:7:8 any any 0 0 0 0
 

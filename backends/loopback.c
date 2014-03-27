@@ -26,6 +26,32 @@
 #include <arpa/inet.h>
 #include <string.h>
 
+static bool
+is_any(int family, const void *address)
+{
+	switch (family) {
+	case AF_INET:
+		return !memcmp(address, &inaddr_any, sizeof inaddr_any);
+	case AF_INET6:
+		return !memcmp(address, &in6addr_any, sizeof in6addr_any);
+	default:
+		return false;
+	}
+}
+
+static bool
+is_loopback(int family, const void *address)
+{
+	switch (family) {
+	case AF_INET:
+		return !memcmp(address, &inaddr_loopback, sizeof inaddr_loopback);
+	case AF_INET6:
+		return !memcmp(address, &in6addr_loopback, sizeof in6addr_loopback);
+	default:
+		return false;
+	}
+}
+
 void
 setup_forward(netresolve_query_t query, char **settings)
 {
@@ -38,9 +64,25 @@ setup_forward(netresolve_query_t query, char **settings)
 		return;
 	}
 
+	netresolve_backend_set_canonical_name(query, "localhost");
 	if (ipv4)
 		netresolve_backend_add_path(query, AF_INET, &inaddr_loopback, 0, 0, 0, 0, 0, 0, 0);
 	if (ipv6)
 		netresolve_backend_add_path(query, AF_INET6, &in6addr_loopback, 0, 0, 0, 0, 0, 0, 0);
+
+	netresolve_backend_finished(query);
+}
+
+void
+setup_reverse(netresolve_query_t query, char **settings)
+{
+	int family = netresolve_backend_get_family(query);
+	const void *address = netresolve_backend_get_address(query);
+
+	if (!is_any(family, address) && !is_loopback(family, address)) {
+		netresolve_backend_failed(query);
+		return;
+	}
+
 	netresolve_backend_finished(query);
 }

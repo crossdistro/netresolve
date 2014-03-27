@@ -25,18 +25,56 @@
 #include <stdlib.h>
 #include <arpa/inet.h>
 
+static bool
+is_any(int family, const void *address)
+{
+	switch (family) {
+	case AF_INET:
+		return !memcmp(address, &inaddr_any, sizeof inaddr_any);
+	case AF_INET6:
+		return !memcmp(address, &in6addr_any, sizeof in6addr_any);
+	default:
+		return false;
+	}
+}
+
 void
 setup_forward(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
 
-	/* Fail for non-NULL node name and when defaulting to loopback is requested. */
-	if (netresolve_backend_get_default_loopback(query) || (node && *node)) {
+	/* skip if requested */
+	if (netresolve_backend_get_default_loopback(query)) {
+		netresolve_backend_failed(query);
+		return;
+	}
+
+	if (node && *node) {
 		netresolve_backend_failed(query);
 		return;
 	}
 
 	netresolve_backend_add_path(query, AF_INET, &inaddr_any, 0, 0, 0, 0, 0, 0, 0);
 	netresolve_backend_add_path(query, AF_INET6, &in6addr_any, 0, 0, 0, 0, 0, 0, 0);
+	netresolve_backend_finished(query);
+}
+void
+setup_reverse(netresolve_query_t query, char **settings)
+{
+	int family = netresolve_backend_get_family(query);
+	const void *address = netresolve_backend_get_address(query);
+
+	/* skip if requested */
+	if (netresolve_backend_get_default_loopback(query)) {
+		netresolve_backend_failed(query);
+		return;
+	}
+
+	if (!is_any(family, address)) {
+		netresolve_backend_failed(query);
+		return;
+	}
+
+	netresolve_backend_set_canonical_name(query, "");
 	netresolve_backend_finished(query);
 }

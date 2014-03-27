@@ -37,6 +37,8 @@ void netresolve_close(netresolve_t channel);
 bool netresolve_dispatch_fd(netresolve_t channel, int fd, int events);
 
 netresolve_query_t netresolve_query(netresolve_t channel, const char *node, const char *service);
+netresolve_query_t netresolve_query_reverse(netresolve_t channel, int family, const void *address, int ifindex, int port);
+netresolve_query_t netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type);
 void netresolve_query_done(netresolve_query_t query);
 
 /* Callbacks */
@@ -67,13 +69,21 @@ void netresolve_set_dns_srv_lookup(netresolve_t channel, bool value);
 /* Output */
 void *netresolve_query_get_user_data(netresolve_query_t query);
 size_t netresolve_query_get_count(const netresolve_query_t query);
+const char *netresolve_query_get_canonical_name(const netresolve_query_t query);
+
+/* Output: Forward query */
 void netresolve_query_get_address_info(const netresolve_query_t query, size_t idx,
 		int *family, const void **address,  int *ifindex);
 void netresolve_query_get_port_info(const netresolve_query_t query, size_t idx,
 		int *socktype, int *protocol, int *port);
 void netresolve_query_get_aux_info(const netresolve_query_t query, size_t idx,
 		int *priority, int *weight, int *ttl);
-const char *netresolve_query_get_canonical_name(const netresolve_query_t query);
+
+/* Output: Reverse query */
+char *netresolve_query_get_name(const netresolve_query_t query);
+
+/* Output: DNS query */
+void *netresolve_query_get_dns_answer(const netresolve_query_t query, size_t *sizettl);
 
 /* BSD socket API compatibility */
 const struct sockaddr *netresolve_query_get_sockaddr(const netresolve_query_t query, size_t idx,

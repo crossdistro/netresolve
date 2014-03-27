@@ -48,7 +48,7 @@ static const struct in_addr inaddr_loopback = { 0x0100007f };
 	#error Neither big endian nor little endian
 #endif
 
-/* Input */
+/* Input: Forward lookup */
 const char *netresolve_backend_get_nodename(netresolve_query_t query);
 const char *netresolve_backend_get_servname(netresolve_query_t query);
 int netresolve_backend_get_family(netresolve_query_t query);
@@ -57,6 +57,12 @@ int netresolve_backend_get_socktype(netresolve_query_t query);
 bool netresolve_backend_get_default_loopback(netresolve_query_t query);
 bool netresolve_backend_get_dns_srv_lookup(netresolve_query_t query);
 
+/* Input: Reverse lookup */
+bool netresolve_backend_get_reverse_lookup(netresolve_query_t query);
+void *netresolve_backend_get_address(netresolve_query_t query);
+
+/* Input: DNS record lookup */
+const char *netresolve_backend_get_dns_query(netresolve_query_t query, int *cls, int *type);
 /* Convenience input */
 struct addrinfo netresolve_backend_get_addrinfo_hints(netresolve_query_t query);
 
@@ -66,6 +72,7 @@ void netresolve_backend_add_path(netresolve_query_t query,
 		int socktype, int protocol, int port,
 		int priority, int weight, int32_t ttl);
 void netresolve_backend_set_canonical_name(netresolve_query_t query, const char *canonical_name);
+void netresolve_backend_set_dns_answer(netresolve_query_t query, void *answer, size_t length);
 
 /* Convenience output */
 void netresolve_backend_apply_addrinfo(netresolve_query_t query,
@@ -101,7 +108,9 @@ bool netresolve_backend_parse_path(const char *str,
 		int *socktype, int *protocol, int *port);
 
 /* Backend function prototypes */
-void setup(netresolve_query_t query, char **settings);
+void setup_forward(netresolve_query_t query, char **settings);
+void setup_reverse(netresolve_query_t query, char **settings);
+void setup_dns(netresolve_query_t query, char **settings);
 void dispatch(netresolve_query_t query, int fd, int revents);
 void cleanup(netresolve_query_t query);
 
