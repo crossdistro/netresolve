@@ -52,9 +52,9 @@ libnetresolve_la_LDFLAGS = \
 	-export-symbols-regex '^netresolve_'
 
 libnetresolve_libc_la_SOURCES = \
+	compat/netresolve-compat.h \
 	compat/libc.c \
-	compat/compat.c \
-	compat/compat.h
+	compat/compat.c
 libnetresolve_libc_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	--export-all-symbols
