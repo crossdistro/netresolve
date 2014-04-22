@@ -370,6 +370,12 @@ netresolve_backend_parse_path(const char *str,
 {
 	char *saveptr;
 
+	/* Silence stupid gcc/glibc warning, see:
+	 *
+	 * http://gcc.gnu.org/bugzilla/show_bug.cgi?id=26634
+	 */
+	saveptr = NULL;
+
 	if (!netresolve_backend_parse_address(strtok_r(strdupa(str), " ", &saveptr), address, family, ifindex))
 		return false;
 	*socktype = enum_id_from_name(strtok_r(NULL, " ", &saveptr), socktypes);
