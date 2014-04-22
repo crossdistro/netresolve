@@ -124,7 +124,6 @@ start(netresolve_query_t query, char **settings)
 	}
 
 	/* Load nsswitch backend: */
-	memset(priv, 0, sizeof priv);
 	priv->name = strdup(*settings);
 	priv->api = secure_getenv("NETRESOLVE_NSS_API");
 	snprintf(priv->filename, sizeof priv->filename, "libnss_%s.so.2", priv->name);
