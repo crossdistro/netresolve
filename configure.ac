@@ -18,7 +18,8 @@ AC_CHECK_LIB([dl], [dlopen])
 AC_CHECK_HEADER([epoll.h])
 
 PKG_CHECK_MODULES([ARES], [libcares])
-AC_CHECK_LIB([libunbound], [ub_ctx_create])
+AC_CHECK_LIB([unbound], [ub_ctx_create], [UNBOUND_LIBS=-lunbound])
+AC_SUBST(UNBOUND_LIBS)
 
 AC_CONFIG_HEADERS([config.h])
 AC_CONFIG_FILES([
