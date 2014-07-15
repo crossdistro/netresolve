@@ -20,6 +20,7 @@ stamp-h1
 /test-bind-connect
 /test-getaddrinfo
 /test-gethostbyname
+/test-libevent
 /test-sync
 
 /netresolve-*.*.*
