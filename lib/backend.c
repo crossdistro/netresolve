@@ -29,7 +29,6 @@
 #include <sys/epoll.h>
 
 #include <netresolve-backend.h>
-#include <netresolve-string.h>
 
 #include "netresolve-private.h"
 

@@ -27,44 +27,6 @@
 #include <string.h>
 
 #include "netresolve-private.h"
-#include "netresolve-string.h"
-
-static int
-family_from_string(const char *str)
-{
-	if (!strcmp(str, "ip4"))
-		return AF_INET;
-	if (!strcmp(str, "ip6"))
-		return AF_INET6;
-	if (!strcmp(str, "unix"))
-		return AF_UNIX;
-	/* "any" */
-	return AF_UNSPEC;
-}
-
-static int
-socktype_from_string(const char *str)
-{
-	if (!strcmp(str, "stream"))
-		return SOCK_STREAM;
-	if (!strcmp(str, "dgram"))
-		return SOCK_DGRAM;
-	if (!strcmp(str, "seqpacket"))
-		return SOCK_SEQPACKET;
-	return 0;
-}
-
-static int
-protocol_from_string(const char *str)
-{
-	if (!strcmp(str, "tcp"))
-		return IPPROTO_TCP;
-	if (!strcmp(str, "udp"))
-		return IPPROTO_UDP;
-	if (!strcmp(str, "sctp"))
-		return IPPROTO_SCTP;
-	return 0;
-}
 
 static int
 count_argv(char **argv)
@@ -119,13 +81,13 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 			service = optarg;
 			break;
 		case 'f':
-			netresolve_set_family(channel, family_from_string(optarg));
+			netresolve_set_family(channel, netresolve_family_from_string(optarg));
 			break;
 		case 't':
-			netresolve_set_socktype(channel, socktype_from_string(optarg));
+			netresolve_set_socktype(channel, netresolve_socktype_from_string(optarg));
 			break;
 		case 'p':
-			netresolve_set_protocol(channel, protocol_from_string(optarg));
+			netresolve_set_protocol(channel, netresolve_protocol_from_string(optarg));
 			break;
 		case 'v':
 			netresolve_set_log_level(NETRESOLVE_LOG_LEVEL_DEBUG);

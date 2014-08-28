@@ -22,7 +22,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <netresolve-backend.h>
-#include <netresolve-string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>

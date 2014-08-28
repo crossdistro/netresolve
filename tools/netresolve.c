@@ -27,7 +27,6 @@
 
 #include <netresolve.h>
 #include <netresolve-cli.h>
-#include <netresolve-string.h>
 
 int
 main(int argc, char **argv)

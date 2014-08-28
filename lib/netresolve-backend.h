@@ -84,4 +84,9 @@ void start(netresolve_query_t query, char **settings);
 void dispatch(netresolve_query_t query, int fd, int revents);
 void cleanup(netresolve_query_t query);
 
+/* String functions */
+const char * netresolve_get_request_string(netresolve_query_t query);
+const char * netresolve_get_path_string(netresolve_query_t query, int i);
+const char * netresolve_get_response_string(netresolve_query_t query);
+
 #endif /* NETRESOLVE_BACKEND_H */

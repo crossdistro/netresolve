@@ -30,7 +30,6 @@
 
 #include <netresolve.h>
 #include <netresolve-cli.h>
-#include <netresolve-string.h>
 
 static void
 read_and_write(int rfd, int wfd)

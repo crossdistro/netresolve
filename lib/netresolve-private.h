@@ -23,7 +23,6 @@
  */
 #include <netresolve.h>
 #include <netresolve-backend.h>
-#include <netresolve-string.h>
 #include <netresolve-cli.h>
 #include <nss.h>
 #include <netdb.h>
@@ -150,3 +149,11 @@ void netresolve_connect_cleanup(netresolve_query_t query);
 
 void netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,
 		const char *request_service, int socktype, int protocol);
+
+int netresolve_family_from_string(const char *str);
+int netresolve_socktype_from_string(const char *str);
+int netresolve_protocol_from_string(const char *str);
+
+const char * netresolve_get_request_string(netresolve_query_t query);
+const char * netresolve_get_path_string(netresolve_query_t query, int i);
+const char * netresolve_get_response_string(netresolve_query_t query);

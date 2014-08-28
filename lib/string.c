@@ -65,6 +65,45 @@ protocol_to_string(int proto)
 	}
 }
 
+int
+netresolve_family_from_string(const char *str)
+{
+	if (!str)
+		return AF_UNSPEC;
+	if (!strcmp(str, "ip4"))
+		return AF_INET;
+	if (!strcmp(str, "ip6"))
+		return AF_INET6;
+	if (!strcmp(str, "unix"))
+		return AF_UNIX;
+	/* "any" */
+	return AF_UNSPEC;
+}
+
+int
+netresolve_socktype_from_string(const char *str)
+{
+	if (!strcmp(str, "stream"))
+		return SOCK_STREAM;
+	if (!strcmp(str, "dgram"))
+		return SOCK_DGRAM;
+	if (!strcmp(str, "seqpacket"))
+		return SOCK_SEQPACKET;
+	return 0;
+}
+
+int
+netresolve_protocol_from_string(const char *str)
+{
+	if (!strcmp(str, "tcp"))
+		return IPPROTO_TCP;
+	if (!strcmp(str, "udp"))
+		return IPPROTO_UDP;
+	if (!strcmp(str, "sctp"))
+		return IPPROTO_SCTP;
+	return 0;
+}
+
 static int
 bprintf(char **current, char *end, const char *fmt, ...)
 {
