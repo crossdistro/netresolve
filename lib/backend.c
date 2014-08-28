@@ -132,7 +132,7 @@ netresolve_backend_add_path(netresolve_query_t query,
 		return;
 	}
 
-	if (socktype == -1 || protocol == -1 || portnum == -1) {
+	if (query->request.servname && socktype == -1) {
 		PathData data = {
 			.query = query,
 			.family = family,
@@ -143,6 +143,13 @@ netresolve_backend_add_path(netresolve_query_t query,
 		netresolve_get_service_info(path_callback, &data, query->request.servname,
 				query->request.socktype, query->request.protocol);
 		return;
+	}
+
+	/* don't pass negative numbers */
+	if (socktype == -1) {
+		socktype = 0;
+		protocol = 0;
+		portnum = 0;
 	}
 
 	if (query->request.family != AF_UNSPEC && query->request.family != family)

@@ -184,26 +184,22 @@ netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_
 {
 	int port = 0;
 	const Service *service;
+	char *endptr;
 
-	if (request_service) {
-		char *endptr;
-
-		port = strtol(request_service, &endptr, 10);
-		if (!*endptr)
-			found_port(callback, user_data, socktype, protocol, port);
-		else {
-			if (!services)
-				read_services();
-			for (service = services; service->name; service++) {
-				if (protocol && protocol != service->protocol)
-					continue;
-				if (port && port != service->port)
-					continue;
-				if (!port && request_service && strcmp(request_service, service->name))
-					continue;
-				found_port(callback, user_data, socktype, service->protocol, service->port);
-			}
+	port = strtol(request_service, &endptr, 10);
+	if (!*endptr)
+		found_port(callback, user_data, socktype, protocol, port);
+	else {
+		if (!services)
+			read_services();
+		for (service = services; service->name; service++) {
+			if (protocol && protocol != service->protocol)
+				continue;
+			if (port && port != service->port)
+				continue;
+			if (!port && request_service && strcmp(request_service, service->name))
+				continue;
+			found_port(callback, user_data, socktype, service->protocol, service->port);
 		}
-	} else
-		callback(socktype, protocol, port, user_data);
+	}
 }
