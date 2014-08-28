@@ -107,6 +107,9 @@ struct netresolve_channel {
 		bool default_loopback;
 		bool dns_srv_lookup;
 	} request;
+	struct netresolve_config {
+		int force_family;
+	} config;
 	/* A list of queries */
 	netresolve_query_t *queries;
 	size_t nqueries;

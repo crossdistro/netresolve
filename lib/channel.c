@@ -52,6 +52,7 @@ netresolve_open(void)
 	}
 
 	channel->request.default_loopback = strtob(secure_getenv("NETRESOLVE_FLAG_DEFAULT_LOOPBACK"));
+	channel->config.force_family = netresolve_family_from_string(secure_getenv("NETRESOLVE_FORCE_FAMILY"));
 
 	return channel;
 }
@@ -282,6 +283,9 @@ netresolve_query_new(netresolve_t channel, const char *nodename, const char *ser
 	memcpy(&query->request, &channel->request, sizeof channel->request);
 	query->request.nodename = nodename;
 	query->request.servname = servname;
+
+	if (channel->config.force_family)
+		query->request.family = channel->config.force_family;
 
 	netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
 
