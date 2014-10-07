@@ -74,6 +74,22 @@ netresolve_backend_get_dns_srv_lookup(netresolve_query_t query)
 	return query->request.dns_srv_lookup;
 }
 
+struct addrinfo
+netresolve_backend_get_addrinfo_hints(netresolve_query_t query)
+{
+	struct addrinfo hints = {
+		.ai_family = netresolve_backend_get_family(query),
+		.ai_socktype = netresolve_backend_get_socktype(query),
+		.ai_protocol = netresolve_backend_get_protocol(query),
+		.ai_flags = 0,
+	};
+
+	if (!netresolve_backend_get_default_loopback(query))
+		hints.ai_flags |= AI_PASSIVE;
+
+	return hints;
+}
+
 static size_t
 family_to_length(int family)
 {
@@ -395,6 +411,50 @@ netresolve_backend_parse_path(const char *str,
 	*port = enum_id_from_name(strtok_r(NULL, " ", &saveptr), NULL);
 
 	return true;
+}
+
+void
+netresolve_backend_apply_addrinfo(netresolve_query_t query,
+		int status, const struct addrinfo *result, int32_t ttl)
+{
+	const struct addrinfo *item;
+
+	switch (status) {
+	case 0:
+		for (item = result; item; item = item->ai_next) {
+			union {
+				struct in_addr address4;
+				struct in6_addr address6;
+			} address = {{0}};
+			int ifindex = 0;
+			int port = 0;
+
+			switch (item->ai_family) {
+			case AF_INET:
+				memcpy(&address.address4, &((struct sockaddr_in *) item->ai_addr)->sin_addr, sizeof address.address4);
+				port = ntohs(((struct sockaddr_in *) item->ai_addr)->sin_port);
+				break;
+			case AF_INET6:
+				memcpy(&address.address6, &((struct sockaddr_in6 *) item->ai_addr)->sin6_addr, sizeof address.address6);
+				if (IN6_IS_ADDR_LINKLOCAL(&address.address6))
+					ifindex = ((struct sockaddr_in6 *) item->ai_addr)->sin6_scope_id;
+				port = ntohs(((struct sockaddr_in6 *) item->ai_addr)->sin6_port);
+				break;
+			}
+
+			netresolve_backend_add_path(query,
+					item->ai_family, &address, ifindex,
+					item->ai_socktype, item->ai_protocol, port,
+					0, 0, ttl);
+		}
+		/* fall through */
+	case EAI_NONAME:
+	case EAI_NODATA:
+		netresolve_backend_finished(query);
+		break;
+	default:
+		netresolve_backend_failed(query);
+	}
 }
 
 void

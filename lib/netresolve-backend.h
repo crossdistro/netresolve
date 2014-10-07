@@ -45,6 +45,9 @@ int netresolve_backend_get_socktype(netresolve_query_t query);
 bool netresolve_backend_get_default_loopback(netresolve_query_t query);
 bool netresolve_backend_get_dns_srv_lookup(netresolve_query_t query);
 
+/* Convenience input */
+struct addrinfo netresolve_backend_get_addrinfo_hints(netresolve_query_t query);
+
 /* Output */
 void netresolve_backend_add_path(netresolve_query_t query,
 		int family, const void *address, int ifindex,
@@ -53,6 +56,8 @@ void netresolve_backend_add_path(netresolve_query_t query,
 void netresolve_backend_set_canonical_name(netresolve_query_t query, const char *canonical_name);
 
 /* Convenience output */
+void netresolve_backend_apply_addrinfo(netresolve_query_t query,
+		int status, const struct addrinfo *result, int32_t ttl);
 void netresolve_backend_apply_addrtuple(netresolve_query_t query,
 		enum nss_status status, const struct gaih_addrtuple *result,
 		int32_t ttl);
