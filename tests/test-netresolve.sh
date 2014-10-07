@@ -25,6 +25,7 @@ $DIFF <($NR --node /path/to/socket --family unix) $DATA/unix
 $DIFF <($NR --node /path/to/socket --family unix --socktype stream) $DATA/unix-stream
 $DIFF <($NR --node /path/to/socket --family unix --socktype dgram) $DATA/unix-dgram
 $DIFF <($NR --node x-x-x-x-x-x-x-x-x) $DATA/empty
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so) $DATA/any
 $DIFF <($NR --backends=nss:files:gethostbyname --node localhost) $DATA/localhost4
 $DIFF <($NR --backends=nss:files:gethostbyname2 --node localhost) $DATA/localhost
 $DIFF <($NR --backends=nss:files:gethostbyname2 --family ip4 --node localhost) $DATA/localhost4

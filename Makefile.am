@@ -30,7 +30,8 @@ include_HEADERS = \
 
 lib_LTLIBRARIES = \
 	libnetresolve.la \
-	libnetresolve-libc.la
+	libnetresolve-libc.la \
+	libnss_netresolve.la
 
 libnetresolve_la_SOURCES = \
 	lib/netresolve-private.h \
@@ -60,6 +61,10 @@ libnetresolve_libc_la_LDFLAGS = \
 	--export-all-symbols
 libnetresolve_libc_la_LIBADD = \
 	libnetresolve.la
+
+libnss_netresolve_la_SOURCES = \
+	compat/nsswitch.c \
+	compat/compat.c
 
 lib_LTLIBRARIES += \
 	libnetresolve-backend-unix.la \
