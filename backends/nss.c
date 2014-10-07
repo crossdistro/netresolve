@@ -74,8 +74,8 @@ struct priv_nss {
 static int
 combine_statuses(int s4, int s6)
 {
-	/* NSS_STATUS_TRYAGAIN first, as it means something needs we don't have
-	 * the final version of the information.
+	/* NSS_STATUS_TRYAGAIN first, as it means we don't have the final version
+	 * of the information.
 	 */
 	if (s4 == NSS_STATUS_TRYAGAIN || s6 == NSS_STATUS_TRYAGAIN)
 		return NSS_STATUS_TRYAGAIN;
@@ -167,7 +167,6 @@ start(netresolve_query_t query, char **settings)
 	const char *node = netresolve_backend_get_nodename(query);
 	int family = netresolve_backend_get_family(query);
 	struct priv_nss priv = { 0 };
-	enum nss_status status = NSS_STATUS_UNAVAIL;
 
 	initialize(&priv, query, settings);
 
@@ -179,21 +178,23 @@ start(netresolve_query_t query, char **settings)
 	/*if (priv->gethostbyname4_r) {
 		TODO
 	} else*/ if (node && (priv.gethostbyname3_r || priv.gethostbyname2_r)) {
-		char buffer4[SIZE], buffer6[SIZE];
+		char buffer4[SIZE] = { 0 };
+		char buffer6[SIZE] = { 0 };
 		int status4 = NSS_STATUS_NOTFOUND, status6 = NSS_STATUS_NOTFOUND;
 		struct hostent he4, he6;
 		int errnop, h_errnop;
+		int32_t ttl4 = 0;
+		int32_t ttl6 = 0;
+		char *canonname4 = NULL;
+		char *canonname6 = NULL;
 
 		if (priv.gethostbyname3_r) {
-			int32_t ttl;
-			char *canonname = NULL;
-
 			if (family == AF_INET || family == AF_UNSPEC)
 				status4 = DL_CALL_FCT(priv.gethostbyname3_r, (node, AF_INET,
-					&he4, buffer4, sizeof buffer4, &errnop, &h_errnop, &ttl, &canonname));
+					&he4, buffer4, sizeof buffer4, &errnop, &h_errnop, &ttl4, &canonname4));
 			if (family == AF_INET6 || family == AF_UNSPEC)
 				status6 = DL_CALL_FCT(priv.gethostbyname3_r, (node, AF_INET6,
-					&he6, buffer6, sizeof buffer6, &errnop, &h_errnop, &ttl, &canonname));
+					&he6, buffer6, sizeof buffer6, &errnop, &h_errnop, &ttl6, &canonname6));
 		} else {
 			if (family == AF_INET || family == AF_UNSPEC)
 				status4 = DL_CALL_FCT(priv.gethostbyname2_r, (node, AF_INET,
@@ -203,30 +204,36 @@ start(netresolve_query_t query, char **settings)
 					&he6, buffer6, sizeof buffer6, &errnop, &h_errnop));
 		}
 
-		status = combine_statuses(status4, status6);
-		if (status == NSS_STATUS_SUCCESS) {
-			if (status4 == NSS_STATUS_SUCCESS)
-				netresolve_backend_apply_hostent(query, &he4, 0, 0, 0, 0, 0, 0);
+		if (combine_statuses(status4, status6) == NSS_STATUS_SUCCESS) {
+			if (status6 == NSS_STATUS_SUCCESS && canonname6)
+				netresolve_backend_set_canonical_name(query, canonname6);
+			else if (status4 == NSS_STATUS_SUCCESS && canonname4)
+				netresolve_backend_set_canonical_name(query, canonname4);
 			if (status6 == NSS_STATUS_SUCCESS)
-				netresolve_backend_apply_hostent(query, &he6, 0, 0, 0, 0, 0, 0);
-		}
+				netresolve_backend_apply_hostent(query, &he6, 0, 0, 0, 0, 0, ttl4);
+			if (status4 == NSS_STATUS_SUCCESS)
+				netresolve_backend_apply_hostent(query, &he4, 0, 0, 0, 0, 0, ttl6);
+			netresolve_backend_finished(query);
+		} else
+			netresolve_backend_failed(query);
 	} else if (node && priv.gethostbyname_r) {
 		char buffer[SIZE];
 		int errnop, h_errnop;
 		struct hostent he;
+		enum nss_status status;
 
 		status = DL_CALL_FCT(priv.gethostbyname_r, (node,
 			&he, buffer, sizeof buffer, &errnop, &h_errnop));
 
 		if (status == NSS_STATUS_SUCCESS) {
 			netresolve_backend_apply_hostent(query, &he, 0, 0, 0, 0, 0, 0);
-		}
+			netresolve_backend_finished(query);
+		} else
+			netresolve_backend_failed(query);
+	} else {
+		debug("no suitable backend found\n");
+		netresolve_backend_failed(query);
 	}
 
 	finalize(&priv);
-
-	if (status == NSS_STATUS_SUCCESS)
-		netresolve_backend_finished(query);
-	else
-		netresolve_backend_failed(query);
 }

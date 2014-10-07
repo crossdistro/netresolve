@@ -18,9 +18,17 @@ $DIFF <($NR --node 1:2:3:4:5:6:7:8) $DATA/numeric6
 $DIFF <($NR --node 1:2:3:4:5:6:7:8%lo) $DATA/numeric6lo
 $DIFF <($NR --node 1:2:3:4:5:6:7:8%999999) $DATA/numeric6nines
 $DIFF <($NR --node 1:2:3:4:5:6:7:8%999999x) $DATA/empty
+# we don't require network connectivity
 #$DIFF <($NR a.root-servers.net) $DATA/dns
 $DIFF <($NR --service http) $DATA/services
 $DIFF <($NR --node /path/to/socket --family unix) $DATA/unix
 $DIFF <($NR --node /path/to/socket --family unix --socktype stream) $DATA/unix-stream
 $DIFF <($NR --node /path/to/socket --family unix --socktype dgram) $DATA/unix-dgram
 $DIFF <($NR --node x-x-x-x-x-x-x-x-x) $DATA/empty
+$DIFF <($NR --backends=nss:files:gethostbyname --node localhost) $DATA/localhost4
+$DIFF <($NR --backends=nss:files:gethostbyname2 --node localhost) $DATA/localhost
+$DIFF <($NR --backends=nss:files:gethostbyname2 --family ip4 --node localhost) $DATA/localhost4
+$DIFF <($NR --backends=nss:files:gethostbyname2 --family ip6 --node localhost) $DATA/localhost6
+$DIFF <($NR --backends=nss:files:gethostbyname3 --node localhost) $DATA/localhost
+$DIFF <($NR --backends=nss:files:gethostbyname3 --family ip4 --node localhost) $DATA/localhost4
+$DIFF <($NR --backends=nss:files:gethostbyname3 --family ip6 --node localhost) $DATA/localhost6

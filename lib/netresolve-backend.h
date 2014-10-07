@@ -51,6 +51,12 @@ void netresolve_backend_add_path(netresolve_query_t query,
 		int priority, int weight, int32_t ttl);
 void netresolve_backend_set_canonical_name(netresolve_query_t query, const char *canonical_name);
 
+/* Convenience output */
+void netresolve_backend_apply_hostent(netresolve_query_t query,
+		const struct hostent *he,
+		int socktype, int protocol, int port,
+		int priority, int weight, int32_t ttl);
+
 /* Tools */
 void *netresolve_backend_new_priv(netresolve_query_t query, size_t size);
 void *netresolve_backend_get_priv(netresolve_query_t query);
@@ -72,10 +78,6 @@ bool netresolve_backend_parse_address(const char *string_orig,
 bool netresolve_backend_parse_path(const char *str,
 		Address *address, int *family, int *ifindex,
 		int *socktype, int *protocol, int *port);
-void netresolve_backend_apply_hostent(netresolve_query_t query,
-		const struct hostent *he,
-		int socktype, int protocol, int port,
-		int priority, int weight, int32_t ttl);
 
 /* Backend function prototypes */
 void start(netresolve_query_t query, char **settings);
