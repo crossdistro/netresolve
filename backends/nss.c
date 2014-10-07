@@ -76,6 +76,15 @@ struct priv_nss {
 		const char *trimdomain[4];
 		unsigned int flags;
 	} *res_hconf;
+	/* getaddrinfo:
+	 *
+	 * A getaddrinfo based API encorporating capabilities of all
+	 * gethostbyname*_r APIs and more.
+	 */
+	int (*getaddrinfo)(const char *nodename, const char *servname,
+		const struct addrinfo *hints,
+		struct addrinfo **res,
+		int32_t *ttlp);
 };
 
 static int
@@ -156,6 +165,7 @@ initialize(struct priv_nss *priv, netresolve_query_t query, char **settings)
 	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname3_r, "_nss_%s_gethostbyname3_r", "gethostbyname3");
 	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname4_r, "_nss_%s_gethostbyname4_r", "gethostbyname4");
 	try_symbol_pattern(query, priv, (void *) &priv->res_hconf, "_res_hconf", "gethostbyname4");
+	try_symbol_pattern(query, priv, (void *) &priv->getaddrinfo, "_nss_%s_getaddrinfo", "getaddrinfo");
 
 	free(priv->name);
 	priv->name = NULL;
@@ -183,7 +193,18 @@ start(netresolve_query_t query, char **settings)
 		return;
 	}
 
-	if (priv.gethostbyname4_r && family == AF_UNSPEC) {
+	if (priv.getaddrinfo) {
+		const char *service = netresolve_backend_get_servname(query);
+		struct addrinfo hints = netresolve_backend_get_addrinfo_hints(query);
+		int status;
+		struct addrinfo *result;
+		int32_t ttl;
+
+		status = DL_CALL_FCT(priv.getaddrinfo, (node, service, &hints, &result, &ttl));
+		netresolve_backend_apply_addrinfo(query, status, result, ttl);
+		if (status == 0)
+			freeaddrinfo(result);
+	} else if (priv.gethostbyname4_r && family == AF_UNSPEC) {
 		char buffer[SIZE] = { 0 };
 		enum nss_status status;
 		struct gaih_addrtuple *result;
