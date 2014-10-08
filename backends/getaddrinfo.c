@@ -33,5 +33,5 @@ start(netresolve_query_t query, char **settings)
 	struct addrinfo *result;
 
 	status = getaddrinfo(node, service, &hints, &result);
-	netresolve_backend_apply_addrinfo(query, status, result, -1);
+	netresolve_backend_apply_addrinfo(query, status, result, 0);
 }
