@@ -27,7 +27,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-/* A timeout starting when the first successful answer has been received. */
 struct priv_ubdns {
 	struct ub_ctx* ctx;
 	bool finished;
@@ -44,12 +43,6 @@ host_callback(void *arg, int status, struct ub_result* result)
 	netresolve_query_t query = lookup_data->query;
 	struct priv_ubdns *priv = netresolve_backend_get_priv(query);
 	int family = result->qtype == ns_t_a ? AF_INET : AF_INET6;
-	int socktype = -1;
-	int protocol = -1;
-	int port = -1;
-	int priority = 0;
-	int weight = 0;
-	int ttl = 0;
 
 	switch (status) {
 	case 0:
@@ -57,7 +50,7 @@ host_callback(void *arg, int status, struct ub_result* result)
 			char **data;
 
 			for (data = result->data; *data; data++)
-				netresolve_backend_add_path(query, family, *data, 0, socktype, protocol, port, priority, weight, ttl);
+				netresolve_backend_add_path(query, family, *data, 0, 0, 0, 0, 0, 0, result->ttl);
 		}
 		ub_resolve_free(result);
 		break;
