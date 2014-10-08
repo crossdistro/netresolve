@@ -1,4 +1,4 @@
 response netresolve 0.0.1
-path ::1 any any 0 0 0
-path 127.0.0.1 any any 0 0 0
+ip ::1 any any 0 0 0 0
+ip 127.0.0.1 any any 0 0 0 0
 

@@ -1,6 +1,6 @@
 response netresolve 0.0.1
-path :: stream tcp 80 0 0
-path :: dgram udp 80 0 0
-path 0.0.0.0 stream tcp 80 0 0
-path 0.0.0.0 dgram udp 80 0 0
+ip :: stream tcp 80 0 0 0
+ip :: dgram udp 80 0 0 0
+ip 0.0.0.0 stream tcp 80 0 0 0
+ip 0.0.0.0 dgram udp 80 0 0 0
 

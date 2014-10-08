@@ -1,4 +1,4 @@
 response netresolve 0.0.1
-path 198.41.0.4 any any 0 0 0
-path 2001:503:ba3e::2:30 any any 0 0 0
+ip 198.41.0.4 any any 0 0 0 0
+ip 2001:503:ba3e::2:30 any any 0 0 0 0
 

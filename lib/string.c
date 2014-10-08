@@ -124,7 +124,7 @@ add_path(char **start, char *end, netresolve_query_t query, int i)
 {
 	int family, ifindex, socktype, protocol, port, priority, weight, ttl;
 	const void *address;
-	char ifname[IF_NAMESIZE] = {0};
+	char ifname[IF_NAMESIZE+1+1] = {0};
 	char addrstr[1024] = {0};
 	const char *socktypestr;
 	const char *protocolstr;
@@ -141,14 +141,16 @@ add_path(char **start, char *end, netresolve_query_t query, int i)
 
 	if (family == AF_UNIX)
 		bprintf(start, end, "unix %s %s\n", address, socktypestr);
-	else if (ifindex) {
-		if (!if_indextoname(ifindex, ifname))
-			snprintf(ifname, sizeof ifname, "%d", ifindex);
-		bprintf(start, end, "path %s%%%s %s %s %d %d %d\n",
-				addrstr, ifname, socktypestr, protocolstr, port, priority, weight);
-	} else {
-		bprintf(start, end, "path %s %s %s %d %d %d\n",
-				addrstr, socktypestr, protocolstr, port, priority, weight);
+	else {
+		if (ifindex) {
+			ifname[0] = '%';
+			if (!if_indextoname(ifindex, ifname + 1))
+				snprintf(ifname + 1, sizeof ifname - 1, "%d", ifindex);
+		}
+		bprintf(start, end, "ip %s%s %s %s %d %d %d %d\n",
+				addrstr, ifname,
+				socktypestr, protocolstr, port,
+				priority, weight, ttl);
 	}
 }
 
