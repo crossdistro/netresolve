@@ -38,7 +38,7 @@ start(netresolve_query_t query, char **settings)
 		return;
 	}
 
-	netresolve_backend_add_address(query, AF_INET, &inaddr_any, 0);
-	netresolve_backend_add_address(query, AF_INET6, &in6addr_any, 0);
+	netresolve_backend_add_path(query, AF_INET, &inaddr_any, 0, 0, 0, 0, 0, 0);
+	netresolve_backend_add_path(query, AF_INET6, &in6addr_any, 0, 0, 0, 0, 0, 0);
 	netresolve_backend_finished(query);
 }

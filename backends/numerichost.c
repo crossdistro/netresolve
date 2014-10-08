@@ -36,6 +36,6 @@ start(netresolve_query_t query, char **settings)
 		return;
 	}
 
-	netresolve_backend_add_address(query, family, &address, ifindex);
+	netresolve_backend_add_path(query, family, &address, ifindex, 0, 0, 0, 0, 0);
 	netresolve_backend_finished(query);
 }

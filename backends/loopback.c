@@ -47,8 +47,8 @@ start(netresolve_query_t query, char **settings)
 	}
 
 	if (ipv4)
-		netresolve_backend_add_address(query, AF_INET, &inaddr_loopback, 0);
+		netresolve_backend_add_path(query, AF_INET, &inaddr_loopback, 0, 0, 0, 0, 0, 0);
 	if (ipv6)
-		netresolve_backend_add_address(query, AF_INET6, &in6addr_loopback, 0);
+		netresolve_backend_add_path(query, AF_INET6, &in6addr_loopback, 0, 0, 0, 0, 0, 0);
 	netresolve_backend_finished(query);
 }

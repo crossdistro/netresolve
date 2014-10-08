@@ -49,8 +49,6 @@ void netresolve_backend_add_path(netresolve_query_t query,
 		int family, const void *address, int ifindex,
 		int socktype, int protocol, int port,
 		int priority, int weight);
-#define netresolve_backend_add_address(query, family, address, ifindex) \
-	netresolve_backend_add_path(query, family, address, ifindex, 0, 0, 0, 0, 0);
 void netresolve_backend_set_canonical_name(netresolve_query_t query, const char *canonical_name);
 
 /* Tools */
