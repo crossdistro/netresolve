@@ -38,9 +38,6 @@ start(netresolve_query_t query, char **settings)
 		return;
 	}
 
-	if (!socktype)
-		socktype = -1;
-
 	netresolve_backend_add_path(query, AF_UNIX, node, 0, socktype, 0, 0, 0, 0);
 	netresolve_backend_finished(query);
 }

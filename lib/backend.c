@@ -126,13 +126,13 @@ netresolve_backend_add_path(netresolve_query_t query,
 	struct netresolve_path path;
 	int i;
 
-	if (family == AF_UNIX && socktype == -1) {
+	if (family == AF_UNIX && !socktype) {
 		netresolve_backend_add_path(query, family, address, 0, SOCK_STREAM, 0, 0, 0, 0);
 		netresolve_backend_add_path(query, family, address, 0, SOCK_DGRAM, 0, 0, 0, 0);
 		return;
 	}
 
-	if (query->request.servname && socktype == -1) {
+	if (query->request.servname && !socktype) {
 		PathData data = {
 			.query = query,
 			.family = family,
@@ -143,13 +143,6 @@ netresolve_backend_add_path(netresolve_query_t query,
 		netresolve_get_service_info(path_callback, &data, query->request.servname,
 				query->request.socktype, query->request.protocol);
 		return;
-	}
-
-	/* don't pass negative numbers */
-	if (socktype == -1) {
-		socktype = 0;
-		protocol = 0;
-		portnum = 0;
 	}
 
 	if (query->request.family != AF_UNSPEC && query->request.family != family)
@@ -359,14 +352,14 @@ struct enum_item socktypes[] = {
 	{ SOCK_STREAM, "stream" },
 	{ SOCK_DGRAM, "dgram" },
 	{ SOCK_SEQPACKET, "seqpacket" },
-	{ -1, NULL }
+	{ 0, NULL }
 };
 
 struct enum_item protocols[] = {
 	{ IPPROTO_TCP, "tcp" },
 	{ IPPROTO_UDP, "udp" },
 	{ IPPROTO_SCTP, "sctp" },
-	{ -1, NULL }
+	{ 0, NULL }
 };
 
 bool
