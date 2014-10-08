@@ -398,6 +398,25 @@ netresolve_backend_parse_path(const char *str,
 }
 
 void
+netresolve_backend_apply_addrtuple(netresolve_query_t query,
+		enum nss_status status, const struct gaih_addrtuple *result,
+		int32_t ttl)
+{
+	const struct gaih_addrtuple *item;
+
+	if (status == NSS_STATUS_SUCCESS) {
+		for (item = result; item; item = item->next) {
+			netresolve_backend_add_path(query,
+					item->family, item->addr, item->scopeid,
+					0, 0, 0,
+					0, 0, ttl);
+		}
+		netresolve_backend_finished(query);
+	} else
+		netresolve_backend_failed(query);
+}
+
+void
 netresolve_backend_apply_hostent(netresolve_query_t query,
 		const struct hostent *he,
 		int socktype, int protocol, int port,

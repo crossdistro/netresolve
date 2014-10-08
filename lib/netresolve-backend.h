@@ -31,6 +31,7 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <netdb.h>
+#include <nss.h>
 #include <poll.h>
 
 typedef struct netresolve_query *netresolve_query_t;
@@ -52,6 +53,9 @@ void netresolve_backend_add_path(netresolve_query_t query,
 void netresolve_backend_set_canonical_name(netresolve_query_t query, const char *canonical_name);
 
 /* Convenience output */
+void netresolve_backend_apply_addrtuple(netresolve_query_t query,
+		enum nss_status status, const struct gaih_addrtuple *result,
+		int32_t ttl);
 void netresolve_backend_apply_hostent(netresolve_query_t query,
 		const struct hostent *he,
 		int socktype, int protocol, int port,

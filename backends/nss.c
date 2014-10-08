@@ -24,7 +24,6 @@
 #include <netresolve-backend.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <nss.h>
 #include <dlfcn.h>
 
 #define SIZE (128*1024)
@@ -69,6 +68,14 @@ struct priv_nss {
 		struct gaih_addrtuple **pat,
 		char *buffer, size_t buflen, int *errnop,
 		int *h_errnop, int32_t *ttlp);
+	struct hconf {
+		int initialized;
+		int unused1;
+		int unused2[4];
+		int num_trimdomains;
+		const char *trimdomain[4];
+		unsigned int flags;
+	} *res_hconf;
 };
 
 static int
@@ -148,6 +155,7 @@ initialize(struct priv_nss *priv, netresolve_query_t query, char **settings)
 	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname2_r, "_nss_%s_gethostbyname2_r", "gethostbyname2");
 	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname3_r, "_nss_%s_gethostbyname3_r", "gethostbyname3");
 	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname4_r, "_nss_%s_gethostbyname4_r", "gethostbyname4");
+	try_symbol_pattern(query, priv, (void *) &priv->res_hconf, "_res_hconf", "gethostbyname4");
 
 	free(priv->name);
 	priv->name = NULL;
@@ -175,9 +183,28 @@ start(netresolve_query_t query, char **settings)
 		return;
 	}
 
-	/*if (priv->gethostbyname4_r) {
-		TODO
-	} else*/ if (node && (priv.gethostbyname3_r || priv.gethostbyname2_r)) {
+	if (priv.gethostbyname4_r && family == AF_UNSPEC) {
+		char buffer[SIZE] = { 0 };
+		enum nss_status status;
+		struct gaih_addrtuple *result;
+		int errnop, h_errnop;
+		int32_t ttl;
+
+		/* Without this, libnss_files won't resolve using multiple records
+		 * in /etc/hosts, e.g. won't return both IPv4 and IPv6 for "localhost"
+		 * even when /etc/hosts is configured correctly.
+		 *
+		 * See relevant files in glibc sources:
+		 *  - nss_files/files-hosts.c
+		 *  - resolv/res_hconf.h
+		 */
+		if (priv.res_hconf)
+			priv.res_hconf->flags = 16;
+
+		status = DL_CALL_FCT(priv.gethostbyname4_r, (node, &result,
+			buffer, sizeof buffer, &errnop, &h_errnop, &ttl));
+		netresolve_backend_apply_addrtuple(query, status, result, ttl);
+	} else if (node && (priv.gethostbyname3_r || priv.gethostbyname2_r)) {
 		char buffer4[SIZE] = { 0 };
 		char buffer6[SIZE] = { 0 };
 		int status4 = NSS_STATUS_NOTFOUND, status6 = NSS_STATUS_NOTFOUND;

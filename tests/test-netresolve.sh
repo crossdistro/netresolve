@@ -32,3 +32,5 @@ $DIFF <($NR --backends=nss:files:gethostbyname2 --family ip6 --node localhost) $
 $DIFF <($NR --backends=nss:files:gethostbyname3 --node localhost) $DATA/localhost
 $DIFF <($NR --backends=nss:files:gethostbyname3 --family ip4 --node localhost) $DATA/localhost4
 $DIFF <($NR --backends=nss:files:gethostbyname3 --family ip6 --node localhost) $DATA/localhost6
+$DIFF <($NR --backends=nss:files:gethostbyname4 --node localhost) $DATA/localhost
+$DIFF <($NR --backends=nss:files --node localhost) $DATA/localhost
