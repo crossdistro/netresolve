@@ -90,9 +90,12 @@ start_address_lookup(netresolve_query_t query)
 void
 start(netresolve_query_t query, char **settings)
 {
+	const char *node = netresolve_backend_get_nodename(query);
 	struct priv_ubdns *priv = netresolve_backend_new_priv(query, sizeof *priv);
 
 	if (!priv)
+		goto fail;
+	if (!node)
 		goto fail;
 
 	priv->ctx = ub_ctx_create();
@@ -125,6 +128,8 @@ cleanup(netresolve_query_t query)
 {
 	struct priv_ubdns *priv = netresolve_backend_get_priv(query);
 
-	netresolve_backend_watch_fd(query, ub_fd(priv->ctx), 0);
-	ub_ctx_delete(priv->ctx);
+	if (priv->ctx) {
+		netresolve_backend_watch_fd(query, ub_fd(priv->ctx), 0);
+		ub_ctx_delete(priv->ctx);
+	}
 }

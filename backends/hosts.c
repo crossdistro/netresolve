@@ -146,17 +146,22 @@ out:
 void
 start(netresolve_query_t query, char **settings)
 {
-	const char *request_node = netresolve_backend_get_nodename(query);
+	const char *node = netresolve_backend_get_nodename(query);
 	struct hosts_list list;
 	struct hosts_item *item;
 	int count = 0;
+
+	if (!node) {
+		netresolve_backend_failed(query);
+		return;
+	}
 
 	/* TODO: Would be nice to read the hosts once in a thread-safe way and with timestamp checking. */
 	memset(&list, 0, sizeof list);
 	read_list(&list);
 
 	for (item = list.items; item->name; item++) {
-		if (request_node && strcmp(request_node, item->name))
+		if (strcmp(node, item->name))
 			continue;
 		netresolve_backend_add_path(query, item->family, &item->address, item->ifindex, 0, 0, 0, 0, 0, 0);
 		count++;

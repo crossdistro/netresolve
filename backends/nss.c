@@ -204,7 +204,7 @@ start(netresolve_query_t query, char **settings)
 		netresolve_backend_apply_addrinfo(query, status, result, ttl);
 		if (status == 0)
 			freeaddrinfo(result);
-	} else if (priv.gethostbyname4_r && family == AF_UNSPEC) {
+	} else if (node && priv.gethostbyname4_r && family == AF_UNSPEC) {
 		char buffer[SIZE] = { 0 };
 		enum nss_status status;
 		struct gaih_addrtuple *result;

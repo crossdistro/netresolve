@@ -203,6 +203,7 @@ start_srv_lookup(netresolve_query_t query)
 void
 start(netresolve_query_t query, char **settings)
 {
+	const char *node = netresolve_backend_get_nodename(query);
 	struct priv_dns *priv = netresolve_backend_new_priv(query, sizeof *priv);
 	/* ares doesn't seem to accept const options */
 	static struct ares_options options = {
@@ -213,6 +214,9 @@ start(netresolve_query_t query, char **settings)
 
 	if (!priv)
 		goto fail;
+	if (!node)
+		goto fail;
+
 
 	priv->ptfd = -1;
 
