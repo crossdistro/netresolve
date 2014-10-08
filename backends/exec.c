@@ -124,11 +124,11 @@ received_line(netresolve_query_t query, struct priv_exec *priv, const char *line
 	if (!strncmp(addrprefix, line, addrprefixlen)) {
 		if (netresolve_backend_parse_address(line + addrprefixlen,
 					&address, &family, &ifindex))
-			netresolve_backend_add_path(query, family, &address, ifindex, 0, 0, 0, 0, 0);
+			netresolve_backend_add_path(query, family, &address, ifindex, 0, 0, 0, 0, 0, 0);
 	} else if (!strncmp(pathprefix, line, pathprefixlen)) {
 		if (netresolve_backend_parse_path(line + pathprefixlen,
 					&address, &family, &ifindex, &socktype, &protocol, &port))
-			netresolve_backend_add_path(query, family, &address, ifindex, socktype, protocol, port, 0, 0);
+			netresolve_backend_add_path(query, family, &address, ifindex, socktype, protocol, port, 0, 0, 0);
 	}
 
 	return false;

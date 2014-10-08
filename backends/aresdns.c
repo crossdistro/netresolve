@@ -91,6 +91,7 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 	int port = -1;
 	int priority = 0;
 	int weight = 0;
+	int ttl = 0;
 
 	if (srv) {
 		socktype = netresolve_backend_get_socktype(query);
@@ -107,7 +108,7 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 		priv->ptfd = netresolve_backend_add_timeout(query, partial_timeout, 0);
 		if (priv->ptfd == -1)
 			error("timer: %s", strerror(errno));
-		netresolve_backend_apply_hostent(query, he, socktype, protocol, port, priority, weight);
+		netresolve_backend_apply_hostent(query, he, socktype, protocol, port, priority, weight, ttl);
 		break;
 	default:
 		error("ares: %s\n", ares_strerror(status));

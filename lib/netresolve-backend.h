@@ -48,7 +48,7 @@ bool netresolve_backend_get_dns_srv_lookup(netresolve_query_t query);
 void netresolve_backend_add_path(netresolve_query_t query,
 		int family, const void *address, int ifindex,
 		int socktype, int protocol, int port,
-		int priority, int weight);
+		int priority, int weight, int32_t ttl);
 void netresolve_backend_set_canonical_name(netresolve_query_t query, const char *canonical_name);
 
 /* Tools */
@@ -75,7 +75,7 @@ bool netresolve_backend_parse_path(const char *str,
 void netresolve_backend_apply_hostent(netresolve_query_t query,
 		const struct hostent *he,
 		int socktype, int protocol, int port,
-		int priority, int weight);
+		int priority, int weight, int32_t ttl);
 
 /* Backend function prototypes */
 void start(netresolve_query_t query, char **settings);

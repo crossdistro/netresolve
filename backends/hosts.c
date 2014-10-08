@@ -158,7 +158,7 @@ start(netresolve_query_t query, char **settings)
 	for (item = list.items; item->name; item++) {
 		if (request_node && strcmp(request_node, item->name))
 			continue;
-		netresolve_backend_add_path(query, item->family, &item->address, item->ifindex, 0, 0, 0, 0, 0);
+		netresolve_backend_add_path(query, item->family, &item->address, item->ifindex, 0, 0, 0, 0, 0, 0);
 		count++;
 	}
 

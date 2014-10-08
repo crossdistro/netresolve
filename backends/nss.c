@@ -168,9 +168,9 @@ start(netresolve_query_t query, char **settings)
 		status = combine_statuses(status4, status6);
 		if (status == NSS_STATUS_SUCCESS) {
 			if (status4 == NSS_STATUS_SUCCESS)
-				netresolve_backend_apply_hostent(query, &he4, 0, 0, 0, 0, 0);
+				netresolve_backend_apply_hostent(query, &he4, 0, 0, 0, 0, 0, 0);
 			if (status6 == NSS_STATUS_SUCCESS)
-				netresolve_backend_apply_hostent(query, &he6, 0, 0, 0, 0, 0);
+				netresolve_backend_apply_hostent(query, &he6, 0, 0, 0, 0, 0, 0);
 		}
 	} else if (node && priv->gethostbyname_r) {
 		char buffer[SIZE];
@@ -181,7 +181,7 @@ start(netresolve_query_t query, char **settings)
 			&he, buffer, sizeof buffer, &errnop, &h_errnop));
 
 		if (status == NSS_STATUS_SUCCESS) {
-			netresolve_backend_apply_hostent(query, &he, 0, 0, 0, 0, 0);
+			netresolve_backend_apply_hostent(query, &he, 0, 0, 0, 0, 0, 0);
 		}
 	}
 

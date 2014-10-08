@@ -92,6 +92,9 @@ typedef struct {
 	int family;
 	const void *address;
 	int ifindex;
+	int priority;
+	int weight;
+	int32_t ttl;
 } PathData;
 
 static void
@@ -102,7 +105,7 @@ path_callback(int socktype, int protocol, int port, void *user_data)
 	netresolve_backend_add_path(data->query,
 			data->family, data->address, data->ifindex,
 			socktype, protocol, port,
-			0, 0);
+			data->priority, data->weight, data->ttl);
 }
 
 static int
@@ -120,15 +123,14 @@ void
 netresolve_backend_add_path(netresolve_query_t query,
 		int family, const void *address, int ifindex,
 		int socktype, int protocol, int portnum,
-		int priority, int weight)
+		int priority, int weight, int32_t ttl)
 {
 	struct netresolve_response *response = &query->response;
-	struct netresolve_path path;
 	int i;
 
 	if (family == AF_UNIX && !socktype) {
-		netresolve_backend_add_path(query, family, address, 0, SOCK_STREAM, 0, 0, 0, 0);
-		netresolve_backend_add_path(query, family, address, 0, SOCK_DGRAM, 0, 0, 0, 0);
+		netresolve_backend_add_path(query, family, address, 0, SOCK_STREAM, 0, 0, priority, weight, ttl);
+		netresolve_backend_add_path(query, family, address, 0, SOCK_DGRAM, 0, 0, priority, weight, ttl);
 		return;
 	}
 
@@ -138,6 +140,9 @@ netresolve_backend_add_path(netresolve_query_t query,
 			.family = family,
 			.address = address,
 			.ifindex = ifindex,
+			.priority = priority,
+			.weight = weight,
+			.ttl = ttl
 		};
 
 		netresolve_get_service_info(path_callback, &data, query->request.servname,
@@ -150,18 +155,26 @@ netresolve_backend_add_path(netresolve_query_t query,
 
 	size_t length = family_to_length(family);
 
-	memset(&path, 0, sizeof path);
-	path.node.family = family;
+	struct netresolve_path path = {
+		.node = {
+			.family = family,
+			.address = { 0 },
+			.ifindex = ifindex
+		},
+		.service = {
+			.socktype = socktype,
+			.protocol = protocol,
+			.port = portnum
+		},
+		.priority = priority,
+		.weight = weight,
+		.ttl = ttl
+	};
+
 	if (length)
 		memcpy(path.node.address, address, length);
 	else
 		strncpy(path.node.address, address, sizeof path.node.address);
-	path.node.ifindex = ifindex;
-	path.service.socktype = socktype;
-	path.service.protocol = protocol;
-	path.service.port = portnum;
-	path.priority = priority;
-	path.weight = weight;
 
 	for (i = 0; i < response->pathcount; i++)
 		if (path_cmp(&path, &response->paths[i]) < 0)
@@ -388,7 +401,7 @@ void
 netresolve_backend_apply_hostent(netresolve_query_t query,
 		const struct hostent *he,
 		int socktype, int protocol, int port,
-		int priority, int weight)
+		int priority, int weight, int32_t ttl)
 {
 	char **addr;
 
@@ -396,7 +409,7 @@ netresolve_backend_apply_hostent(netresolve_query_t query,
 		netresolve_backend_add_path(query,
 				he->h_addrtype, *addr, 0,
 				socktype, protocol, port,
-				priority, weight);
+				priority, weight, ttl);
 
 	if (he->h_name)
 		netresolve_backend_set_canonical_name(query, he->h_name);

@@ -58,7 +58,7 @@ add_addresses(netresolve_query_t query, const struct addrinfo *first)
 		netresolve_backend_add_path(query,
 				ai->ai_family, &address, ifindex,
 				ai->ai_socktype, ai->ai_protocol, port,
-				0, 0);
+				0, 0, 0);
 	}
 
 }
