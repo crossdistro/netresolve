@@ -29,7 +29,8 @@
 
 struct priv_ubdns {
 	struct ub_ctx* ctx;
-	bool finished;
+	bool finished4;
+	bool finished6;
 };
 
 struct priv_address_lookup {
@@ -58,7 +59,10 @@ host_callback(void *arg, int status, struct ub_result* result)
 		error("libunbound: %s\n", ub_strerror(status));
 	}
 
-	priv->finished = true;
+	if (family == AF_INET)
+		priv->finished4 = true;
+	else
+		priv->finished6 = true;
 }
 
 static void
@@ -112,7 +116,7 @@ dispatch(netresolve_query_t query, int fd, int events)
 
 	ub_process(priv->ctx);
 
-	if (priv->finished)
+	if (priv->finished4 && priv->finished6)
 		netresolve_backend_finished(query);
 }
 
