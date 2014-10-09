@@ -207,9 +207,13 @@ start(netresolve_query_t query, char **settings)
 	} else if (node && priv.gethostbyname4_r && family == AF_UNSPEC) {
 		char buffer[SIZE] = { 0 };
 		enum nss_status status;
-		struct gaih_addrtuple *result;
+		/* The libnss_files.so plugin checks the gaih_addrtuple pointer for being
+		 * NULL and fails badly otherwise. Whether such behavior is correct
+		 * remains a question.
+		 */
+		struct gaih_addrtuple *result = NULL;
 		int errnop, h_errnop;
-		int32_t ttl;
+		int32_t ttl = 0;
 
 		/* Without this, libnss_files won't resolve using multiple records
 		 * in /etc/hosts, e.g. won't return both IPv4 and IPv6 for "localhost"
