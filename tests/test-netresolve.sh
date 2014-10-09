@@ -16,6 +16,11 @@ $DIFF <($NR --backends=getaddrinfo) $DATA/empty
 $DIFF <($NR --backends=nss:files) $DATA/empty
 $DIFF <($NR --backends=nss:bogusbogus) $DATA/empty
 $DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so) $DATA/any
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so:getaddrinfo) $DATA/any
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so:gethostbyname4) $DATA/empty
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so:gethostbyname3) $DATA/empty
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so:gethostbyname2) $DATA/empty
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so:gethostbyname) $DATA/empty
 
 # empty (passive)
 $DIFF <(NETRESOLVE_FLAG_DEFAULT_LOOPBACK=yes $NR) $DATA/localhost
@@ -39,31 +44,41 @@ $DIFF <($NR --node 1:2:3:4:5:6:7:8%999999x) $DATA/empty
 $DIFF <($NR --node localhost) $DATA/localhost
 $DIFF <($NR --backends=hosts --node localhost) $DATA/localhost
 $DIFF <($NR --backends=nss:files --node localhost) $DATA/localhost
-$DIFF <($NR --backends=nss:files:gethostbyname --node localhost) $DATA/localhost4
 $DIFF <($NR --backends=nss:files:gethostbyname4 --node localhost) $DATA/localhost
 $DIFF <($NR --backends=nss:files:gethostbyname3 --node localhost) $DATA/localhost
 $DIFF <($NR --backends=nss:files:gethostbyname2 --node localhost) $DATA/localhost
+$DIFF <($NR --backends=nss:files:gethostbyname --node localhost) $DATA/localhost4
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so --node localhost) $DATA/localhost
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so:getaddrinfo --node localhost) $DATA/localhost
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so:gethostbyname4 --node localhost) $DATA/localhost
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so:gethostbyname3 --node localhost) $DATA/localhost
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so:gethostbyname2 --node localhost) $DATA/localhost
+$DIFF <($NR --backends=nss:./.libs/libnss_netresolve.so:gethostbyname --node localhost) $DATA/localhost4
 
 # localhost/http
 $DIFF <($NR --node localhost) $DATA/localhost
 $DIFF <($NR --backends=getaddrinfo --node localhost --service http) $DATA/localhost-http
 $DIFF <($NR --backends=nss:files --node localhost --service http) $DATA/localhost-http
-$DIFF <($NR --backends=nss:files:gethostbyname --node localhost --service http) $DATA/localhost4-http
 $DIFF <($NR --backends=nss:files:gethostbyname4 --node localhost --service http) $DATA/localhost-http
 $DIFF <($NR --backends=nss:files:gethostbyname3 --node localhost --service http) $DATA/localhost-http
 $DIFF <($NR --backends=nss:files:gethostbyname2 --node localhost --service http) $DATA/localhost-http
+$DIFF <($NR --backends=nss:files:gethostbyname --node localhost --service http) $DATA/localhost4-http
 
 # localhost (ip4)
 $DIFF <($NR --node localhost --family ip4) $DATA/localhost4
 $DIFF <($NR --backends=nss:files --node localhost --family ip4) $DATA/localhost4
+$DIFF <($NR --backends=nss:files:gethostbyname4 --node localhost --family ip4) $DATA/empty
 $DIFF <($NR --backends=nss:files:gethostbyname3 --node localhost --family ip4) $DATA/localhost4
 $DIFF <($NR --backends=nss:files:gethostbyname2 --node localhost --family ip4) $DATA/localhost4
+$DIFF <($NR --backends=nss:files:gethostbyname --node localhost --family ip4) $DATA/localhost4
 
 # localhost (ip6)
 $DIFF <($NR --node localhost --family ip6) $DATA/localhost6
 $DIFF <($NR --backends=nss:files --node localhost --family ip6) $DATA/localhost6
+$DIFF <($NR --backends=nss:files:gethostbyname4 --node localhost --family ip6) $DATA/empty
 $DIFF <($NR --backends=nss:files:gethostbyname3 --node localhost --family ip6) $DATA/localhost6
 $DIFF <($NR --backends=nss:files:gethostbyname2 --node localhost --family ip6) $DATA/localhost6
+$DIFF <($NR --backends=nss:files:gethostbyname --node localhost --family ip6) $DATA/empty
 
 # localhost4
 $DIFF <($NR --node localhost4) $DATA/localhost4
