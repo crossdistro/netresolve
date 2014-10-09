@@ -29,8 +29,7 @@
 int
 _nss_netresolve_getaddrinfo(const char *nodename, const char *servname,
 		const struct addrinfo *hints,
-		struct addrinfo **res,
-		int32_t *ttlp)
+		struct addrinfo **result, int32_t *ttl)
 {
 	netresolve_t channel;
 	netresolve_query_t query;
@@ -40,7 +39,7 @@ _nss_netresolve_getaddrinfo(const char *nodename, const char *servname,
 		return status;
 
 	if ((query = netresolve_query_getaddrinfo(channel, nodename, servname, hints)))
-		status = netresolve_query_getaddrinfo_done(query, res);
+		status = netresolve_query_getaddrinfo_done(query, result, ttl);
 
 	netresolve_close(channel);
 	return status;

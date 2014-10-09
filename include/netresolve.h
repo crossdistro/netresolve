@@ -77,7 +77,7 @@ const char *netresolve_query_get_canonical_name(const netresolve_query_t query);
 
 /* BSD socket API compatibility */
 const struct sockaddr *netresolve_query_get_sockaddr(const netresolve_query_t query, size_t idx,
-		socklen_t *salen, int *socktype, int *protocol);
+		socklen_t *salen, int *socktype, int *protocol, int32_t *ttl);
 
 /* Logging */
 enum netresolve_log_level {

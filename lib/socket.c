@@ -37,7 +37,7 @@ netresolve_query_bind(netresolve_query_t query, size_t idx)
 	socklen_t salen;
 	int sock;
 
-	sa = netresolve_query_get_sockaddr(query, idx, &salen, &socktype, &protocol);
+	sa = netresolve_query_get_sockaddr(query, idx, &salen, &socktype, &protocol, NULL);
 	if (!sa)
 		return;
 	sock = socket(sa->sa_family, socktype | flags, protocol);
@@ -64,7 +64,7 @@ netresolve_query_connect(netresolve_query_t query, size_t idx)
 	if (path->socket.state != NETRESOLVE_STATE_INIT)
 		return;
 
-	sa = netresolve_query_get_sockaddr(query, path - query->response.paths, &salen, &socktype, &protocol);
+	sa = netresolve_query_get_sockaddr(query, path - query->response.paths, &salen, &socktype, &protocol, NULL);
 	if (!sa)
 		goto fail;
 	path->socket.fd = socket(sa->sa_family, socktype | flags, protocol);

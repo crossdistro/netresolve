@@ -47,7 +47,7 @@ getaddrinfo(const char *nodename, const char *servname,
 		return status;
 
 	if ((query = netresolve_query_getaddrinfo(channel, nodename, servname, hints)))
-		status = netresolve_query_getaddrinfo_done(query, res);
+		status = netresolve_query_getaddrinfo_done(query, res, NULL);
 
 	netresolve_close(channel);
 	return status;

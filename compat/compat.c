@@ -54,7 +54,7 @@ netresolve_query_getaddrinfo(netresolve_t channel, const char *node, const char 
 }
 
 int
-netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **res)
+netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **res, int32_t *ttlp)
 {
 	size_t npaths = netresolve_query_get_count(query);
 	const char *canonname = netresolve_query_get_canonical_name(query);
@@ -62,10 +62,17 @@ netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **re
 	struct addrinfo *ai = &head;
 	int i;
 
+	if (ttlp)
+		*ttlp = INT32_MAX;
+
 	for (i = 0; i < npaths; i++) {
 		int socktype, protocol;
 		socklen_t salen;
-		const struct sockaddr *sa = netresolve_query_get_sockaddr(query, i, &salen, &socktype, &protocol);
+		int32_t ttl;
+		const struct sockaddr *sa = netresolve_query_get_sockaddr(query, i, &salen, &socktype, &protocol, &ttl);
+
+		if (ttlp && ttl < *ttlp)
+			*ttlp = ttl;
 
 		ai = ai->ai_next = calloc(1, sizeof *ai + salen);
 		if (!ai) {

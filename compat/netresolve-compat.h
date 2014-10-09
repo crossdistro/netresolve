@@ -29,7 +29,7 @@
 
 netresolve_query_t netresolve_query_getaddrinfo(netresolve_t channel,
 		const char *node, const char *service, const struct addrinfo *hints);
-int netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **res);
+int netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **res, int32_t *ttlp);
 void netresolve_query_getaddrinfo_free(struct addrinfo *ai);
 
 netresolve_query_t netresolve_query_gethostbyname(netresolve_t channel, const char *name);

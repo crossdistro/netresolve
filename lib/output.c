@@ -88,13 +88,14 @@ netresolve_query_get_canonical_name(const netresolve_query_t query)
 
 const struct sockaddr *
 netresolve_query_get_sockaddr(netresolve_query_t query, size_t idx,
-		socklen_t *salen, int *socktype, int *protocol)
+		socklen_t *salen, int *socktype, int *protocol, int32_t *ttl)
 {
 	int family, ifindex, port;
 	const void *address;
 
 	netresolve_query_get_address_info(query, idx, &family, &address, &ifindex);
 	netresolve_query_get_port_info(query, idx, socktype, protocol, &port);
+	netresolve_query_get_aux_info(query, idx, NULL, NULL, ttl);
 
 	if (!address)
 		return NULL;
