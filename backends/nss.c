@@ -68,14 +68,6 @@ struct priv_nss {
 		struct gaih_addrtuple **pat,
 		char *buffer, size_t buflen, int *errnop,
 		int *h_errnop, int32_t *ttlp);
-	struct hconf {
-		int initialized;
-		int unused1;
-		int unused2[4];
-		int num_trimdomains;
-		const char *trimdomain[4];
-		unsigned int flags;
-	} *res_hconf;
 	/* getaddrinfo:
 	 *
 	 * A getaddrinfo based API encorporating capabilities of all
@@ -164,7 +156,6 @@ initialize(struct priv_nss *priv, netresolve_query_t query, char **settings)
 	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname2_r, "_nss_%s_gethostbyname2_r", "gethostbyname2");
 	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname3_r, "_nss_%s_gethostbyname3_r", "gethostbyname3");
 	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname4_r, "_nss_%s_gethostbyname4_r", "gethostbyname4");
-	try_symbol_pattern(query, priv, (void *) &priv->res_hconf, "_res_hconf", "gethostbyname4");
 	try_symbol_pattern(query, priv, (void *) &priv->getaddrinfo, "_nss_%s_getaddrinfo", "getaddrinfo");
 
 	free(priv->name);
@@ -223,8 +214,15 @@ start(netresolve_query_t query, char **settings)
 		 *  - nss_files/files-hosts.c
 		 *  - resolv/res_hconf.h
 		 */
-		if (priv.res_hconf)
-			priv.res_hconf->flags = 16;
+		extern struct {
+			int initialized;
+			int unused1;
+			int unused2[4];
+			int num_trimdomains;
+			const char *trimdomain[4];
+			unsigned int flags;
+		} _res_hconf;
+		_res_hconf.flags = 0x10;
 
 		status = DL_CALL_FCT(priv.gethostbyname4_r, (node, &result,
 			buffer, sizeof buffer, &errnop, &h_errnop, &ttl));
