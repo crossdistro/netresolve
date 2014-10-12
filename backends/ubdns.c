@@ -26,85 +26,179 @@
 #include <arpa/nameser.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <ldns/ldns.h>
 
 struct priv_ubdns {
-	struct ub_ctx* ctx;
-	bool finished4;
-	bool finished6;
-};
-
-struct priv_address_lookup {
 	netresolve_query_t query;
+	struct ub_ctx* ctx;
+	int protocol;
+	uint16_t port;
+	int priority;
+	int weight;
+	char *node;
+	int family;
+	bool ip4_finished;
+	bool ip6_finished;
 };
 
+static void lookup(struct priv_ubdns *priv, int family);
+
 static void
-host_callback(void *arg, int status, struct ub_result* result)
+callback(void *arg, int status, struct ub_result* result)
 {
-	struct priv_address_lookup *lookup_data = arg;
-	netresolve_query_t query = lookup_data->query;
-	struct priv_ubdns *priv = netresolve_backend_get_priv(query);
-	int family = result->qtype == ns_t_a ? AF_INET : AF_INET6;
+	struct priv_ubdns *priv = arg;
+	netresolve_query_t query = priv->query;
+	int family = AF_UNSPEC;
 
-	switch (status) {
-	case 0:
-		if (result->havedata) {
-			char **data;
-
-			for (data = result->data; *data; data++)
-				netresolve_backend_add_path(query, family, *data, 0, 0, 0, 0, 0, 0, result->ttl);
-		}
-		ub_resolve_free(result);
-		break;
-	default:
+	if (status) {
 		error("libunbound: %s\n", ub_strerror(status));
-	}
-
-	if (family == AF_INET)
-		priv->finished4 = true;
-	else
-		priv->finished6 = true;
-}
-
-static void
-start_address_lookup(netresolve_query_t query)
-{
-	struct priv_ubdns *priv = netresolve_backend_get_priv(query);
-	const char *node = netresolve_backend_get_nodename(query);
-	struct priv_address_lookup *lookup_data = calloc(1, sizeof *lookup_data);
-
-	if (!lookup_data) {
-		netresolve_backend_failed(query);
 		return;
 	}
 
-	lookup_data->query = query;
+	switch (result->qtype) {
+	case ns_t_srv:
+		debug("received SRV response\n");
+		break;
+	case ns_t_a:
+		debug("received A resonse\n");
+		priv->ip4_finished = true;
+		family = AF_INET;
+		break;
+	case ns_t_aaaa:
+		debug("received AAAA resonse\n");
+		priv->ip6_finished = true;
+		family = AF_INET6;
+		break;
+	}
 
-	debug("Looking up %d %d %s\n", ns_t_a, ns_c_in, node);
-	ub_resolve_async(priv->ctx, node, ns_t_a, ns_c_in, lookup_data, host_callback, NULL);
-	ub_resolve_async(priv->ctx, node, ns_t_aaaa, ns_c_in, lookup_data, host_callback, NULL);
+	if (family)
+		for (char **data = result->data; *data; data++)
+			if (priv->port)
+				netresolve_backend_add_path(query, family, *data, 0,
+						0, priv->protocol, priv->port,
+						priv->priority, priv->weight, result->ttl);
+			else
+				netresolve_backend_add_path(query, family, *data, 0,
+						0, 0, 0,
+						priv->priority, priv->weight, result->ttl);
+	else {
+		ldns_pkt *pkt;
+		ldns_status status = ldns_wire2pkt(&pkt, result->answer_packet, result->answer_len);
+
+		if (status) {
+			netresolve_backend_failed(query);
+			return;
+		}
+
+		/* FIXME: We only support one SRV record per name. */
+		free(priv->node);
+		priv->priority = ldns_rdf2native_int16(pkt->_answer->_rrs[0]->_rdata_fields[0]);
+		priv->weight = ldns_rdf2native_int16(pkt->_answer->_rrs[0]->_rdata_fields[1]);
+		priv->port = ldns_rdf2native_int16(pkt->_answer->_rrs[0]->_rdata_fields[2]);
+		priv->node = ldns_rdf2str(pkt->_answer->_rrs[0]->_rdata_fields[3]);
+		lookup(priv, AF_INET);
+		lookup(priv, AF_INET6);
+
+		ldns_pkt_free(pkt);
+	}
+
+	ub_resolve_free(result);
+}
+
+static const char *
+protocol_to_string(int proto)
+{
+	switch (proto) {
+	case IPPROTO_UDP:
+		return "udp";
+	case IPPROTO_TCP:
+		return "tcp";
+	case IPPROTO_SCTP:
+		return "sctp";
+	default:
+		return "0";
+	}
+}
+
+static void
+lookup_srv(struct priv_ubdns *priv)
+{
+	char *name;
+
+	priv->protocol = netresolve_backend_get_protocol(priv->query);
+
+	if (asprintf(&name, "_%s._%s.%s",
+			netresolve_backend_get_servname(priv->query),
+			protocol_to_string(priv->protocol),
+			netresolve_backend_get_nodename(priv->query)) == -1) {
+		error("memory allocation failed");
+		netresolve_backend_failed(priv->query);
+		return;
+	}
+	debug("looking up SRV record for %s\n", name);
+	ub_resolve_async(priv->ctx, name, ns_t_srv, ns_c_in, priv, callback, NULL);
+}
+
+static void
+lookup(struct priv_ubdns *priv, int family)
+{
+	int type;
+	const char *type_name;
+
+	if (priv->family != AF_UNSPEC && priv->family != family)
+		return;
+
+	switch (family) {
+	case AF_INET:
+		type = ns_t_a;
+		type_name = "A";
+		break;
+	case AF_INET6:
+		type = ns_t_aaaa;
+		type_name = "AAAA";
+		break;
+	default:
+		return;
+	}
+
+	debug("looking up %s record for %s\n", type_name, priv->node);
+	ub_resolve_async(priv->ctx, priv->node, type, ns_c_in, priv, callback, NULL);
 }
 
 void
 start(netresolve_query_t query, char **settings)
 {
-	const char *node = netresolve_backend_get_nodename(query);
 	struct priv_ubdns *priv = netresolve_backend_new_priv(query, sizeof *priv);
+	const char *node = netresolve_backend_get_nodename(query);
 
-	if (!priv)
+	if (!priv || !node)
 		goto fail;
-	if (!node)
+
+	priv->query = query;
+	priv->node = strdup(node);
+	priv->family = netresolve_backend_get_family(query);
+
+	if (!priv->node)
 		goto fail;
+
+	priv->node = strdup(priv->node);
 
 	priv->ctx = ub_ctx_create();
 	if(!priv->ctx)
 		goto fail;
 
 	ub_ctx_resolvconf(priv->ctx, NULL);
-
-	start_address_lookup(query);
-
 	netresolve_backend_watch_fd(query, ub_fd(priv->ctx), POLLIN);
+
+	if (netresolve_backend_get_dns_srv_lookup(query))
+		lookup_srv(priv);
+	else {
+		lookup(priv, AF_INET);
+		lookup(priv, AF_INET6);
+	}
+
 	return;
+
 fail:
 	netresolve_backend_failed(query);
 }
@@ -116,7 +210,7 @@ dispatch(netresolve_query_t query, int fd, int events)
 
 	ub_process(priv->ctx);
 
-	if (priv->finished4 && priv->finished6)
+	if (priv->ip4_finished && priv->ip6_finished)
 		netresolve_backend_finished(query);
 }
 
@@ -129,4 +223,6 @@ cleanup(netresolve_query_t query)
 		netresolve_backend_watch_fd(query, ub_fd(priv->ctx), 0);
 		ub_ctx_delete(priv->ctx);
 	}
+	if (priv->node)
+		free(priv->node);
 }
