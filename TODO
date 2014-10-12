@@ -3,34 +3,33 @@
 ## Core library
 
  * Improve path ordering
-    - use priority from DNS SRV
-    - use weight from DNS SRV for randomized ordering
     - use rules from http://tools.ietf.org/html/rfc6724
     - use /etc/gai.conf
- * Support reverse lookup
+    - handle :: and 0.0.0.0 queries gracefully
  * Improve socket API and happy eyeballs
     - support TCP application layer happy eyeballs
     - support UDP happy eyeballs
  * Add DNSSEC validation information
     - what about non-DNS protocols?
     - what about any, localhost or numeric addresses
- * Use -fvisibility=hidden and mark exported symbols explicitly
- * Allow backend setting at any time
+ * Consider using -fvisibility=hidden
+ * Consider using a separete libnetresolve-backend.so
+ * Allow backend setting at any time or at least check whether they can be changed
  * Make /etc/services reading thread safe
+ * Read a configuration file in addition to environment variables
 
-## Tools, wrappers, testing and compatibility
+## Tools, wrappers and tests
 
- * Improve `netresolve-libc` and extend `netresolve` accordingly
-    - add support for other libc resolver functions
-    - `getnameinfo()`, `gethostbyaddr()`
-    - `getaddrinfo_a()`, `gai_suspend()`, `gai_error()` and `gai_cancel()`
- * Implement name service switch backend on top of netresolve
-    - environment variables and/or a configuration file for defaults
- * Implement other network resolution APIs
-    - POSIX resolver routines
-    - libasyncns
-    - getdns
- * Build a fake ares library to support DNS testing
+ * Extend `libnetresolve-libc.so` with more functions
+    - `getnameinfo()`, `gethostbyaddr()` (POSIX)
+    - `getaddrinfo_a()`, `gai_suspend()`, `gai_error()` and `gai_cancel()` (glibc specific)
+ * Implement wrappers over netresolve for notable event loops or event connectors
+    - GLib main loop
+    - libevent
+    - libverto
+    - Python PEP 3156
+    - and more...
+ * Build a fake ares/libunbound library to support DNS testing
  * A comprehensive dualstack test plan
     - DNS: AAAA wildcard search available, only global A record set
     - DNS: AAAA record not answered, A answered (and vice versa)
@@ -40,30 +39,25 @@
     - TCP: IPv6-only destination, first address not answered, next address works
     - TCP: first SYN answered, application layer failure, next address works
     - UDP: application layer failure, next address works
- * Implement wrappers over netresolve for notable event loops or event connectors
-    - GLib main loop
-    - libevent
-    - libverto
-    - Python PEP 3156
-    - and more...
 
 ## Backends
 
- * Improve the DNS backend
-    - add PTR support
-    - add domain search support (while still prioritizing non-searched results)
-    - consider MX/SSH/TLSA and other records; add DNS-only API for that
+ * Improve the DNS backends (mainly libunbound)
+    - consider domain search support
     - validation information
     - `ai_addrconfig`-like functionality
- * Implement a multicast DNS backend
-    - nonblocking
+ * Implement a nonblocking multicast DNS backend
  * Improve `nss` backend
-    - support `gethostbyname4`
     - support non-gethostbyname functions
  * Improve `exec` backend
     - make sure it send all request attributes and accepts all response attributes
     - add tests
  * Implement `hostname` backend
+ * Provide more backends
+    - POSIX resolver routines
+    - asyncns
+    - getdns
+    - multicast DNS
 
 ## Portability
 
