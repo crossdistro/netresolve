@@ -86,9 +86,9 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 	netresolve_query_t query = lookup_data->query;
 	struct ares_srv_reply *srv = lookup_data->srv;
 	struct priv_dns *priv = netresolve_backend_get_priv(query);
-	int socktype = -1;
-	int protocol = -1;
-	int port = -1;
+	int socktype = 0;
+	int protocol = 0;
+	int port = 0;
 	int priority = 0;
 	int weight = 0;
 	int ttl = 0;
