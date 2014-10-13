@@ -103,27 +103,6 @@ family_to_length(int family)
 	}
 }
 
-typedef struct {
-	netresolve_query_t query;
-	int family;
-	const void *address;
-	int ifindex;
-	int priority;
-	int weight;
-	int32_t ttl;
-} PathData;
-
-static void
-path_callback(int socktype, int protocol, int port, void *user_data)
-{
-	PathData *data = user_data;
-
-	netresolve_backend_add_path(data->query,
-			data->family, data->address, data->ifindex,
-			socktype, protocol, port,
-			data->priority, data->weight, data->ttl);
-}
-
 static int
 path_cmp(struct netresolve_path *p1, struct netresolve_path *p2)
 {
@@ -135,14 +114,54 @@ path_cmp(struct netresolve_path *p1, struct netresolve_path *p2)
 	return 0;
 }
 
-void
-netresolve_backend_add_path(netresolve_query_t query,
-		int family, const void *address, int ifindex,
-		int socktype, int protocol, int portnum,
-		int priority, int weight, int32_t ttl)
+static void
+add_path(netresolve_query_t query, struct netresolve_path *path)
 {
 	struct netresolve_response *response = &query->response;
 	int i;
+
+	for (i = 0; i < response->pathcount; i++)
+		if (path_cmp(path, &response->paths[i]) < 0)
+			break;
+
+	response->paths = realloc(response->paths, (response->pathcount + 1) * sizeof *path);
+	memmove(&response->paths[i+1], &response->paths[i],
+			(response->pathcount++ - i) * sizeof *response->paths);
+	memcpy(&response->paths[i], path, sizeof *path);
+
+	debug("added path: %s", netresolve_get_path_string(query, response->pathcount - 1));
+
+	if (query->channel->callbacks.on_bind)
+		netresolve_query_bind(query, response->pathcount - 1);
+}
+
+struct path_data {
+	struct netresolve_query *query;
+	struct netresolve_path *path;
+};
+
+static void
+path_callback(int socktype, int protocol, int port, void *user_data)
+{
+	struct path_data *data = user_data;
+	struct netresolve_path *path = data->path;
+
+	netresolve_backend_add_path(data->query,
+			path->node.family, path->node.address, path->node.ifindex,
+			socktype, protocol, port,
+			path->priority, path->weight, path->ttl);
+}
+
+void
+netresolve_backend_add_path(netresolve_query_t query,
+		int family, const void *address, int ifindex,
+		int socktype, int protocol, int port,
+		int priority, int weight, int32_t ttl)
+{
+	struct netresolve_request *request = &query->request;
+
+	if (request->family != AF_UNSPEC && request->family != family)
+		return;
 
 	if (family == AF_UNIX && !socktype) {
 		netresolve_backend_add_path(query, family, address, 0, SOCK_STREAM, 0, 0, priority, weight, ttl);
@@ -150,27 +169,7 @@ netresolve_backend_add_path(netresolve_query_t query,
 		return;
 	}
 
-	if (query->request.servname && !socktype) {
-		PathData data = {
-			.query = query,
-			.family = family,
-			.address = address,
-			.ifindex = ifindex,
-			.priority = priority,
-			.weight = weight,
-			.ttl = ttl
-		};
-
-		netresolve_get_service_info(path_callback, &data, query->request.servname,
-				query->request.socktype, query->request.protocol);
-		return;
-	}
-
-	if (query->request.family != AF_UNSPEC && query->request.family != family)
-		return;
-
 	size_t length = family_to_length(family);
-
 	struct netresolve_path path = {
 		.node = {
 			.family = family,
@@ -178,9 +177,9 @@ netresolve_backend_add_path(netresolve_query_t query,
 			.ifindex = ifindex
 		},
 		.service = {
-			.socktype = socktype,
-			.protocol = protocol,
-			.port = portnum
+			.socktype = socktype ? socktype : request->socktype,
+			.protocol = protocol ? protocol : request->protocol,
+			.port = port
 		},
 		.priority = priority,
 		.weight = weight,
@@ -192,19 +191,15 @@ netresolve_backend_add_path(netresolve_query_t query,
 	else
 		strncpy(path.node.address, address, sizeof path.node.address);
 
-	for (i = 0; i < response->pathcount; i++)
-		if (path_cmp(&path, &response->paths[i]) < 0)
-			break;
+	if (query->request.servname && (!socktype || !protocol || !port)) {
+		struct path_data data = { .query = query, .path = &path };
 
-	response->paths = realloc(response->paths, (response->pathcount + 1) * sizeof path);
-	memmove(&response->paths[i+1], &response->paths[i],
-			(response->pathcount++ - i) * sizeof *response->paths);
-	memcpy(&response->paths[i], &path, sizeof path);
+		netresolve_get_service_info(path_callback, &data,
+				request->servname, path.service.socktype, path.service.protocol);
+		return;
+	}
 
-	debug("added path: %s", netresolve_get_path_string(query, response->pathcount - 1));
-
-	if (query->channel->callbacks.on_bind)
-		netresolve_query_bind(query, response->pathcount - 1);
+	add_path(query, &path);
 }
 
 void
