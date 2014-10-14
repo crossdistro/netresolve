@@ -201,7 +201,7 @@ start_srv_lookup(netresolve_query_t query)
 }
 
 void
-start(netresolve_query_t query, char **settings)
+setup(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
 	struct priv_dns *priv = netresolve_backend_new_priv(query, sizeof *priv);

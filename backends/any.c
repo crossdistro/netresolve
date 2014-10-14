@@ -28,7 +28,7 @@
 static struct in_addr inaddr_any = { 0 };
 
 void
-start(netresolve_query_t query, char **settings)
+setup(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
 

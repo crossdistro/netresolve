@@ -24,7 +24,7 @@
 #include <netresolve-backend.h>
 
 void
-start(netresolve_query_t query, char **settings)
+setup(netresolve_query_t query, char **settings)
 {
 	const char *request_node = netresolve_backend_get_nodename(query);
 	Address address;

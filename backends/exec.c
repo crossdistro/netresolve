@@ -29,7 +29,7 @@
 
 struct buffer {
 	char *buffer;
-	char *start;
+	char *setup;
 	char *end;
 };
 
@@ -88,10 +88,10 @@ err_pipe1:
 static void
 send_stdin(netresolve_query_t query, struct priv_exec *priv)
 {
-	if (priv->inbuf.start != priv->inbuf.end) {
-		ssize_t size = write(priv->infd, priv->inbuf.start, priv->inbuf.end - priv->inbuf.start);
+	if (priv->inbuf.setup != priv->inbuf.end) {
+		ssize_t size = write(priv->infd, priv->inbuf.setup, priv->inbuf.end - priv->inbuf.setup);
 		if (size > 0) {
-			priv->inbuf.start += size;
+			priv->inbuf.setup += size;
 			return;
 		}
 		debug("write failed: %s", strerror(errno));
@@ -141,16 +141,16 @@ pickup_stdout(netresolve_query_t query, struct priv_exec *priv)
 	int size;
 
 	if (!priv->outbuf.buffer) {
-		priv->outbuf.buffer = priv->outbuf.start = malloc(1024);
+		priv->outbuf.buffer = priv->outbuf.setup = malloc(1024);
 		if (priv->outbuf.buffer)
-			priv->outbuf.end = priv->outbuf.start + 1024;
+			priv->outbuf.end = priv->outbuf.setup + 1024;
 	}
 	if (!priv->outbuf.buffer) {
 		netresolve_backend_failed(query);
 		return;
 	}
 
-	size = read(priv->outfd, priv->outbuf.start, priv->outbuf.end - priv->outbuf.start);
+	size = read(priv->outfd, priv->outbuf.setup, priv->outbuf.end - priv->outbuf.setup);
 	if (size <= 0) {
 		abort();
 		if (size < 0)
@@ -158,22 +158,22 @@ pickup_stdout(netresolve_query_t query, struct priv_exec *priv)
 		netresolve_backend_failed(query);
 		return;
 	}
-	debug("read: %*s\n", size, priv->outbuf.start);
-	priv->outbuf.start += size;
+	debug("read: %*s\n", size, priv->outbuf.setup);
+	priv->outbuf.setup += size;
 
-	while ((nl = memchr(priv->outbuf.buffer, '\n', priv->outbuf.start - priv->outbuf.buffer))) {
+	while ((nl = memchr(priv->outbuf.buffer, '\n', priv->outbuf.setup - priv->outbuf.buffer))) {
 		*nl++ = '\0';
 		if (received_line(query, priv, priv->outbuf.buffer)) {
 			netresolve_backend_finished(query);
 			return;
 		}
-		memmove(priv->outbuf.buffer, nl, priv->outbuf.end - priv->outbuf.start);
-		priv->outbuf.start = priv->outbuf.buffer + (priv->outbuf.start - nl);
+		memmove(priv->outbuf.buffer, nl, priv->outbuf.end - priv->outbuf.setup);
+		priv->outbuf.setup = priv->outbuf.buffer + (priv->outbuf.setup - nl);
 	}
 }
 
 void
-start(netresolve_query_t query, char **settings)
+setup(netresolve_query_t query, char **settings)
 {
 	struct priv_exec *priv = netresolve_backend_new_priv(query, sizeof *priv);
 
@@ -186,7 +186,7 @@ start(netresolve_query_t query, char **settings)
 	}
 
 	priv->inbuf.buffer = strdup(netresolve_get_request_string(query));
-	priv->inbuf.start = priv->inbuf.buffer;
+	priv->inbuf.setup = priv->inbuf.buffer;
 	priv->inbuf.end = priv->inbuf.buffer + strlen(priv->inbuf.buffer);
 
 	netresolve_backend_watch_fd(query, priv->infd, POLLOUT);

@@ -68,11 +68,11 @@ load_backend(char **take_settings)
 		goto fail;
 	}
 
-	backend->start = dlsym(backend->dl_handle, "start");
+	backend->setup = dlsym(backend->dl_handle, "setup");
 	backend->dispatch = dlsym(backend->dl_handle, "dispatch");
 	backend->cleanup = dlsym(backend->dl_handle, "cleanup");
 
-	if (!backend->start)
+	if (!backend->setup)
 		goto fail;
 
 	return backend;
@@ -84,7 +84,7 @@ fail:
 void
 netresolve_set_backend_string(netresolve_t channel, const char *string)
 {
-	const char *start, *end;
+	const char *setup, *end;
 	char **settings = NULL;
 	int nsettings = 0;
 	int nbackends = 0;
@@ -104,12 +104,12 @@ netresolve_set_backend_string(netresolve_t channel, const char *string)
 	}
 
 	/* Install new set of backends */
-	for (start = end = string; true; end++) {
+	for (setup = end = string; true; end++) {
 		if (*end == ':' || *end == ',' || *end == '\0') {
 			settings = realloc(settings, (nsettings + 2) * sizeof *settings);
-			settings[nsettings++] = strndup(start, end - start);
+			settings[nsettings++] = strndup(setup, end - setup);
 			settings[nsettings] = NULL;
-			start = end + 1;
+			setup = end + 1;
 		}
 		if (*end == ',' || *end == '\0') {
 			if (settings && *settings && **settings) {

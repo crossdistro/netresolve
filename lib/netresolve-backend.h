@@ -89,7 +89,7 @@ bool netresolve_backend_parse_path(const char *str,
 		int *socktype, int *protocol, int *port);
 
 /* Backend function prototypes */
-void start(netresolve_query_t query, char **settings);
+void setup(netresolve_query_t query, char **settings);
 void dispatch(netresolve_query_t query, int fd, int revents);
 void cleanup(netresolve_query_t query);
 

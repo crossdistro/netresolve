@@ -144,7 +144,7 @@ netresolve_query_start(netresolve_query_t query)
 {
 	struct netresolve_backend *backend = *query->backend;
 
-	backend->start(query, backend->settings+1);
+	backend->setup(query, backend->settings+1);
 }
 
 static bool
