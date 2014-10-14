@@ -26,16 +26,17 @@
 void
 setup(netresolve_query_t query, char **settings)
 {
-	const char *request_node = netresolve_backend_get_nodename(query);
+	const char *node = netresolve_backend_get_nodename(query);
 	Address address;
 	int family;
 	int ifindex;
 
-	if (!netresolve_backend_parse_address(request_node, &address, &family, &ifindex)) {
+	if (!netresolve_backend_parse_address(node, &address, &family, &ifindex)) {
 		netresolve_backend_failed(query);
 		return;
 	}
 
 	netresolve_backend_add_path(query, family, &address, ifindex, 0, 0, 0, 0, 0, 0);
+	netresolve_backend_set_canonical_name(query, node);
 	netresolve_backend_finished(query);
 }
