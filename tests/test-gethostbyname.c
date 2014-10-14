@@ -22,6 +22,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <netdb.h>
 
@@ -31,10 +32,44 @@ main(int argc, char **argv)
 	const char *node = "1:2:3:4:5:6:7:8";
 	struct hostent *result = NULL;
 
+#ifdef REENTRANT
+	struct hostent he;
+	size_t buflen = 1024;
+	char buffer[buflen];
+	int my_errno, my_h_errno;
+#ifdef GETHOSTBYNAME2
+	my_errno = gethostbyname2_r(node, AF_UNSPEC, &he, buffer, buflen, &result, &my_h_errno);
+#else
+	my_errno = gethostbyname_r(node, &he, buffer, buflen, &result, &my_h_errno);
+#endif
+	assert(!my_errno);
+	assert(result == &he);
+#else
+#ifdef GETHOSTBYNAME2
+	result = gethostbyname2(node, AF_UNSPEC);
+#else
 	result = gethostbyname(node);
-	assert(result);
-	assert(result->h_addr_list[0]);
-	assert(!result->h_addr_list[1]);
+#endif
+#endif
+	assert(result && result->h_addr_list[0]);
+
+	struct { struct hostent he; char *ha[1]; char *al[2]; struct in6_addr ia; } expected = {
+		.he = {
+			.h_name = result->h_name,
+			.h_aliases = result->h_aliases,
+			.h_addrtype = AF_INET6,
+			.h_length = sizeof expected.ia,
+			.h_addr_list = result->h_addr_list,
+		},
+		.ha = { NULL },
+		.al = { *result->h_addr_list, NULL },
+		.ia = { .s6_addr = { 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8} }
+	};
+	assert(!memcmp(result, &expected.he, sizeof expected.he));
+	assert(result->h_name && !strcmp(result->h_name, node));
+	assert(!memcmp(result->h_aliases, &expected.ha, sizeof expected.ha));
+	assert(!memcmp(result->h_addr_list, &expected.al, sizeof expected.al));
+	assert(!memcmp(result->h_addr_list[0], &expected.ia, sizeof expected.ia));
 
 	return EXIT_SUCCESS;
 }

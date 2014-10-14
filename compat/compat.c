@@ -69,6 +69,7 @@ netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **re
 		int socktype, protocol;
 		socklen_t salen;
 		int32_t ttl;
+
 		const struct sockaddr *sa = netresolve_query_get_sockaddr(query, i, &salen, &socktype, &protocol, &ttl);
 
 		if (ttlp && ttl < *ttlp)
@@ -121,13 +122,15 @@ netresolve_query_getaddrinfo_free(struct addrinfo *ai)
  * `netresolve_query_gethostbyname_free()`.
  */
 netresolve_query_t
-netresolve_query_gethostbyname(netresolve_t channel, const char *name)
+netresolve_query_gethostbyname(netresolve_t channel, const char *name, int family)
 {
+	netresolve_set_family(channel, family);
+
 	return netresolve_query(channel, name, NULL);
 }
 
 struct hostent *
-netresolve_query_gethostbyname_done(netresolve_query_t query, int *herrno)
+netresolve_query_gethostbyname_done(netresolve_query_t query, int *errnop, int *h_errnop, int32_t *ttlp)
 {
 	size_t npaths = netresolve_query_get_count(query);
 	const char *canonname = netresolve_query_get_canonical_name(query);
@@ -136,14 +139,17 @@ netresolve_query_gethostbyname_done(netresolve_query_t query, int *herrno)
 	int n = 0;
 
 	if (!npaths) {
-		*herrno = HOST_NOT_FOUND;
+		*h_errnop = HOST_NOT_FOUND;
 		goto out;
 	}
 
 	if (!(he = calloc(1, sizeof *he))) {
-		*herrno = NO_RECOVERY;
+		*h_errnop = NO_RECOVERY;
 		goto out;
 	}
+
+	if (ttlp)
+		*ttlp = INT32_MAX;
 
 	if (canonname)
 		he->h_name = strdup(canonname);
@@ -152,10 +158,15 @@ netresolve_query_gethostbyname_done(netresolve_query_t query, int *herrno)
 
 	for (idx = 0; idx < npaths; idx++) {
 		int family, ifindex, socktype, protocol, port;
+		int32_t ttl;
 		const void *address;
 
 		netresolve_query_get_address_info(query, idx, &family, &address, &ifindex);
 		netresolve_query_get_port_info(query, idx, &socktype, &protocol, &port);
+		netresolve_query_get_aux_info(query, idx, NULL, NULL, &ttl);
+
+		if (ttlp && ttl < *ttlp)
+			*ttlp = ttl;
 
 		if (family != AF_INET && family != AF_INET6)
 			continue;

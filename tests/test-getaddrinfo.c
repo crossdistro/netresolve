@@ -22,6 +22,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <stdlib.h>
+#include <string.h>
 #include <assert.h>
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -36,15 +37,35 @@ main(int argc, char **argv)
 		.ai_family = AF_UNSPEC,
 		.ai_socktype = 0,
 		.ai_protocol = IPPROTO_TCP,
-		.ai_flags = 0,
+		.ai_flags = AI_CANONNAME,
 	};
 	struct addrinfo *result = NULL;
 	int status;
 
+	/* run getaddrinfo */
 	status = getaddrinfo(node, service, &hints, &result);
+
 	assert(status == 0);
 	assert(result);
-	assert(!result->ai_next);
+	struct { struct addrinfo ai; struct sockaddr_in6 sa; } expected = {
+		.ai = {
+			.ai_family = AF_INET6,
+			.ai_socktype = SOCK_STREAM,
+			.ai_protocol = IPPROTO_TCP,
+			.ai_addr = result->ai_addr,
+			.ai_addrlen = sizeof expected.sa,
+			.ai_canonname = result->ai_canonname
+		},
+		.sa = {
+			.sin6_family = AF_INET6,
+			.sin6_port = htons(80),
+			.sin6_addr = { .s6_addr = { 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8 } },
+			.sin6_scope_id = 999999
+		}
+	};
+	assert(!memcmp(result, &expected.ai, sizeof expected.ai));
+	assert(result->ai_canonname && !strcmp(result->ai_canonname, node));
+	assert(!memcmp(result->ai_addr, &expected.sa, sizeof expected.sa));
 
 	return EXIT_SUCCESS;
 }

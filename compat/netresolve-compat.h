@@ -32,8 +32,8 @@ netresolve_query_t netresolve_query_getaddrinfo(netresolve_t channel,
 int netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **res, int32_t *ttlp);
 void netresolve_query_getaddrinfo_free(struct addrinfo *ai);
 
-netresolve_query_t netresolve_query_gethostbyname(netresolve_t channel, const char *name);
-struct hostent *netresolve_query_gethostbyname_done(netresolve_query_t query, int *herrno);
+netresolve_query_t netresolve_query_gethostbyname(netresolve_t channel, const char *name, int family);
+struct hostent *netresolve_query_gethostbyname_done(netresolve_query_t query, int *errnop, int *h_errnop, int32_t *ttlp);
 void netresolve_query_gethostbyname_free(struct hostent *he);
 
 #endif /* NETRESOLVE_COMPAT_H */

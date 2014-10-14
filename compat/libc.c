@@ -23,6 +23,8 @@
  */
 #include <netresolve-compat.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <string.h>
 
 /* getaddrinfo:
  *
@@ -37,7 +39,7 @@
  */
 int
 getaddrinfo(const char *nodename, const char *servname,
-		const struct addrinfo *hints, struct addrinfo **res)
+		const struct addrinfo *hints, struct addrinfo **result)
 {
 	netresolve_t channel;
 	netresolve_query_t query;
@@ -47,7 +49,7 @@ getaddrinfo(const char *nodename, const char *servname,
 		return status;
 
 	if ((query = netresolve_query_getaddrinfo(channel, nodename, servname, hints)))
-		status = netresolve_query_getaddrinfo_done(query, res, NULL);
+		status = netresolve_query_getaddrinfo_done(query, result, NULL);
 
 	netresolve_close(channel);
 	return status;
@@ -60,9 +62,35 @@ getaddrinfo(const char *nodename, const char *servname,
  * Defined in POSIX.1-2008.
  */
 void
-freeaddrinfo(struct addrinfo *ai)
+freeaddrinfo(struct addrinfo *result)
 {
-	netresolve_query_getaddrinfo_free(ai);
+	netresolve_query_getaddrinfo_free(result);
+}
+
+/* gethostbyname2:
+ *
+ * Extended version of `gethostbyname()` with the capability to select address
+ * family.
+ *
+ * GNU extention to POSIX.1-2001 `gethostbyname()`
+ */
+struct hostent *
+gethostbyname2(const char *node, int family)
+{
+	netresolve_t channel;
+	netresolve_query_t query;
+	static struct hostent *he = NULL;
+
+	if (!(channel = netresolve_open()))
+		return NULL;
+
+	if ((query = netresolve_query_gethostbyname(channel, node, family))) {
+		netresolve_query_gethostbyname_free(he);
+		he = netresolve_query_gethostbyname_done(query, &errno, &h_errno, NULL);
+	}
+
+	netresolve_close(channel);
+	return he;
 }
 
 /* gethostbyname:
@@ -77,18 +105,70 @@ freeaddrinfo(struct addrinfo *ai)
 struct hostent *
 gethostbyname(const char *node)
 {
+	return gethostbyname2(node, AF_UNSPEC);
+}
+
+int
+gethostbyname2_r(const char *name, int family,
+		struct hostent *he, char *buffer, size_t buflen,
+		struct hostent **result, int *h_errnop)
+{
 	netresolve_t channel;
 	netresolve_query_t query;
-	static struct hostent *he = NULL;
+	struct hostent *tmp;
+	int lerrno;
 
-	if (!(channel = netresolve_open()))
-		return he;
-
-	if ((query = netresolve_query_gethostbyname(channel, node))) {
-		netresolve_query_gethostbyname_free(he);
-		he = netresolve_query_gethostbyname_done(query, &h_errno);
+	if (!(channel = netresolve_open())) {
+		*result = NULL;
+		return errno;
 	}
 
+	if ((query = netresolve_query_gethostbyname(channel, name, family)))
+		tmp = netresolve_query_gethostbyname_done(query, &lerrno, h_errnop, NULL);
+
+	size_t len_name = tmp->h_name ? strlen(tmp->h_name) + 1 : 0;
+	size_t count = 0;
+	for (char **alias = tmp->h_aliases; *alias; alias++)
+		count++;
+	size_t len_aliases = (count + 1) * sizeof *tmp->h_aliases;
+	count = 0;
+	for (char **addr = tmp->h_addr_list; *addr; addr++)
+		count++;
+	size_t len_addr_list = (count + 1) * sizeof *tmp->h_addr_list;
+	size_t len_addr_data = count * tmp->h_length;
+	size_t len_total = len_aliases + len_name + len_addr_list + len_addr_data;
+
+	if (len_total > buflen) {
+		*result = NULL;
+		return ERANGE;
+	}
+
+	memcpy(he, tmp, sizeof *he);
+	memset(buffer, 0, buflen);
+	he->h_name = buffer;
+	he->h_aliases = (void *) buffer + len_name;
+	he->h_addr_list = (void *) buffer + len_name + len_aliases;
+	memcpy(he->h_name, tmp->h_name, len_name);
+	/* we don't allocate space for actual aliases */
+	memset(he->h_aliases, 0, len_aliases);
+	memcpy(he->h_addr_list, tmp->h_addr_list, len_addr_list);
+	for (int i = 0; tmp->h_addr_list[i]; i++) {
+		he->h_addr_list[i] = buffer + len_name + len_aliases + len_addr_list + i * tmp->h_length;
+		memcpy(he->h_addr_list[i], tmp->h_addr_list[i], he->h_length);
+	}
+
+	netresolve_query_gethostbyname_free(tmp);
 	netresolve_close(channel);
-	return he;
+
+	*result = he;
+
+	return 0;
+}
+
+int
+gethostbyname_r(const char *name,
+		struct hostent *he, char *buffer, size_t buflen,
+		struct hostent **result, int *h_errnop)
+{
+	return gethostbyname2_r(name, AF_UNSPEC, he, buffer, buflen, result, h_errnop);
 }
