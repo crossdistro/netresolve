@@ -120,7 +120,7 @@ bprintf(char **current, char *end, const char *fmt, ...)
 }
 
 static void
-add_path(char **setup, char *end, netresolve_query_t query, int i)
+add_path(char **start, char *end, netresolve_query_t query, int i)
 {
 	int family, ifindex, socktype, protocol, port, priority, weight, ttl;
 	const void *address;
@@ -140,14 +140,14 @@ add_path(char **setup, char *end, netresolve_query_t query, int i)
 		inet_ntop(family, address, addrstr, sizeof addrstr);
 
 	if (family == AF_UNIX)
-		bprintf(setup, end, "unix %s %s\n", address, socktypestr);
+		bprintf(start, end, "unix %s %s\n", address, socktypestr);
 	else {
 		if (ifindex) {
 			ifname[0] = '%';
 			if (!if_indextoname(ifindex, ifname + 1))
 				snprintf(ifname + 1, sizeof ifname - 1, "%d", ifindex);
 		}
-		bprintf(setup, end, "ip %s%s %s %s %d %d %d %d\n",
+		bprintf(start, end, "ip %s%s %s %s %d %d %d %d\n",
 				addrstr, ifname,
 				socktypestr, protocolstr, port,
 				priority, weight, ttl);
@@ -159,15 +159,15 @@ netresolve_get_request_string(netresolve_query_t query)
 {
 	const char *node = netresolve_backend_get_nodename(query);
 	const char *service = netresolve_backend_get_servname(query);
-	char *setup = query->buffer;
+	char *start = query->buffer;
 	char *end = query->buffer + sizeof query->buffer;
 
-	bprintf(&setup, end, "request %s %s\n", PACKAGE_NAME, VERSION);
+	bprintf(&start, end, "request %s %s\n", PACKAGE_NAME, VERSION);
 	if (node)
-		bprintf(&setup, end, "node %s\n", node);
+		bprintf(&start, end, "node %s\n", node);
 	if (service)
-		bprintf(&setup, end, "service %s\n", service);
-	bprintf(&setup, end, "\n");
+		bprintf(&start, end, "service %s\n", service);
+	bprintf(&start, end, "\n");
 
 	return query->buffer;
 }
@@ -175,10 +175,10 @@ netresolve_get_request_string(netresolve_query_t query)
 const char *
 netresolve_get_path_string(netresolve_query_t query, int i)
 {
-	char *setup = query->buffer;
+	char *start = query->buffer;
 	char *end = query->buffer + sizeof query->buffer;
 
-	add_path(&setup, end, query, i);
+	add_path(&start, end, query, i);
 
 	return query->buffer;
 }
@@ -186,16 +186,16 @@ netresolve_get_path_string(netresolve_query_t query, int i)
 const char *
 netresolve_get_response_string(netresolve_query_t query)
 {
-	char *setup = query->buffer;
+	char *start = query->buffer;
 	char *end = query->buffer + sizeof query->buffer;
 
 	size_t npaths = netresolve_query_get_count(query);
 	size_t i;
 
-	bprintf(&setup, end, "response %s %s\n", PACKAGE_NAME, VERSION);
+	bprintf(&start, end, "response %s %s\n", PACKAGE_NAME, VERSION);
 	for (i = 0; i < npaths; i++)
-		add_path(&setup, end, query, i);
-	bprintf(&setup, end, "\n");
+		add_path(&start, end, query, i);
+	bprintf(&start, end, "\n");
 
 	return query->buffer;
 }
