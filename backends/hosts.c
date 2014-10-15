@@ -144,7 +144,7 @@ out:
 }
 
 void
-setup(netresolve_query_t query, char **settings)
+setup_forward(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
 	struct hosts_list list;

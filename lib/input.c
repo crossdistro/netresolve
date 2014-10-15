@@ -68,7 +68,7 @@ load_backend(char **take_settings)
 		goto fail;
 	}
 
-	backend->setup = dlsym(backend->dl_handle, "setup");
+	backend->setup = dlsym(backend->dl_handle, "setup_forward");
 	backend->dispatch = dlsym(backend->dl_handle, "dispatch");
 	backend->cleanup = dlsym(backend->dl_handle, "cleanup");
 

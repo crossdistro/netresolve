@@ -166,7 +166,7 @@ lookup(struct priv_ubdns *priv, int family)
 }
 
 void
-setup(netresolve_query_t query, char **settings)
+setup_forward(netresolve_query_t query, char **settings)
 {
 	struct priv_ubdns *priv = netresolve_backend_new_priv(query, sizeof *priv);
 	const char *node = netresolve_backend_get_nodename(query);

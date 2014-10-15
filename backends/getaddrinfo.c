@@ -24,7 +24,7 @@
 #include <netresolve-backend.h>
 
 void
-setup(netresolve_query_t query, char **settings)
+setup_forward(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
 	const char *service = netresolve_backend_get_servname(query);
