@@ -26,14 +26,6 @@
 #include <arpa/inet.h>
 #include <string.h>
 
-#if BYTE_ORDER == BIG_ENDIAN
-static const struct in_addr inaddr_loopback = { 0x7f000001 };
-#elif BYTE_ORDER == LITTLE_ENDIAN
-static const struct in_addr inaddr_loopback = { 0x0100007f };
-#else
-	#error Neither big endian nor little endian
-#endif
-
 void
 setup_forward(netresolve_query_t query, char **settings)
 {

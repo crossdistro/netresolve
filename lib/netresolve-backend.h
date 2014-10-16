@@ -36,6 +36,18 @@
 
 typedef struct netresolve_query *netresolve_query_t;
 
+__attribute__((unused))
+static struct in_addr inaddr_any = { 0 };
+
+__attribute__((unused))
+#if BYTE_ORDER == BIG_ENDIAN
+static const struct in_addr inaddr_loopback = { 0x7f000001 };
+#elif BYTE_ORDER == LITTLE_ENDIAN
+static const struct in_addr inaddr_loopback = { 0x0100007f };
+#else
+	#error Neither big endian nor little endian
+#endif
+
 /* Input */
 const char *netresolve_backend_get_nodename(netresolve_query_t query);
 const char *netresolve_backend_get_servname(netresolve_query_t query);

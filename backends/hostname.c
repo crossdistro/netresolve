@@ -22,21 +22,70 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <netresolve-backend.h>
-#include <stdlib.h>
-#include <arpa/inet.h>
+#include <sys/utsname.h>
+#include <ifaddrs.h>
+
+static bool
+add_addresses(netresolve_query_t query, struct ifaddrs *list, bool filter)
+{
+	bool result = false;
+
+	for (struct ifaddrs *item = list; item; item = item->ifa_next) {
+		struct sockaddr *sa = item->ifa_addr;
+		int family = sa->sa_family;
+		void *address = NULL;
+		int ifindex = 0;
+
+		debug("found address: dev %s family %d\n", item->ifa_name, family);
+
+		switch (family) {
+		case AF_INET:
+			address = &((struct sockaddr_in *) sa)->sin_addr;
+			if (filter && !memcmp(address, &inaddr_loopback, sizeof inaddr_loopback))
+				continue;
+			break;
+		case AF_INET6:
+			address = &((struct sockaddr_in6 *) sa)->sin6_addr;
+			ifindex = ((struct sockaddr_in6 *) sa)->sin6_scope_id;
+			if (filter) {
+				if (!memcmp(address, &in6addr_loopback, sizeof inaddr_loopback))
+					continue;
+				if (ifindex)
+					continue;
+			}
+			break;
+		default:
+			continue;
+		}
+
+		netresolve_backend_add_path(query, family, address, ifindex, 0, 0, 0, 0, 0, 0);
+		result = true;
+	}
+
+	return result;
+}
 
 void
 setup_forward(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
+	struct ifaddrs *list;
+	struct utsname name;
 
-	/* Fail for non-NULL node name and when defaulting to loopback is requested. */
-	if (netresolve_backend_get_default_loopback(query) || (node && *node)) {
+	uname(&name);
+	if (strcmp(node, name.nodename)) {
 		netresolve_backend_failed(query);
 		return;
 	}
 
-	netresolve_backend_add_path(query, AF_INET, &inaddr_any, 0, 0, 0, 0, 0, 0, 0);
-	netresolve_backend_add_path(query, AF_INET6, &in6addr_any, 0, 0, 0, 0, 0, 0, 0);
+	if (getifaddrs(&list)) {
+		netresolve_backend_failed(query);
+		return;
+	}
+
+	if (!add_addresses(query, list, true))
+		add_addresses(query, list, false);
+
+	netresolve_backend_set_canonical_name(query, node);
 	netresolve_backend_finished(query);
 }
