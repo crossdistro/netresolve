@@ -1,0 +1,29 @@
+#!/bin/sh
+#
+# Compatibility wrapper for netresolve that runs a program with libc functions
+# replaced by netresolve based implementations.
+
+export LIBDIR="${LIBDIR:-%libdir%/libnetresolve-libc.so}"
+export LD_PRELOAD="$LIBDIR/libnetresolve-libc.so"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        (-v|--verbose)
+            export NETRESOLVE_VERBOSE=yes
+            ;;
+        (-4)
+            export NETRESOLVE_FORCE_FAMILY=ip4
+            ;;
+        (-6)
+            export NETRESOLVE_FORCE_FAMILY=ip6
+            ;;
+        (-*)
+            echo "unknown option: $1" >&2
+            exit 1
+            ;;
+        (*)
+            exec libtool execute "$@"
+            ;;
+    esac
+    shift
+done

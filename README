@@ -171,13 +171,15 @@ Supported functions:
  * `getaddrinfo()`
  * `gethostbyname()`
 
-You can also force a dynamically linked program to use the functions using `LD_PRELOAD`.
+You can use the `wrapresolve` command to start a program with `LD_PRELOAD` configured so that your program uses netresolve functions instead of libc.
 
-    export LD_PRELOAD=/path/to/libnetresolve-libc.so
+    wrapresolve curl http://www.sourceware.org/
 
-Environment variables can be used to tweak netresolve configuration. You can for example limit all queries to the IPv4 address family.
+You can tweak netresolve configuration via environment variables, or you can use convenience options provided by `wrapresolve`. Currently there are options to force IPv4-only or IPv6-only resolution.
 
-    export NETRESOLVE_FORCE_FAMILY=ip4
+    wrapresolve -4 curl http://www.nix.cz/
+
+    wrapresolve -6 curl http://www.nix.cz/
 
 ## Socket API
 

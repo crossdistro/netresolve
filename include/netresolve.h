@@ -91,6 +91,7 @@ const struct sockaddr *netresolve_query_get_sockaddr(const netresolve_query_t qu
 
 /* Logging */
 enum netresolve_log_level {
+	NETRESOLVE_LOG_LEVEL_QUIET = 0x00,
 	NETRESOLVE_LOG_LEVEL_FATAL = 0x10,
 	NETRESOLVE_LOG_LEVEL_ERROR = 0x20,
 	NETRESOLVE_LOG_LEVEL_INFO = 0x30,

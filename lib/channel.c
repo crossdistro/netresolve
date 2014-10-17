@@ -35,12 +35,15 @@
 static bool
 strtob(const char *string)
 {
-	return string && (!strcasecmp(string, "yes") || !strcasecmp(string, "true"));
+	return string && (!strcasecmp(string, "yes") || !strcasecmp(string, "true") || !strcasecmp(string, "1"));
 }
 
 netresolve_t
 netresolve_open(void)
 {
+	/* FIXME: this should probably be only called once */
+	netresolve_set_log_level(strtob(secure_getenv("NETRESOLVE_VERBOSE")) ? NETRESOLVE_LOG_LEVEL_DEBUG : NETRESOLVE_LOG_LEVEL_QUIET);
+
 	netresolve_t channel = calloc(1, sizeof *channel);
 	if (!channel)
 		return NULL;
@@ -320,6 +323,8 @@ netresolve_query(netresolve_t channel, const char *nodename, const char *servnam
 	if (!query)
 		return NULL;
 
+	if (channel->config.force_family)
+		query->request.family = channel->config.force_family;
 	query->request.nodename = nodename;
 	query->request.servname = servname;
 

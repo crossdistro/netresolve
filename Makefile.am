@@ -95,6 +95,7 @@ libnetresolve_backend_nss_la_SOURCES = backends/nss.c
 libnetresolve_backend_exec_la_SOURCES = backends/exec.c
 
 bin_PROGRAMS = netresolve netconnect
+bin_SCRIPTS = tools/wrapresolve
 
 netresolve_SOURCES = tools/netresolve.c
 netresolve_LDADD = libnetresolve.la

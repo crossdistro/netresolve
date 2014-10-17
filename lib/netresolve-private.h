@@ -80,7 +80,6 @@ struct netresolve_path {
 };
 
 struct netresolve_channel {
-	int log_level;
 	int epoll_fd;
 	int epoll_count;
 	struct netresolve_backend **backends;

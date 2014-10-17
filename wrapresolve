@@ -1,0 +1,10 @@
+#!/bin/sh
+#
+# Wrapper over the real netresolve compatibility wrapper that can be run
+# within the source tree.
+
+dirname=$(dirname $0)
+
+export LIBDIR="$dirname/.libs"
+export LD_LIBRARY_PATH="$LIBDIR"
+source "$dirname/tools/wrapresolve.in"
