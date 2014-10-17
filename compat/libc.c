@@ -123,8 +123,13 @@ gethostbyname2_r(const char *name, int family,
 		return errno;
 	}
 
-	if ((query = netresolve_query_gethostbyname(channel, name, family)))
-		tmp = netresolve_query_gethostbyname_done(query, &lerrno, h_errnop, NULL);
+	if (!(query = netresolve_query_gethostbyname(channel, name, family))) {
+		*result = NULL;
+		netresolve_close(channel);
+		return errno;
+	}
+
+	tmp = netresolve_query_gethostbyname_done(query, &lerrno, h_errnop, NULL);
 
 	size_t len_name = tmp->h_name ? strlen(tmp->h_name) + 1 : 0;
 	size_t count = 0;
