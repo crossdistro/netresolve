@@ -303,6 +303,8 @@ apply_result(netresolve_query_t query, struct ub_result *result)
 	case ns_t_aaaa:
 		family = AF_INET6;
 		break;
+	default:
+		return false;
 	}
 
 	if (result->rcode)
@@ -322,12 +324,29 @@ dispatch(netresolve_query_t query, int fd, int events)
 
 	ub_process(priv->ctx);
 
-	if (priv->ip4_result && priv->ip6_result) {
-		if (!apply_result(query, priv->ip4_result)) {
+	bool ip4_done = !!priv->ip4_result;
+	bool ip6_done = !!priv->ip6_result;
+
+	switch (priv->family) {
+	case AF_UNSPEC:
+		break;
+	case AF_INET:
+		ip6_done = true;
+		break;
+	case AF_INET6:
+		ip4_done = true;
+		break;
+	default:
+		netresolve_backend_failed(query);
+		return;
+	}
+
+	if (ip4_done && ip6_done) {
+		if (priv->ip4_result && !apply_result(query, priv->ip4_result)) {
 			netresolve_backend_failed(query);
 			return;
 		}
-		if (!apply_result(query, priv->ip6_result)) {
+		if (priv->ip6_result && !apply_result(query, priv->ip6_result)) {
 			netresolve_backend_failed(query);
 			return;
 		}
