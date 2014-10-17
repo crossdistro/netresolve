@@ -3,8 +3,7 @@
 # Compatibility wrapper for netresolve that runs a program with libc functions
 # replaced by netresolve based implementations.
 
-export LIBDIR="${LIBDIR:-%libdir%/libnetresolve-libc.so}"
-export LD_PRELOAD="$LIBDIR/libnetresolve-libc.so"
+export LD_PRELOAD="libnetresolve-libc.so"
 
 while [ $# -gt 0 ]; do
     case "$1" in

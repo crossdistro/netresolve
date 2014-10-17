@@ -5,6 +5,5 @@
 
 dirname=$(dirname $0)
 
-export LIBDIR="$dirname/.libs"
-export LD_LIBRARY_PATH="$LIBDIR"
+export LD_LIBRARY_PATH="$dirname/.libs"
 source "$dirname/tools/wrapresolve.in"
