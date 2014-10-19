@@ -238,7 +238,7 @@ void *
 netresolve_backend_new_priv(netresolve_query_t query, size_t size)
 {
 	if ((*query->backend)->data) {
-		error("Backend data already present.\n");
+		error("Backend data already present.");
 		free((*query->backend)->data);
 	}
 
@@ -327,7 +327,7 @@ netresolve_backend_failed(netresolve_query_t query)
 	if (query->response.pathcount)
 		error("Non-empty failed reply.");
 
-	debug("failed\n");
+	debug("failed");
 	backend_cleanup(query);
 
 	/* Restart with the next backend. */

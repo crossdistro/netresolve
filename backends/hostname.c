@@ -36,7 +36,7 @@ add_addresses(netresolve_query_t query, struct ifaddrs *list, bool filter)
 		void *address = NULL;
 		int ifindex = 0;
 
-		debug("found address: dev %s family %d\n", item->ifa_name, family);
+		debug("found address: dev %s family %d", item->ifa_name, family);
 
 		switch (family) {
 		case AF_INET:

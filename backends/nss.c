@@ -111,9 +111,9 @@ try_symbol_pattern(netresolve_query_t query, struct priv_nss *priv, void **f, co
 	*f = dlsym(priv->dl_handle, symbol);
 
 	if (*f)
-		debug("loaded %s (%s)\n", symbol, api);
+		debug("loaded %s (%s)", symbol, api);
 	else
-		debug("not loaded %s (%s): %s\n", symbol, api, dlerror());
+		debug("not loaded %s (%s): %s", symbol, api, dlerror());
 }
 
 static void
@@ -144,10 +144,10 @@ initialize(struct priv_nss *priv, netresolve_query_t query, char **settings)
 			priv->filename = NULL;
 
 	/* load nsswitch module */
-	debug("loading NSS module: %s\n", priv->filename);
+	debug("loading NSS module: %s", priv->filename);
 	priv->dl_handle = dlopen(priv->filename, RTLD_LAZY);
 	if (!priv->dl_handle) {
-		error("%s\n", dlerror());
+		error("%s", dlerror());
 		return;
 	}
 
@@ -281,7 +281,7 @@ setup_forward(netresolve_query_t query, char **settings)
 		} else
 			netresolve_backend_failed(query);
 	} else {
-		debug("no suitable backend found\n");
+		debug("no suitable backend found");
 		netresolve_backend_failed(query);
 	}
 

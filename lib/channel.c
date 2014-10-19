@@ -103,7 +103,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 
 	query->state = state;
 
-	debug("state: %s -> %s\n", state_to_string(old_state), state_to_string(state));
+	debug("state: %s -> %s", state_to_string(old_state), state_to_string(state));
 
 	/* Leaving state... */
 	switch (old_state) {
@@ -151,7 +151,7 @@ netresolve_query_start(netresolve_query_t query)
 	struct netresolve_backend *backend = *query->backend;
 	void (*setup)(netresolve_query_t query, char **settings);
 
-	debug("starting backend: %s\n", backend->settings[0]);
+	debug("starting backend: %s", backend->settings[0]);
 	setup = backend->setup[query->request.type];
 	if (setup)
 		setup(query, backend->settings + 1);
@@ -207,7 +207,7 @@ netresolve_watch_fd(netresolve_t channel, int fd, int events)
 {
 	struct epoll_event event = { .events = events, .data = { .fd = fd} };
 
-	debug("watching file descriptor: %d %d\n", fd, events);
+	debug("watching file descriptor: %d %d", fd, events);
 
 	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_DEL, fd, &event) != -1)
 		channel->epoll_count--;
@@ -237,7 +237,7 @@ netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec)
 		netresolve_watch_fd(channel, fd, POLLIN);
 	}
 
-	debug("added timeout: %d %d %d\n", fd, (int) sec, (int) nsec);
+	debug("added timeout: %d %d %d", fd, (int) sec, (int) nsec);
 
 	return fd;
 }
@@ -246,7 +246,7 @@ void
 netresolve_remove_timeout(netresolve_t channel, int fd)
 {
 	netresolve_watch_fd(channel, fd, 0);
-	debug("removed timeout: %d\n", fd);
+	debug("removed timeout: %d", fd);
 	close(fd);
 }
 

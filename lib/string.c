@@ -142,14 +142,14 @@ add_path(char **start, char *end, netresolve_query_t query, int i)
 		inet_ntop(family, address, addrstr, sizeof addrstr);
 
 	if (family == AF_UNIX)
-		bprintf(start, end, "unix %s %s\n", address, socktypestr);
+		bprintf(start, end, "unix %s %s", address, socktypestr);
 	else {
 		if (ifindex) {
 			ifname[0] = '%';
 			if (!if_indextoname(ifindex, ifname + 1))
 				snprintf(ifname + 1, sizeof ifname - 1, "%d", ifindex);
 		}
-		bprintf(start, end, "ip %s%s %s %s %d %d %d %d\n",
+		bprintf(start, end, "ip %s%s %s %s %d %d %d %d",
 				addrstr, ifname,
 				socktypestr, protocolstr, port,
 				priority, weight, ttl);
@@ -200,8 +200,10 @@ netresolve_get_response_string(netresolve_query_t query)
 		bprintf(&start, end, "dns %d\n", query->response.dns.length);
 	if (canonname)
 		bprintf(&start, end, "name %s\n", canonname);
-	for (i = 0; i < npaths; i++)
+	for (i = 0; i < npaths; i++) {
 		add_path(&start, end, query, i);
+		bprintf(&start, end, "\n");
+	}
 	bprintf(&start, end, "\n");
 
 	return query->buffer;

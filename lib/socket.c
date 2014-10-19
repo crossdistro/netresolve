@@ -137,7 +137,7 @@ netresolve_connect_start(netresolve_query_t query)
 	bool ip6 = false;
 	int i;
 
-	debug("socket: connecting...\n");
+	debug("socket: connecting...");
 
 	for (i = 0; i < query->response.pathcount; i++) {
 		struct netresolve_path *path = &query->response.paths[i];
@@ -158,7 +158,7 @@ netresolve_connect_dispatch(netresolve_query_t query, int fd, int events)
 {
 	int i;
 
-	debug("socket: dispatching file descriptor: %d %d\n", fd, events);
+	debug("socket: dispatching file descriptor: %d %d", fd, events);
 
 	for (i = 0; i < query->response.pathcount; i++) {
 		struct netresolve_path *path = &query->response.paths[i];
@@ -209,7 +209,7 @@ netresolve_connect_cleanup(netresolve_query_t query)
 {
 	int i;
 
-	debug("socket: cleaning up...\n");
+	debug("socket: cleaning up...");
 
 	for (i = 0; i < query->response.pathcount; i++) {
 		struct netresolve_path *path = &query->response.paths[i];

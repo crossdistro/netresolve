@@ -111,7 +111,7 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 		netresolve_backend_apply_hostent(query, he, socktype, protocol, port, priority, weight, ttl);
 		break;
 	default:
-		error("ares: %s\n", ares_strerror(status));
+		error("ares: %s", ares_strerror(status));
 	}
 }
 
@@ -163,7 +163,7 @@ srv_callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 			start_address_lookup(query, NULL);
 		break;
 	default:
-		error("ares: %s\n", ares_strerror(status));
+		error("ares: %s", ares_strerror(status));
 	}
 }
 
@@ -196,7 +196,7 @@ start_srv_lookup(netresolve_query_t query)
 		return;
 	}
 
-	debug("looking up SRV %s\n", name);
+	debug("looking up SRV %s", name);
 	ares_query(priv->query, name, ns_c_in, ns_t_srv, srv_callback, query);
 }
 
@@ -239,7 +239,7 @@ setup_forward(netresolve_query_t query, char **settings)
 
 	return;
 fail_ares:
-	error("ares: %s\n", ares_strerror(status));
+	error("ares: %s", ares_strerror(status));
 fail:
 	netresolve_backend_failed(query);
 }
@@ -253,7 +253,7 @@ dispatch(netresolve_query_t query, int fd, int events)
 	int wfd = events & POLLOUT ? fd : ARES_SOCKET_BAD;
 
 	if (fd == priv->ptfd) {
-		error("partial response used due to a timeout\n");
+		error("partial response used due to a timeout");
 		netresolve_backend_finished(query);
 		return;
 	}

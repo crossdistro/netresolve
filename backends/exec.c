@@ -71,7 +71,7 @@ start_subprocess(char *const command[], int *pid, int *infd, int *outfd)
 		close(p2[1]);
 		execvp(*command, command);
 		/* Subprocess error occured. */
-		fprintf(stderr, "error running %s: %s\n", *command, strerror(errno));
+		fprintf(stderr, "error running %s: %s", *command, strerror(errno));
 		abort();
 	}
 
@@ -116,7 +116,7 @@ received_line(netresolve_query_t query, struct priv_exec *priv, const char *line
 	int protocol;
 	int port;
 
-	debug("received: %s\n", priv->outbuf.buffer);
+	debug("received: %s", priv->outbuf.buffer);
 
 	if (!*line)
 		return true;
@@ -158,7 +158,7 @@ pickup_stdout(netresolve_query_t query, struct priv_exec *priv)
 		netresolve_backend_failed(query);
 		return;
 	}
-	debug("read: %*s\n", size, priv->outbuf.start);
+	debug("read: %*s", size, priv->outbuf.start);
 	priv->outbuf.start += size;
 
 	while ((nl = memchr(priv->outbuf.buffer, '\n', priv->outbuf.start - priv->outbuf.buffer))) {
@@ -198,17 +198,17 @@ dispatch(netresolve_query_t query, int fd, int events)
 {
 	struct priv_exec *priv = netresolve_backend_get_priv(query);
 
-	debug("exec: events %d on fd %d\n", events, fd);
+	debug("exec: events %d on fd %d", events, fd);
 
 	if (fd == priv->infd && events & POLLOUT)
 		send_stdin(query, priv);
 	else if (fd == priv->outfd && events & POLLIN) {
 		pickup_stdout(query, priv);
 	} else if (fd == priv->outfd && events & POLLHUP) {
-		error("exec: incomplete response\n");
+		error("exec: incomplete response");
 		netresolve_backend_failed(query);
 	} else {
-		error("exec: unknown events %d on fd %d\n", events, fd);
+		error("exec: unknown events %d on fd %d", events, fd);
 		netresolve_backend_failed(query);
 	}
 }

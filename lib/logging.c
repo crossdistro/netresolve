@@ -43,9 +43,15 @@ netresolve_log(int level, const char *fmt, ...)
 {
 	if (level <= netresolve_get_log_level()) {
 		va_list ap;
+		size_t len = strlen(fmt);
+		char fmtnl[len + 2];
+
+		memcpy(fmtnl, fmt, len);
+		fmtnl[len] = '\n';
+		fmtnl[len + 1] = '\0';
 
 		va_start(ap, fmt);
-		vfprintf(stderr, fmt, ap);
+		vfprintf(stderr, fmtnl, ap);
 		va_end(ap);
 	}
 }

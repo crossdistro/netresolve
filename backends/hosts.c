@@ -72,7 +72,7 @@ add_node(struct hosts_list *list, const char *name, int family, void *address, i
 		list->items = realloc(list->items, list->reserved * sizeof item);
 	}
 
-	debug("hosts: adding item %s family %d\n", item.name, item.family);
+	debug("hosts: adding item %s family %d", item.name, item.family);
 	memcpy(&list->items[list->count++], &item, sizeof item);
 }
 

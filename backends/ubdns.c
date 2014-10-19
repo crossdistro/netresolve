@@ -53,7 +53,7 @@ callback(void *arg, int status, struct ub_result* result)
 	netresolve_query_t query = priv->query;
 
 	if (status) {
-		error("libunbound: %s\n", ub_strerror(status));
+		error("libunbound: %s", ub_strerror(status));
 		return;
 	}
 
@@ -66,23 +66,23 @@ callback(void *arg, int status, struct ub_result* result)
 	ldns_pkt *pkt;
 
 	if (ldns_wire2pkt(&pkt, result->answer_packet, result->answer_len)) {
-		debug("can't parse the DNS answer\n");
+		debug("can't parse the DNS answer");
 		netresolve_backend_failed(query);
 		return;
 	}
 
 	switch (result->qtype) {
 	case ns_t_a:
-		debug("received A resonse\n");
+		debug("received A resonse");
 		priv->ip4_result = result;
 		break;
 	case ns_t_aaaa:
-		debug("received AAAA resonse\n");
+		debug("received AAAA resonse");
 		priv->ip6_result = result;
 		break;
 	case ns_t_srv:
 		/* FIXME: We only support one SRV record per name. */
-		debug("received SRV response\n");
+		debug("received SRV response");
 		free(priv->node);
 		priv->priority = ldns_rdf2native_int16(pkt->_answer->_rrs[0]->_rdata_fields[0]);
 		priv->weight = ldns_rdf2native_int16(pkt->_answer->_rrs[0]->_rdata_fields[1]);
@@ -93,7 +93,7 @@ callback(void *arg, int status, struct ub_result* result)
 		break;
 	case ns_t_ptr:
 		/* FIXME: We only support one PTR record. */
-		debug("received PTR response\n");
+		debug("received PTR response");
 		if (!pkt->_answer->_rr_count) {
 			netresolve_backend_failed(query);
 			break;
@@ -104,7 +104,7 @@ callback(void *arg, int status, struct ub_result* result)
 		netresolve_backend_finished(query);
 		break;
 	default:
-		debug("received unknown response\n");
+		debug("received unknown response");
 		netresolve_backend_failed(query);
 		break;
 	}
@@ -149,7 +149,7 @@ lookup(struct priv_ubdns *priv, int family)
 		return;
 	}
 
-	debug("looking up %s record for %s\n", type_name, priv->node);
+	debug("looking up %s record for %s", type_name, priv->node);
 	ub_resolve_async(priv->ctx, priv->node, type, ns_c_in, priv, callback, NULL);
 }
 
@@ -168,7 +168,7 @@ lookup_srv(struct priv_ubdns *priv)
 		netresolve_backend_failed(priv->query);
 		return;
 	}
-	debug("looking up SRV record for %s\n", name);
+	debug("looking up SRV record for %s", name);
 	ub_resolve_async(priv->ctx, name, ns_t_srv, ns_c_in, priv, callback, NULL);
 }
 
@@ -195,14 +195,14 @@ lookup_reverse(struct priv_ubdns *priv, int family)
 		return;
 	}
 
-	debug("looking up PTR record for %s\n", name);
+	debug("looking up PTR record for %s", name);
 	ub_resolve_async(priv->ctx, name, ns_t_ptr, ns_c_in, priv, callback, NULL);
 }
 
 static void
 lookup_dns(struct priv_ubdns *priv)
 {
-	debug("looking up %d record for %s\n", priv->type, priv->node);
+	debug("looking up %d record for %s", priv->type, priv->node);
 	ub_resolve_async(priv->ctx, priv->node, priv->type, priv->cls, priv, callback, NULL);
 }
 
