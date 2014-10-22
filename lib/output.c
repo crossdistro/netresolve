@@ -29,7 +29,7 @@
 void *
 netresolve_query_get_user_data(netresolve_query_t query)
 {
-	return query->request.user_data;
+	return query->user_data;
 }
 
 size_t

@@ -114,14 +114,14 @@ main(int argc, char **argv)
 	netresolve_set_protocol(channel, protocol);
 
 	/* Start name resolution. */
-	netresolve_set_user_data(channel, &data1);
 	query1 = netresolve_query(channel, node1, service);
-	netresolve_set_user_data(channel, &data2);
 	query2 = netresolve_query(channel, node2, service);
 
+	/* Set user data */
+	netresolve_query_set_user_data(query1, &data1);
+	netresolve_query_set_user_data(query2, &data2);
+
 	assert(query1 && query2);
-	assert(netresolve_query_get_user_data(query1) == &data1);
-	assert(netresolve_query_get_user_data(query2) == &data2);
 
 	/* Run the main loop. */
 	while (priv.epoll_count > 0) {

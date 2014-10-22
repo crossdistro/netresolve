@@ -132,11 +132,10 @@ netresolve_set_backend_string(netresolve_t channel, const char *string)
 	}
 }
 
-
 void
-netresolve_set_user_data(netresolve_t channel, void *user_data)
+netresolve_query_set_user_data(netresolve_query_t query, void *user_data)
 {
-	channel->request.user_data = user_data;
+	query->user_data = user_data;
 }
 
 void

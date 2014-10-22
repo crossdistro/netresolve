@@ -59,12 +59,14 @@ void netresolve_set_connect_callback(netresolve_t channel,
 void netresolve_set_backend_string(netresolve_t channel, const char *string);
 
 /* Input */
-void netresolve_set_user_data(netresolve_t channel, void *data);
 void netresolve_set_family(netresolve_t channel, int family);
 void netresolve_set_socktype(netresolve_t channel, int socktype);
 void netresolve_set_protocol(netresolve_t channel, int protocol);
 void netresolve_set_default_loopback(netresolve_t channel, bool value);
 void netresolve_set_dns_srv_lookup(netresolve_t channel, bool value);
+
+/* Query user data */
+void netresolve_query_set_user_data(netresolve_query_t query, void *user_data);
 
 /* Output */
 void *netresolve_query_get_user_data(netresolve_query_t query);

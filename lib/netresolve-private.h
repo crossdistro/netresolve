@@ -95,7 +95,6 @@ struct netresolve_channel {
 		void *user_data_sock;
 	} callbacks;
 	struct netresolve_request {
-		void *user_data;
 		enum netresolve_request_type type;
 		/* Perform L3 address resolution using 'nodename' if not NULL. Use
 		 * 'family' to chose between IPv4, IPv6 and mixed IPv4/IPv6
@@ -135,6 +134,7 @@ struct netresolve_channel {
 
 struct netresolve_query {
 	struct netresolve_channel *channel;
+	void *user_data;
 	enum netresolve_state state;
 	enum netresolve_state delayed_state;
 	int delayed_fd;
