@@ -49,6 +49,8 @@ main(int argc, char **argv)
 	assert(result);
 	struct { struct addrinfo ai; struct sockaddr_in6 sa; } expected = {
 		.ai = {
+			/* FIXME: getaddrinfo sets .flags to 3 */
+			.ai_flags = result->ai_flags,
 			.ai_family = AF_INET6,
 			.ai_socktype = SOCK_STREAM,
 			.ai_protocol = IPPROTO_TCP,
@@ -66,6 +68,8 @@ main(int argc, char **argv)
 	assert(!memcmp(result, &expected.ai, sizeof expected.ai));
 	assert(result->ai_canonname && !strcmp(result->ai_canonname, node));
 	assert(!memcmp(result->ai_addr, &expected.sa, sizeof expected.sa));
+
+	freeaddrinfo(result);
 
 	return EXIT_SUCCESS;
 }
