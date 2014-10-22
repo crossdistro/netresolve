@@ -29,7 +29,11 @@
 int
 main(int argc, char **argv)
 {
+#ifdef GETHOSTBYNAME2
 	const char *node = "1:2:3:4:5:6:7:8";
+#else
+	const char *node = "1.2.3.4";
+#endif
 	struct hostent *result = NULL;
 
 #ifdef REENTRANT
@@ -38,7 +42,7 @@ main(int argc, char **argv)
 	char buffer[buflen];
 	int my_errno, my_h_errno;
 #ifdef GETHOSTBYNAME2
-	my_errno = gethostbyname2_r(node, AF_UNSPEC, &he, buffer, buflen, &result, &my_h_errno);
+	my_errno = gethostbyname2_r(node, AF_INET6, &he, buffer, buflen, &result, &my_h_errno);
 #else
 	my_errno = gethostbyname_r(node, &he, buffer, buflen, &result, &my_h_errno);
 #endif
@@ -46,24 +50,41 @@ main(int argc, char **argv)
 	assert(result == &he);
 #else
 #ifdef GETHOSTBYNAME2
-	result = gethostbyname2(node, AF_UNSPEC);
+	result = gethostbyname2(node, AF_INET6);
 #else
 	result = gethostbyname(node);
 #endif
 #endif
 	assert(result && result->h_addr_list[0]);
 
-	struct { struct hostent he; char *ha[1]; char *al[2]; struct in6_addr ia; } expected = {
+	struct {
+		struct hostent he;
+		char *ha[1];
+		char *al[2];
+#ifdef GETHOSTBYNAME2
+		struct in6_addr ia;
+#else
+		struct in_addr ia;
+#endif
+	} expected = {
 		.he = {
 			.h_name = result->h_name,
 			.h_aliases = result->h_aliases,
+#ifdef GETHOSTBYNAME2
 			.h_addrtype = AF_INET6,
+#else
+			.h_addrtype = AF_INET,
+#endif
 			.h_length = sizeof expected.ia,
 			.h_addr_list = result->h_addr_list,
 		},
 		.ha = { NULL },
 		.al = { *result->h_addr_list, NULL },
+#ifdef GETHOSTBYNAME2
 		.ia = { .s6_addr = { 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8} }
+#else
+		.ia = { .s_addr = htonl(0x01020304) }
+#endif
 	};
 	assert(!memcmp(result, &expected.he, sizeof expected.he));
 	assert(result->h_name && !strcmp(result->h_name, node));

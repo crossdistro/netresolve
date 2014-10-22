@@ -69,8 +69,17 @@ freeaddrinfo(struct addrinfo *result)
 
 /* gethostbyname2:
  *
- * Extended version of `gethostbyname()` with the capability to select address
- * family.
+ * Legacy extended version of `gethostbyname()`o lookup either IPv4 or IPv6 addresses for a
+ * specified family. Result for AF_UNSPEC is not specified.
+ *
+ * Replaced by `getaddrinfo()` as follows:
+ *
+ *  * nodename = node
+ *  * servname = NULL
+ *  * hints.family = family
+ *  * hints.socktype = SOCK_RAW
+ *
+ * See notes for `gethostbyname()`.
  *
  * GNU extention to POSIX.1-2001 `gethostbyname()`
  */
@@ -93,21 +102,37 @@ gethostbyname2(const char *node, int family)
 	return he;
 }
 
+/* Legacy functions without a family parameter will only lookup IPv4. */
+#define GETHOSTBYNAME_FAMILY AF_INET
+
 /* gethostbyname:
  *
- * Caller doesn't free the result of this function. Instead, it is kept,
- * referenced by a static pointer, until the next call of `gethostbyname()`,
- * making `gethostbyname()` not reentrant by definition and the answer to the
- * last request is never freed.
+ * Legacy API to lookup IPv4 addresses for a specified hostname. Memory for
+ * the result is allocated in a static buffer. The caller must not free it
+ * and the function is not reentrant.
+ *
+ * Replaced by `getaddrinfo()` as follows:
+ *
+ *  * nodename = node
+ *  * servname = NULL
+ *  * hints.family = AF_INET
+ *  * hints.socktype = SOCK_RAW
+ *
+ * Note: Using SOCK_RAW is not explicitly mandated by POSIX but it is required
+ * by the GNU implementation.
  *
  * Defined in POSIX.1-2001, removed in POSIX.1-2008.
  */
 struct hostent *
 gethostbyname(const char *node)
 {
-	return gethostbyname2(node, AF_UNSPEC);
+	return gethostbyname2(node, GETHOSTBYNAME_FAMILY);
 }
 
+/* gethostbyname2_r:
+ *
+ * Reentrant version of `gethostbyname2()`, see notes for `gethostbyname()`.
+ */
 int
 gethostbyname2_r(const char *name, int family,
 		struct hostent *he, char *buffer, size_t buflen,
@@ -170,10 +195,14 @@ gethostbyname2_r(const char *name, int family,
 	return 0;
 }
 
+/* gethostbyname2_r:
+ *
+ * Reentrant version of `gethostbyname()`, see notes for `gethostbyname()`.
+ */
 int
 gethostbyname_r(const char *name,
 		struct hostent *he, char *buffer, size_t buflen,
 		struct hostent **result, int *h_errnop)
 {
-	return gethostbyname2_r(name, AF_UNSPEC, he, buffer, buflen, result, h_errnop);
+	return gethostbyname2_r(name, GETHOSTBYNAME_FAMILY, he, buffer, buflen, result, h_errnop);
 }
