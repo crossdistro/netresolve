@@ -109,11 +109,7 @@ TESTS = \
 	test-async \
 	test-libevent \
 	test-bind-connect \
-	test-getaddrinfo \
-	test-gethostbyname \
-	test-gethostbyname2 \
-	test-gethostbyname_r \
-	test-gethostbyname2_r
+	tests/test-compat.sh
 EXTRA_DIST = \
 	tests/test-netresolve.sh \
 	tests/data/any \
@@ -161,19 +157,14 @@ test_bind_connect_SOURCES = tests/test-bind-connect.c
 test_bind_connect_LDADD = libnetresolve.la
 
 test_getaddrinfo_SOURCES = tests/test-getaddrinfo.c
-test_getaddrinfo_LDADD = libnetresolve-libc.la
 
 test_gethostbyname_SOURCES = tests/test-gethostbyname.c
-test_gethostbyname_LDADD = libnetresolve-libc.la
 
 test_gethostbyname2_SOURCES = tests/test-gethostbyname.c
 test_gethostbyname2_CFLAGS = -DGETHOSTBYNAME2
-test_gethostbyname2_LDADD = libnetresolve-libc.la
 
 test_gethostbyname_r_SOURCES = tests/test-gethostbyname.c
 test_gethostbyname_r_CFLAGS = -DREENTRANT
-test_gethostbyname_r_LDADD = libnetresolve-libc.la
 
 test_gethostbyname2_r_SOURCES = tests/test-gethostbyname.c
 test_gethostbyname2_r_CFLAGS = -DGETHOSTBYNAME2 -DREENTRANT
-test_gethostbyname2_r_LDADD = libnetresolve-libc.la
