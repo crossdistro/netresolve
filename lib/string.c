@@ -83,6 +83,8 @@ netresolve_family_from_string(const char *str)
 int
 netresolve_socktype_from_string(const char *str)
 {
+	if (!strcmp(str, "raw"))
+		return SOCK_RAW;
 	if (!strcmp(str, "stream"))
 		return SOCK_STREAM;
 	if (!strcmp(str, "dgram"))
