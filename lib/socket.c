@@ -61,7 +61,7 @@ netresolve_query_connect(netresolve_query_t query, size_t idx)
 	socklen_t salen;
 	struct netresolve_path *path = &query->response.paths[idx];
 
-	if (path->socket.state != NETRESOLVE_STATE_INIT)
+	if (path->socket.state != NETRESOLVE_STATE_NONE)
 		return;
 
 	sa = netresolve_query_get_sockaddr(query, path - query->response.paths, &salen, &socktype, &protocol, NULL);
@@ -97,7 +97,7 @@ connect_check(netresolve_query_t query)
 
 		if (path->socket.state == NETRESOLVE_STATE_FINISHED) {
 			query->channel->callbacks.on_connect(query, idx, path->socket.fd, query->channel->callbacks.user_data_sock);
-			path->socket.state = NETRESOLVE_STATE_INIT;
+			path->socket.state = NETRESOLVE_STATE_NONE;
 			netresolve_query_set_state(query, NETRESOLVE_STATE_FINISHED);
 			break;
 		}
@@ -142,11 +142,11 @@ netresolve_connect_start(netresolve_query_t query)
 	for (i = 0; i < query->response.pathcount; i++) {
 		struct netresolve_path *path = &query->response.paths[i];
 
-		if (!ip4 && path->node.family == AF_INET && path->socket.state == NETRESOLVE_STATE_INIT) {
+		if (!ip4 && path->node.family == AF_INET && path->socket.state == NETRESOLVE_STATE_NONE) {
 			netresolve_query_connect(query, path - query->response.paths);
 			ip4 = true;
 		}
-		if (!ip6 && path->node.family == AF_INET6 && path->socket.state == NETRESOLVE_STATE_INIT) {
+		if (!ip6 && path->node.family == AF_INET6 && path->socket.state == NETRESOLVE_STATE_NONE) {
 			netresolve_query_connect(query, path - query->response.paths);
 			ip6 = true;
 		}
@@ -189,7 +189,7 @@ netresolve_connect_dispatch(netresolve_query_t query, int fd, int events)
 			case NETRESOLVE_STATE_WAITING:
 				close(path->socket.fd);
 				/* path through */
-			case NETRESOLVE_STATE_INIT:
+			case NETRESOLVE_STATE_NONE:
 				path->socket.state = NETRESOLVE_STATE_FAILED;
 				break;
 			default:

@@ -26,9 +26,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <poll.h>
+#include <errno.h>
 #include <sys/epoll.h>
 #include <sys/timerfd.h>
-#include <errno.h>
+#include <sys/eventfd.h>
 
 #include "netresolve-private.h"
 
@@ -82,8 +83,10 @@ static const char *
 state_to_string(enum netresolve_state state)
 {
 	switch (state) {
-	case NETRESOLVE_STATE_INIT:
-		return "init";
+	case NETRESOLVE_STATE_NONE:
+		return "none";
+	case NETRESOLVE_STATE_SETUP:
+		return "setup";
 	case NETRESOLVE_STATE_WAITING:
 		return "waiting";
 	case NETRESOLVE_STATE_FINISHED:
@@ -116,19 +119,39 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		break;
 	}
 
+	/* Delaying state... */
+	switch (state) {
+	case NETRESOLVE_STATE_FINISHED:
+	case NETRESOLVE_STATE_FAILED:
+		if (old_state != NETRESOLVE_STATE_WAITING) {
+			if ((query->delayed_fd = eventfd(1, EFD_NONBLOCK)) == -1) {
+				error("can't create eventfd");
+				break;
+			}
+			query->delayed_state = state;
+			state = query->state = NETRESOLVE_STATE_WAITING;
+			netresolve_watch_fd(query->channel, query->delayed_fd, POLLIN);
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
 	/* Entering state... */
 	switch (state) {
-	case NETRESOLVE_STATE_INIT:
+	case NETRESOLVE_STATE_NONE:
 		free(query->request.dns_name);
 		free(query->response.paths);
 		free(query->response.canonname);
 		memset(&query->response, 0, sizeof query->response);
 		break;
+	case NETRESOLVE_STATE_SETUP:
+		netresolve_query_start(query);
 	case NETRESOLVE_STATE_WAITING:
 		if (query->channel->callbacks.watch_fd)
 			query->channel->callbacks.watch_fd(query, query->channel->epoll_fd, POLLIN,
 					query->channel->callbacks.user_data_fd);
-		netresolve_query_start(query);
 		break;
 	case NETRESOLVE_STATE_FINISHED:
 		if (!query->response.canonname)
@@ -153,9 +176,11 @@ netresolve_query_start(netresolve_query_t query)
 
 	debug("starting backend: %s", backend->settings[0]);
 	setup = backend->setup[query->request.type];
-	if (setup)
+	if (setup) {
 		setup(query, backend->settings + 1);
-	else
+		if (query->state == NETRESOLVE_STATE_SETUP)
+			netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
+	} else
 		netresolve_backend_failed(query);
 }
 
@@ -170,6 +195,17 @@ dispatch_fd(netresolve_t channel, int fd, int events)
 
 		if (query->state != NETRESOLVE_STATE_WAITING)
 			continue;
+
+		if (query->delayed_state && fd == query->delayed_fd) {
+			enum netresolve_state state = query->delayed_state;
+
+			query->delayed_state = NETRESOLVE_STATE_NONE;
+			close(query->delayed_fd);
+			query->delayed_fd = -1;
+
+			netresolve_query_set_state(query, state);
+			return true;
+		}
 
 		if (!backend && netresolve_connect_dispatch(query, fd, events))
 			return true;
@@ -186,7 +222,7 @@ dispatch_fd(netresolve_t channel, int fd, int events)
 bool
 netresolve_epoll(netresolve_t channel, int timeout)
 {
-	static const int maxevents = 1;
+	static const int maxevents = 10;
 	struct epoll_event events[maxevents];
 	int nevents;
 	int i;
@@ -328,6 +364,8 @@ netresolve_query(netresolve_t channel, const char *nodename, const char *servnam
 	query->request.nodename = nodename;
 	query->request.servname = servname;
 
+	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
+
 	return netresolve_query_run(query);
 }
 
@@ -342,6 +380,8 @@ netresolve_query_reverse(netresolve_t channel, int family, const void *address, 
 
 	query->request.family = family;
 	memcpy(query->request.address, address, size);
+
+	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
 
 	return netresolve_query_run(query);
 }
@@ -364,7 +404,7 @@ netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type)
 bool
 netresolve_dispatch_fd(netresolve_t channel, int fd, int events)
 {
-	if (fd != channel->epoll_fd) {
+	if (fd != channel->epoll_fd && fd != -1) {
 		errno = EBADF;
 		return false;
 	}
@@ -389,7 +429,7 @@ netresolve_query_done(netresolve_query_t query)
 	netresolve_t channel = query->channel;
 	int i;
 
-	netresolve_query_set_state(query, NETRESOLVE_STATE_INIT);
+	netresolve_query_set_state(query, NETRESOLVE_STATE_NONE);
 
 	for (i = 0; i < channel->nqueries; i++)
 		if (channel->queries[i] == query)

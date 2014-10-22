@@ -32,7 +32,8 @@
 #include <assert.h>
 
 enum netresolve_state {
-	NETRESOLVE_STATE_INIT,
+	NETRESOLVE_STATE_NONE,
+	NETRESOLVE_STATE_SETUP,
 	NETRESOLVE_STATE_WAITING,
 	NETRESOLVE_STATE_FINISHED,
 	NETRESOLVE_STATE_FAILED
@@ -135,6 +136,8 @@ struct netresolve_channel {
 struct netresolve_query {
 	struct netresolve_channel *channel;
 	enum netresolve_state state;
+	enum netresolve_state delayed_state;
+	int delayed_fd;
 	int first_connect_timeout;
 	struct netresolve_backend **backend;
 	struct netresolve_request request;
