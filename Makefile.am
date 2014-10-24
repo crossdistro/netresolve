@@ -77,6 +77,7 @@ lib_LTLIBRARIES += \
 	libnetresolve-backend-aresdns.la \
 	libnetresolve-backend-ubdns.la \
 	libnetresolve-backend-getaddrinfo.la \
+	libnetresolve-backend-asyncns.la \
 	libnetresolve-backend-nss.la \
 	libnetresolve-backend-exec.la
 libnetresolve_backend_unix_la_SOURCES = backends/unix.c
@@ -91,6 +92,8 @@ libnetresolve_backend_aresdns_la_LDFLAGS = $(AM_LDFLAGS) $(ARES_LIBS)
 libnetresolve_backend_ubdns_la_SOURCES = backends/ubdns.c
 libnetresolve_backend_ubdns_la_LDFLAGS = $(AM_LDFLAGS) $(UNBOUND_LIBS) -lldns
 libnetresolve_backend_getaddrinfo_la_SOURCES = backends/getaddrinfo.c
+libnetresolve_backend_asyncns_la_SOURCES = backends/asyncns.c
+libnetresolve_backend_asyncns_la_LDFLAGS = -lasyncns
 libnetresolve_backend_nss_la_SOURCES = backends/nss.c
 libnetresolve_backend_exec_la_SOURCES = backends/exec.c
 
