@@ -66,6 +66,7 @@ libnetresolve_libc_la_LIBADD = \
 libnss_netresolve_la_SOURCES = \
 	compat/nsswitch.c \
 	compat/compat.c
+libnss_netresolve_la_LDFLAGS = $(AM_LDFLAGS) -version-info 2:0:0
 
 lib_LTLIBRARIES += \
 	libnetresolve-backend-unix.la \
