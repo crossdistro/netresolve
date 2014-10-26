@@ -75,7 +75,7 @@ print_addrinfo(struct addrinfo *item)
 				struct sockaddr_in *sa4 = (void *) item->ai_addr;
 
 				printf("    port = %d\n", ntohs(sa4->sin_port));
-				printf("    address = %d\n", ntohl(sa4->sin_addr.s_addr));
+				printf("    address = 0x%x\n", ntohl(sa4->sin_addr.s_addr));
 			}
 			break;
 		case AF_INET6:
@@ -83,8 +83,8 @@ print_addrinfo(struct addrinfo *item)
 				struct sockaddr_in6 *sa6 = (void *) item->ai_addr;
 
 				printf("    port = %d\n", ntohs(sa6->sin6_port));
-				printf("    flowinfo = %08x\n", ntohs(sa6->sin6_port));
-				printf("    address = ");
+				printf("    flowinfo = 0x%08x\n", ntohs(sa6->sin6_flowinfo));
+				printf("    address = 0x");
 				for (int i = 0; i < 16; i++)
 					printf("%02x", sa6->sin6_addr.s6_addr[i]);
 				printf("\n");
