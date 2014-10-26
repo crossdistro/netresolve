@@ -21,7 +21,17 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <stdlib.h>
+#include <stdio.h>
+#include <getopt.h>
+#include <string.h>
+#include <netdb.h>
+#include <arpa/nameser.h>
+#include <resolv.h>
+
 #include "compat.h"
+
+#define SIZE 8192
 
 int
 main(int argc, char **argv)
@@ -29,66 +39,74 @@ main(int argc, char **argv)
 	static const struct option longopts[] = {
 		{ "help", 0, 0, 'h' },
 		{ "verbose", 0, 0, 'v' },
-		{ "node", 1, 0, 'n' },
-		{ "host", 1, 0, 'n' },
-		{ "ipv4", 0, 0, '4' },
-		{ "ipv6", 0, 0, '6' },
+		{ "search", 0, 0, 's' },
+		{ "dname", 1, 0, 'n' },
+		{ "class", 1, 0, 'c' },
+		{ "type", 1, 0, 't' },
 		{ NULL, 0, 0, 0 }
 	};
-	static const char *opts = "hvn:46";
+	static const char *opts = "hvsn:c:t:";
 	int opt, idx = 0;
-	char *nodename = NULL;
-	int family = 0;
+	bool search = false;
+	const char *dname = NULL;
+	int class = ns_c_in;
+	int type = ns_t_a;
+	uint8_t answer[SIZE];
+	int length = 0;
 
 	while ((opt = getopt_long(argc, argv, opts, longopts, &idx)) != -1) {
 		switch (opt) {
 		case 'h':
 			fprintf(stderr,
 					"-h,--help -- help\n"
-					"-n,--node <nodename> -- node name\n"
-					"-4,--ipv4 -- IPv4 only query\n"
-					"-6,--ipv6 -- IPv6 only query\n");
+					"-s,--search <servname> -- service name\n"
+					"-n,--dname <name> -- domain name\n"
+					"-c,--class <class> -- class\n"
+					"-t,--type <type> -- type\n");
 			exit(EXIT_SUCCESS);
+		case 's':
+			search = true;
+			break;
 		case 'n':
-			nodename = optarg;
+			dname = optarg;
 			break;
-		case '4':
-			family = AF_INET;
+		case 'c':
+			class = strtoll(optarg, NULL, 10);
 			break;
-		case '6':
-			family = AF_INET6;
+		case 't':
+			type = strtoll(optarg, NULL, 10);
 			break;
 		default:
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	if (argv[optind])
-		nodename = argv[optind++];
 	if (argv[optind]) {
-		fprintf(stderr, "Too many arguments.");
+		fprintf(stderr, "Too many arguments.\n");
 		exit(1);
 	}
 
 	printf("query:\n");
-	printf("  api = %s\n", family ? "gethostbyname2" : "gethostbyname");
-	if (family)
-		printf(" family = %d\n", family);
-	printf("  nodename = %s\n", nodename);
+	printf("  search = %s\n", search ? "yes" : "no");
+	printf("  dname = %s\n", dname);
+	printf("  class = %d\n", class);
+	printf("  type = %d\n", type);
 
-	if (!nodename) {
-		fprintf(stderr, "Cannot query an empty nodename\n");
-		exit(1);
+	if (!dname) {
+		fprintf(stderr, "Cannot query NULL dname.\n");
+		exit(EXIT_FAILURE);
 	}
 
-	struct hostent *result = family ? gethostbyname2(nodename, family) : gethostbyname(nodename);
-
-	if (!result) {
-		printf("errno = %d\n", errno);
-		printf("h_errno = %d\n", h_errno);
-		exit(1);
-	}
+	length = (search ? res_search : res_query)(dname, class, type, answer, sizeof answer);
 
 	printf("result:\n");
-	print_hostent(result);
+	printf("  length = %d\n", length);
+	if (length <= 0)
+		exit(EXIT_FAILURE);
+	printf("  answer = 0x");
+	for (int i = 0; i < length; i++)
+		printf("%02x", answer[i]);
+	printf("\n");
+
+	exit(EXIT_SUCCESS);
 }

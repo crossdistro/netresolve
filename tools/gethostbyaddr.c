@@ -29,28 +29,25 @@ main(int argc, char **argv)
 	static const struct option longopts[] = {
 		{ "help", 0, 0, 'h' },
 		{ "verbose", 0, 0, 'v' },
-		{ "node", 1, 0, 'n' },
-		{ "host", 1, 0, 'n' },
-		{ "ipv4", 0, 0, '4' },
-		{ "ipv6", 0, 0, '6' },
+		{ "address", 1, 0, 'a' },
 		{ NULL, 0, 0, 0 }
 	};
-	static const char *opts = "hvn:46";
+	static const char *opts = "hva:46";
 	int opt, idx = 0;
-	char *nodename = NULL;
-	int family = 0;
+	char *address_str = NULL;
+	char address[16];
+	int family, ifindex;
+
 
 	while ((opt = getopt_long(argc, argv, opts, longopts, &idx)) != -1) {
 		switch (opt) {
 		case 'h':
 			fprintf(stderr,
 					"-h,--help -- help\n"
-					"-n,--node <nodename> -- node name\n"
-					"-4,--ipv4 -- IPv4 only query\n"
-					"-6,--ipv6 -- IPv6 only query\n");
+					"-a,--address <address> -- node name\n");
 			exit(EXIT_SUCCESS);
-		case 'n':
-			nodename = optarg;
+		case '1':
+			address_str = optarg;
 			break;
 		case '4':
 			family = AF_INET;
@@ -64,24 +61,28 @@ main(int argc, char **argv)
 	}
 
 	if (argv[optind])
-		nodename = argv[optind++];
+		address_str = argv[optind++];
 	if (argv[optind]) {
 		fprintf(stderr, "Too many arguments.");
 		exit(1);
 	}
 
 	printf("query:\n");
-	printf("  api = %s\n", family ? "gethostbyname2" : "gethostbyname");
-	if (family)
-		printf(" family = %d\n", family);
-	printf("  nodename = %s\n", nodename);
+	printf("  address = %s\n", address_str);
 
-	if (!nodename) {
-		fprintf(stderr, "Cannot query an empty nodename\n");
+	if (!address_str) {
+		fprintf(stderr, "Cannot query an empty address.\n");
 		exit(1);
 	}
 
-	struct hostent *result = family ? gethostbyname2(nodename, family) : gethostbyname(nodename);
+	parse_address(address_str, &address, &family, &ifindex);
+
+	if (ifindex) {
+		fprintf(stderr, "No ifindex/scope_id support in `gethostbyaddr()`.");
+		exit(1);
+	}
+
+	struct hostent *result = gethostbyaddr(&address, family == AF_INET ? 4 : 16, family);
 
 	if (!result) {
 		printf("errno = %d\n", errno);

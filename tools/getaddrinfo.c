@@ -27,77 +27,7 @@
 #include <string.h>
 #include <netdb.h>
 
-/* struct addrinfo {
- *     int ai_flags;
- *     int ai_family;
- *     int ai_socktype;
- *     int ai_protocol;
- *     socklen_t ai_addrlen;
- *     struct sockaddr *ai_addr;
- *     char *ai_canonname;
- *     struct addrinfo *ai_next;
- * };
- *
- * struct sockaddr_in {
- *     sa_family_t sin_family;
- *     in_port_t sin_port;
- *     struct in_addr sin_addr;
- * };
- *
- * struct sockaddr_in6 {
- *     sa_family_t sin6_family;
- *     in_port_t sin6_port;
- *     uint32_t sin6_flowinfo;
- *     struct in6_addr sin6_addr;
- *     uint32_t sin6_scope_id;
- * };
- */
-
-void
-print_addrinfo(struct addrinfo *item)
-{
-	if (item->ai_flags)
-		printf("  flags = %d\n", item->ai_flags);
-	if (item->ai_family)
-		printf("  family = %d\n", item->ai_family);
-	if (item->ai_socktype)
-		printf("  socktype = %d\n", item->ai_socktype);
-	if (item->ai_protocol)
-		printf("  protocol = %d\n", item->ai_protocol);
-	if (item->ai_addrlen)
-		printf("  addrlen = %d\n", item->ai_addrlen);
-	if (item->ai_addr) {
-		printf("  address:\n");
-		printf("    family = %d\n", item->ai_addr->sa_family);
-		switch (item->ai_addr->sa_family) {
-		case AF_INET:
-			{
-				struct sockaddr_in *sa4 = (void *) item->ai_addr;
-
-				printf("    port = %d\n", ntohs(sa4->sin_port));
-				printf("    address = 0x%x\n", ntohl(sa4->sin_addr.s_addr));
-			}
-			break;
-		case AF_INET6:
-			{
-				struct sockaddr_in6 *sa6 = (void *) item->ai_addr;
-
-				printf("    port = %d\n", ntohs(sa6->sin6_port));
-				printf("    flowinfo = 0x%08x\n", ntohs(sa6->sin6_flowinfo));
-				printf("    address = 0x");
-				for (int i = 0; i < 16; i++)
-					printf("%02x", sa6->sin6_addr.s6_addr[i]);
-				printf("\n");
-				printf("    scope_id = %d\n", sa6->sin6_scope_id);
-			}
-			break;
-		default:
-			break;
-		}
-	}
-	if (item->ai_canonname)
-		printf("  canonname = %s\n", item->ai_canonname);
-}
+#include "compat.h"
 
 int
 main(int argc, char **argv)

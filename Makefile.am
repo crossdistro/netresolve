@@ -98,7 +98,7 @@ libnetresolve_backend_asyncns_la_LDFLAGS = -lasyncns
 libnetresolve_backend_nss_la_SOURCES = backends/nss.c
 libnetresolve_backend_exec_la_SOURCES = backends/exec.c
 
-bin_PROGRAMS = netresolve netconnect getaddrinfo gethostbyname
+bin_PROGRAMS = netresolve netconnect getaddrinfo getnameinfo gethostbyname gethostbyaddr res_query
 bin_SCRIPTS = tools/wrapresolve
 
 netresolve_SOURCES = tools/netresolve.c
@@ -107,9 +107,16 @@ netresolve_LDADD = libnetresolve.la
 netconnect_SOURCES = tools/netconnect.c
 netconnect_LDADD = libnetresolve.la
 
-getaddrinfo_SOURCES = tools/getaddrinfo.c
+getaddrinfo_SOURCES = tools/getaddrinfo.c tools/compat.c
 
-gethostbyname_SOURCES = tools/gethostbyname.c
+getnameinfo_SOURCES = tools/getnameinfo.c tools/compat.c
+
+gethostbyname_SOURCES = tools/gethostbyname.c tools/compat.c
+
+gethostbyaddr_SOURCES = tools/gethostbyaddr.c tools/compat.c
+
+res_query_SOURCES = tools/res_query.c tools/compat.c
+res_query_LDFLAGS = $(AM_LDFLAGS) -lresolv
 
 TESTS = \
 	tests/test-netresolve.sh \

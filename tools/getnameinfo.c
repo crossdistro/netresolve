@@ -23,34 +23,47 @@
  */
 #include "compat.h"
 
+#define SIZE 1024
+
 int
 main(int argc, char **argv)
 {
 	static const struct option longopts[] = {
 		{ "help", 0, 0, 'h' },
 		{ "verbose", 0, 0, 'v' },
-		{ "node", 1, 0, 'n' },
-		{ "host", 1, 0, 'n' },
-		{ "ipv4", 0, 0, '4' },
-		{ "ipv6", 0, 0, '6' },
+		{ "address", 1, 0, 'a' },
 		{ NULL, 0, 0, 0 }
 	};
-	static const char *opts = "hvn:46";
+	static const char *opts = "hva:46";
 	int opt, idx = 0;
-	char *nodename = NULL;
-	int family = 0;
+	char *address_str = NULL;
+	char address[16];
+	int family = 0, ifindex = 0;
+	uint16_t port = 0;
+	int flags = 0;
+	union {
+		struct sockaddr sa;
+		struct sockaddr_in sa4;
+		struct sockaddr_in6 sa6;
+	} sa;
+	socklen_t salen;
+	char host[SIZE], serv[SIZE];
+	
+	memset(&sa, 0, sizeof sa);
 
 	while ((opt = getopt_long(argc, argv, opts, longopts, &idx)) != -1) {
 		switch (opt) {
 		case 'h':
 			fprintf(stderr,
 					"-h,--help -- help\n"
-					"-n,--node <nodename> -- node name\n"
-					"-4,--ipv4 -- IPv4 only query\n"
-					"-6,--ipv6 -- IPv6 only query\n");
+					"-a,--address <address> -- node name\n"
+					"-p,--port <port>\n");
 			exit(EXIT_SUCCESS);
-		case 'n':
-			nodename = optarg;
+		case 'a':
+			address_str = optarg;
+			break;
+		case 'p':
+			port = htons(strtoll(optarg, NULL, 10));
 			break;
 		case '4':
 			family = AF_INET;
@@ -64,31 +77,53 @@ main(int argc, char **argv)
 	}
 
 	if (argv[optind])
-		nodename = argv[optind++];
+		address_str = argv[optind++];
+	if (argv[optind])
+		port = htons(strtoll(argv[optind++], NULL, 10));
 	if (argv[optind]) {
 		fprintf(stderr, "Too many arguments.");
 		exit(1);
 	}
 
 	printf("query:\n");
-	printf("  api = %s\n", family ? "gethostbyname2" : "gethostbyname");
-	if (family)
-		printf(" family = %d\n", family);
-	printf("  nodename = %s\n", nodename);
+	printf("  address = %s\n", address_str);
 
-	if (!nodename) {
-		fprintf(stderr, "Cannot query an empty nodename\n");
+	if (!address_str) {
+		fprintf(stderr, "Cannot query an empty address.\n");
 		exit(1);
 	}
 
-	struct hostent *result = family ? gethostbyname2(nodename, family) : gethostbyname(nodename);
+	parse_address(address_str, &address, &family, &ifindex);
 
-	if (!result) {
-		printf("errno = %d\n", errno);
-		printf("h_errno = %d\n", h_errno);
+	switch (family) {
+	case AF_INET:
+		if (ifindex) {
+			fprintf(stderr, "No IPv4 ifindex/scope_id support in `gethostbyaddr()`.");
+			exit(1);
+		}
+		memcpy(&sa.sa4.sin_addr, &address, sizeof sa.sa4.sin_addr);
+		sa.sa4.sin_port = port;
+		salen = sizeof sa.sa4;
+		break;
+	case AF_INET6:
+		memcpy(&sa.sa6.sin6_addr, &address, sizeof sa.sa6.sin6_addr);
+		sa.sa6.sin6_scope_id = ifindex;
+		sa.sa6.sin6_port = port;
+		salen = sizeof sa.sa6;
+		break;
+	default:
+		fprintf(stderr, "Cannot parse address.\n");
 		exit(1);
 	}
 
+	sa.sa.sa_family = family;
+
+	int status = getnameinfo(&sa.sa, salen, host, sizeof host, serv, sizeof serv, flags);
+
+	printf("status = %d\n", status);
+	if (status)
+		exit(1);
 	printf("result:\n");
-	print_hostent(result);
+	printf("  host = %s\n", host);
+	printf("  serv = %s\n", serv);
 }
