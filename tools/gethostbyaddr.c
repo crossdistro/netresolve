@@ -32,7 +32,7 @@ main(int argc, char **argv)
 		{ "address", 1, 0, 'a' },
 		{ NULL, 0, 0, 0 }
 	};
-	static const char *opts = "hva:46";
+	static const char *opts = "hva:";
 	int opt, idx = 0;
 	char *address_str = NULL;
 	char address[16];
@@ -46,14 +46,8 @@ main(int argc, char **argv)
 					"-h,--help -- help\n"
 					"-a,--address <address> -- node name\n");
 			exit(EXIT_SUCCESS);
-		case '1':
+		case 'a':
 			address_str = optarg;
-			break;
-		case '4':
-			family = AF_INET;
-			break;
-		case '6':
-			family = AF_INET6;
 			break;
 		default:
 			exit(EXIT_FAILURE);

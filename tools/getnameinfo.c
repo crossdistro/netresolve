@@ -32,6 +32,7 @@ main(int argc, char **argv)
 		{ "help", 0, 0, 'h' },
 		{ "verbose", 0, 0, 'v' },
 		{ "address", 1, 0, 'a' },
+		{ "port", 1, 0, 'p' },
 		{ NULL, 0, 0, 0 }
 	};
 	static const char *opts = "hva:46";
