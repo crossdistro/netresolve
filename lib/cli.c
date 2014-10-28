@@ -136,7 +136,10 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 		Address address;
 		int family, ifindex;
 
-		netresolve_backend_parse_address(address_str, &address, &family, &ifindex);
+		if (!netresolve_backend_parse_address(address_str, &address, &family, &ifindex)) {
+			errno = EINVAL;
+			return NULL;
+		}
 		query = netresolve_query_reverse(channel, family, &address, ifindex, port_str ? strtol(port_str, NULL, 10) : 0);
 	} else
 		query = netresolve_query(channel, node, service);
