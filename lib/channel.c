@@ -143,7 +143,8 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 	case NETRESOLVE_STATE_NONE:
 		free(query->request.dns_name);
 		free(query->response.paths);
-		free(query->response.canonname);
+		free(query->response.nodename);
+		free(query->response.servname);
 		memset(&query->response, 0, sizeof query->response);
 		break;
 	case NETRESOLVE_STATE_SETUP:
@@ -154,8 +155,8 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 					query->channel->callbacks.user_data_fd);
 		break;
 	case NETRESOLVE_STATE_FINISHED:
-		if (!query->response.canonname)
-			query->response.canonname = query->request.nodename ? strdup(query->request.nodename) : strdup("localhost");
+		if (!query->response.nodename)
+			query->response.nodename = query->request.nodename ? strdup(query->request.nodename) : strdup("localhost");
 		if (query->channel->callbacks.on_connect)
 			netresolve_connect_cleanup(query);
 		if (query->channel->callbacks.on_success)
@@ -380,6 +381,7 @@ netresolve_query_reverse(netresolve_t channel, int family, const void *address, 
 
 	query->request.family = family;
 	memcpy(query->request.address, address, size);
+	query->request.port = port;
 
 	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
 

@@ -121,7 +121,7 @@ family_to_length(int family)
 }
 
 static int
-path_cmp(struct netresolve_path *p1, struct netresolve_path *p2)
+path_cmp(const struct netresolve_path *p1, const struct netresolve_path *p2)
 {
 	if (p1->node.family == AF_INET6 && p2->node.family == AF_INET)
 		return -1;
@@ -132,7 +132,7 @@ path_cmp(struct netresolve_path *p1, struct netresolve_path *p2)
 }
 
 static void
-add_path(netresolve_query_t query, struct netresolve_path *path)
+add_path(netresolve_query_t query, const struct netresolve_path *path)
 {
 	struct netresolve_response *response = &query->response;
 	int i;
@@ -158,15 +158,16 @@ struct path_data {
 };
 
 static void
-path_callback(int socktype, int protocol, int port, void *user_data)
+path_callback(const char *name, int socktype, int protocol, int port, void *user_data)
 {
 	struct path_data *data = user_data;
-	struct netresolve_path *path = data->path;
+	struct netresolve_path path = *data->path;
 
-	netresolve_backend_add_path(data->query,
-			path->node.family, path->node.address, path->node.ifindex,
-			socktype, protocol, port,
-			path->priority, path->weight, path->ttl);
+	path.service.socktype = socktype;
+	path.service.protocol = protocol;
+	path.service.port = port;
+
+	add_path(data->query, &path);
 }
 
 void
@@ -211,8 +212,9 @@ netresolve_backend_add_path(netresolve_query_t query,
 	if (query->request.servname && (!socktype || !protocol || !port)) {
 		struct path_data data = { .query = query, .path = &path };
 
-		netresolve_get_service_info(path_callback, &data,
-				request->servname, path.service.socktype, path.service.protocol);
+		netresolve_get_service_info(request->servname,
+				path.service.socktype, path.service.protocol, 0,
+				path_callback, &data);
 		return;
 	}
 
@@ -222,8 +224,32 @@ netresolve_backend_add_path(netresolve_query_t query,
 void
 netresolve_backend_set_canonical_name(netresolve_query_t query, const char *canonical_name)
 {
-	free(query->response.canonname);
-	query->response.canonname = strdup(canonical_name);
+	free(query->response.nodename);
+	query->response.nodename = strdup(canonical_name);
+}
+
+static void
+service_callback(const char *name, int socktype, int protocol, int port, void *user_data)
+{
+	netresolve_query_t query = user_data;
+
+	if (query->response.servname)
+		return;
+
+	query->response.servname = strdup(name);
+}
+
+void
+netresolve_backend_add_name_info(netresolve_query_t query, const char *nodename, const char *servname)
+{
+	if (query->response.nodename)
+		return;
+
+	query->response.nodename = nodename ? strdup(nodename) : NULL;
+
+	if (!query->response.servname)
+		netresolve_get_service_info(NULL, 0, 0, query->request.port,
+				service_callback, query);
 }
 
 void

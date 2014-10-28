@@ -75,6 +75,6 @@ setup_reverse(netresolve_query_t query, char **settings)
 		return;
 	}
 
-	netresolve_backend_set_canonical_name(query, "");
+	netresolve_backend_add_name_info(query, "", NULL);
 	netresolve_backend_finished(query);
 }

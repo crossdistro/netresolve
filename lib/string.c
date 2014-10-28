@@ -191,15 +191,17 @@ netresolve_get_response_string(netresolve_query_t query)
 	char *start = query->buffer;
 	char *end = query->buffer + sizeof query->buffer;
 
-	const char *canonname = netresolve_query_get_canonical_name(query);
+	const char *nodename = netresolve_query_get_node_name(query);
 	size_t npaths = netresolve_query_get_count(query);
 	size_t i;
 
 	bprintf(&start, end, "response %s %s\n", PACKAGE_NAME, VERSION);
 	if (query->response.dns.answer)
 		bprintf(&start, end, "dns %d\n", query->response.dns.length);
-	if (canonname)
-		bprintf(&start, end, "name %s\n", canonname);
+	if (nodename)
+		bprintf(&start, end, "name %s\n", nodename);
+	if (query->response.servname)
+		bprintf(&start, end, "service %s\n", query->response.servname);
 	for (i = 0; i < npaths; i++) {
 		add_path(&start, end, query, i);
 		bprintf(&start, end, "\n");

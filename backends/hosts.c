@@ -180,8 +180,9 @@ setup_reverse(netresolve_query_t query, char **settings)
 	const void *address = netresolve_backend_get_address(query);
 	struct hosts_list list = { 0 };
 	struct hosts_item *item;
+	int count = 0;
 
-	/* TODO: Would be nice to read the hosts once in a thread-safe way and with timestamp checking. */
+	/* FIXME: we need to read the host once and in a thread-safe manner */
 	read_list(&list);
 
 	for (item = list.items; item->name; item++) {
@@ -189,14 +190,14 @@ setup_reverse(netresolve_query_t query, char **settings)
 			continue;
 		if (memcmp(address, &item->address, family_to_length(family)))
 			continue;
-		/* FIXME: we only support one name as a result */
-		netresolve_backend_set_canonical_name(query, item->name);
-		netresolve_backend_finished(query);
-		goto out;
+		count++;
+		netresolve_backend_add_name_info(query, item->name, NULL);
 	}
 
-	netresolve_backend_failed(query);
+	if (count)
+		netresolve_backend_finished(query);
+	else
+		netresolve_backend_failed(query);
 
-out:
 	free(list.items);
 }

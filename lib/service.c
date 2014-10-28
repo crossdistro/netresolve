@@ -29,17 +29,17 @@
 #include <fcntl.h>
 #include <arpa/inet.h>
 
-typedef struct {
+struct netresolve_protocol {
 	int socktype;
 	int protocol;
 	bool defaultpair;
 	const char *name;
-} Protocol;
+};
 
 /* Order of socktype/protocol pairs is the same as in glibc's getaddrinfo()
  * implementation.
  */
-static const Protocol protocols[] = {
+static const struct netresolve_protocol protocols[] = {
 	{ SOCK_STREAM, IPPROTO_TCP, true, "tcp" },
 	{ SOCK_DGRAM, IPPROTO_UDP, true, "udp" },
 	{ SOCK_DCCP, IPPROTO_DCCP, false, "dccp" },
@@ -49,19 +49,19 @@ static const Protocol protocols[] = {
 	{ 0, 0, false, "" }
 };
 
-typedef struct {
+struct netresolve_service {
 	int protocol;
 	int port;
 	const char *name;
-} Service;
+};
 
-static Service *services = NULL;
+static struct netresolve_service *services = NULL;
 static int servicecount = 0, servicereservedcount = 0;
 
 static int
 protocol_from_string(const char *str)
 {
-	const Protocol *protocol;
+	const struct netresolve_protocol *protocol;
 
 	if (!str)
 		return 0;
@@ -74,7 +74,7 @@ protocol_from_string(const char *str)
 static void
 add_service(int protocol, int port, const char *name)
 {
-	Service service;
+	struct netresolve_service service;
 
 	memset(&service, 0, sizeof service);
 	service.protocol = protocol;
@@ -162,10 +162,10 @@ out:
 }
 
 static void
-found_port(void (*callback)(int, int, int, void *), void *user_data,
-		int socktype, int proto, int portnum)
+found_port(const char *name, int socktype, int proto, int port,
+		netresolve_service_callback callback, void *user_data)
 {
-	const Protocol *protocol;
+	const struct netresolve_protocol *protocol;
 
 	for (protocol = protocols; protocol->protocol; protocol++) {
 		if (socktype && socktype != protocol->socktype)
@@ -174,32 +174,45 @@ found_port(void (*callback)(int, int, int, void *), void *user_data,
 			continue;
 		if ((!socktype || !proto) && !protocol->defaultpair)
 			continue;
-		callback(protocol->socktype, protocol->protocol, portnum, user_data);
+		callback(name, protocol->socktype, protocol->protocol, port, user_data);
 	}
 }
 
 void
-netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,
-		const char *request_service, int socktype, int protocol)
+netresolve_get_service_info(const char *name, int socktype, int protocol, int port,
+		netresolve_service_callback callback, void *user_data)
 {
-	int port = 0;
-	const Service *service;
-	char *endptr;
+	const struct netresolve_service *service;
+	int count = 0;
 
-	port = strtol(request_service, &endptr, 10);
-	if (!*endptr)
-		found_port(callback, user_data, socktype, protocol, port);
-	else {
-		if (!services)
-			read_services();
-		for (service = services; service->name; service++) {
-			if (protocol && protocol != service->protocol)
-				continue;
-			if (port && port != service->port)
-				continue;
-			if (!port && request_service && strcmp(request_service, service->name))
-				continue;
-			found_port(callback, user_data, socktype, service->protocol, service->port);
+	if (name && !port) {
+		char *endptr;
+
+		port = strtol(name, &endptr, 10);
+		if (!*endptr) {
+			found_port(name, socktype, protocol, port, callback, user_data);
+			return;
 		}
+	}
+
+	if (!services)
+		read_services();
+
+	for (service = services; service->name; service++) {
+		if (name && strcmp(name, service->name))
+			continue;
+		if (protocol && protocol != service->protocol)
+			continue;
+		if ((port || !name) && port != service->port)
+			continue;
+		count++;
+		found_port(service->name, socktype, service->protocol, service->port, callback, user_data);
+	}
+
+	if (!count) {
+		char buffer[128] = { 0 };
+
+		snprintf(buffer, sizeof buffer, "%d", (int) port);
+		found_port(buffer, socktype, protocol, port, callback, user_data);
 	}
 }

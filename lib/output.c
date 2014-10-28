@@ -81,9 +81,15 @@ netresolve_query_get_aux_info(netresolve_query_t query, size_t idx,
 }
 
 const char *
-netresolve_query_get_canonical_name(const netresolve_query_t query)
+netresolve_query_get_node_name(const netresolve_query_t query)
 {
-	return query->response.canonname;
+	return query->response.nodename;
+}
+
+const char *
+netresolve_query_get_service_name(const netresolve_query_t query)
+{
+	return query->response.servname;
 }
 
 const struct sockaddr *

@@ -71,7 +71,8 @@ void netresolve_query_set_user_data(netresolve_query_t query, void *user_data);
 /* Output */
 void *netresolve_query_get_user_data(netresolve_query_t query);
 size_t netresolve_query_get_count(const netresolve_query_t query);
-const char *netresolve_query_get_canonical_name(const netresolve_query_t query);
+const char *netresolve_query_get_node_name(const netresolve_query_t query);
+const char *netresolve_query_get_service_name(const netresolve_query_t query);
 
 /* Output: Forward query */
 void netresolve_query_get_address_info(const netresolve_query_t query, size_t idx,

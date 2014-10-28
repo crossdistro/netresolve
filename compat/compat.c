@@ -57,7 +57,7 @@ int
 netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **res, int32_t *ttlp)
 {
 	size_t npaths = netresolve_query_get_count(query);
-	const char *canonname = netresolve_query_get_canonical_name(query);
+	const char *canonname = netresolve_query_get_node_name(query);
 	struct addrinfo head = {0};
 	struct addrinfo *ai = &head;
 	int i;
@@ -133,7 +133,7 @@ struct hostent *
 netresolve_query_gethostbyname_done(netresolve_query_t query, int *errnop, int *h_errnop, int32_t *ttlp)
 {
 	size_t npaths = netresolve_query_get_count(query);
-	const char *canonname = netresolve_query_get_canonical_name(query);
+	const char *canonname = netresolve_query_get_node_name(query);
 	struct hostent *he = NULL;
 	int idx;
 	int n = 0;

@@ -110,6 +110,7 @@ struct netresolve_channel {
 		const char *servname;
 		int socktype;
 		int protocol;
+		int port;
 		/* Advanced configuration */
 		bool default_loopback;
 		bool dns_srv_lookup;
@@ -144,7 +145,8 @@ struct netresolve_query {
 	struct netresolve_response {
 		struct netresolve_path *paths;
 		size_t pathcount;
-		char *canonname;
+		char *nodename;
+		char *servname;
 		struct {
 			void *answer;
 			size_t length;
@@ -174,8 +176,9 @@ void netresolve_connect_start(netresolve_query_t query);
 bool netresolve_connect_dispatch(netresolve_query_t query, int fd, int events);
 void netresolve_connect_cleanup(netresolve_query_t query);
 
-void netresolve_get_service_info(void (*callback)(int, int, int, void *), void *user_data,
-		const char *request_service, int socktype, int protocol);
+typedef void (*netresolve_service_callback)(const char *name, int socktype, int protocol, int port, void *user_data);
+void netresolve_get_service_info(const char *name, int socktype, int protocol, int port,
+		netresolve_service_callback callback, void *user_data);
 
 int netresolve_family_from_string(const char *str);
 int netresolve_socktype_from_string(const char *str);

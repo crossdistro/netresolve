@@ -43,7 +43,7 @@ libnetresolve_la_SOURCES = \
 	lib/output.c \
 	lib/logging.c \
 	lib/backend.c \
-	lib/services.c \
+	lib/service.c \
 	lib/socket.c \
 	lib/utils.c \
 	lib/string.c \

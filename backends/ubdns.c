@@ -99,7 +99,7 @@ callback(void *arg, int status, struct ub_result* result)
 			break;
 		}
 		char *result = ldns_rdf2str(pkt->_answer->_rrs[0]->_rdata_fields[0]);
-		netresolve_backend_set_canonical_name(query, result);
+		netresolve_backend_add_name_info(query, result, NULL);
 		free(result);
 		netresolve_backend_finished(query);
 		break;
