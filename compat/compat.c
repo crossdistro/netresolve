@@ -21,9 +21,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <netresolve-compat.h>
 #include <stdlib.h>
 #include <string.h>
+
+/* FIXME: Would be nicer to only require `netresolve-compat.h`. */
+#include <netresolve-private.h>
 
 /* netresolve_query_getaddrinfo:
  *
@@ -98,17 +100,40 @@ netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **re
 	return *res ? 0 : EAI_NODATA;
 }
 
-void
-netresolve_query_getaddrinfo_free(struct addrinfo *ai)
+netresolve_query_t
+netresolve_query_getnameinfo(netresolve_t channel, const struct sockaddr *sa, socklen_t salen, int flags)
 {
-	struct addrinfo *tmp;
+	struct sockaddr_in *sa4 = (void *) sa;
+	struct sockaddr_in6 *sa6 = (void *) sa;
 
-	while (ai) {
-		tmp = ai;
-		ai = ai->ai_next;
-		free(tmp->ai_canonname);
-		free(tmp);
+	switch (sa->sa_family) {
+	case AF_INET:
+		if (salen != sizeof *sa4)
+			return NULL;
+		return netresolve_query_reverse(channel, sa4->sin_family, &sa4->sin_addr, 0, ntohs(sa4->sin_port));
+	case AF_INET6:
+		if (salen != sizeof *sa6)
+			return NULL;
+		return netresolve_query_reverse(channel, sa6->sin6_family, &sa6->sin6_addr, sa6->sin6_scope_id, ntohs(sa6->sin6_port));
+	default:
+		return NULL;
 	}
+}
+
+int
+netresolve_query_getnameinfo_done(netresolve_query_t query, char **node, char **service, int32_t *ttl)
+{
+	const char *mynode = netresolve_query_get_node_name(query);
+	const char *myservice = netresolve_query_get_service_name(query);
+
+	if (node)
+		*node = mynode ? strdup(mynode) : NULL;
+	if (service)
+		*service = myservice ? strdup(myservice) : NULL;
+
+	netresolve_query_done(query);
+
+	return 0;
 }
 
 /* netresolve_query_gethostbyname:
@@ -129,19 +154,14 @@ netresolve_query_gethostbyname(netresolve_t channel, const char *name, int famil
 	return netresolve_query(channel, name, NULL);
 }
 
-struct hostent *
-netresolve_query_gethostbyname_done(netresolve_query_t query, int *errnop, int *h_errnop, int32_t *ttlp)
+static struct hostent *
+get_hostent(netresolve_query_t query, int *h_errnop, int32_t *ttlp)
 {
 	size_t npaths = netresolve_query_get_count(query);
 	const char *canonname = netresolve_query_get_node_name(query);
 	struct hostent *he = NULL;
 	int idx;
 	int n = 0;
-
-	if (!npaths) {
-		*h_errnop = HOST_NOT_FOUND;
-		goto out;
-	}
 
 	if (!(he = calloc(1, sizeof *he))) {
 		*h_errnop = NO_RECOVERY;
@@ -192,8 +212,63 @@ out:
 	return he;
 }
 
+struct hostent *
+netresolve_query_gethostbyname_done(netresolve_query_t query, int *h_errnop, int32_t *ttlp)
+{
+	size_t npaths = netresolve_query_get_count(query);
+
+	if (!npaths) {
+		*h_errnop = HOST_NOT_FOUND;
+		return NULL;
+	}
+
+	return get_hostent(query, h_errnop, ttlp);
+}
+
+netresolve_query_t
+netresolve_query_gethostbyaddr(netresolve_t channel, const void *address, int length, int family)
+{
+	switch (family) {
+	case AF_INET:
+		if (length != 4)
+			return NULL;
+		break;
+	case AF_INET6:
+		if (length != 16)
+			return NULL;
+	default:
+		return NULL;
+	}
+
+	netresolve_query_t query = netresolve_query_reverse(channel, family, address, 0, 0);
+
+	if (query)
+		netresolve_backend_add_path(query, family, address, 0, 0, 0, 0, 0, 0, 0);
+
+	return query;
+}
+
+struct hostent *
+netresolve_query_gethostbyaddr_done(netresolve_query_t query, int *h_errnop, int32_t *ttlp)
+{
+	return get_hostent(query, h_errnop, ttlp);
+}
+
 void
-netresolve_query_gethostbyname_free(struct hostent *he)
+netresolve_freeaddrinfo(struct addrinfo *ai)
+{
+	struct addrinfo *tmp;
+
+	while (ai) {
+		tmp = ai;
+		ai = ai->ai_next;
+		free(tmp->ai_canonname);
+		free(tmp);
+	}
+}
+
+void
+netresolve_freehostent(struct hostent *he)
 {
 	char **p;
 

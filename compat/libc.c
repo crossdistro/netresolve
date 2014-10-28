@@ -25,10 +25,11 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <resolv.h>
 
 /* getaddrinfo:
  *
- * Resolve `nodename` and `servname` using `hints` into a linked list of
+ * Translate `nodename` and `servname` using `hints` into a linked list of
  * address records including both L3 and L4 information. Canonical name,
  * if requested, is present in the first address record.
  *
@@ -64,7 +65,55 @@ getaddrinfo(const char *nodename, const char *servname,
 void
 freeaddrinfo(struct addrinfo *result)
 {
-	netresolve_query_getaddrinfo_free(result);
+	netresolve_freeaddrinfo(result);
+}
+
+/* getnameinfo:
+ *
+ * Translate the `sa` into `host` and `serv`. The caller supplies buffers to
+ * store the result.
+ *
+ * Defined in POSIX.1-2008.
+ */
+int getnameinfo(const struct sockaddr *sa, socklen_t salen,
+		char *host, socklen_t hostlen,
+		char *serv, socklen_t servlen,
+		int flags)
+{
+	netresolve_t channel;
+	netresolve_query_t query;
+	int status = EAI_SYSTEM;
+	char *myhost = NULL;
+	char *myserv = NULL;
+	int myhostlen, myservlen;
+
+	if (!(channel = netresolve_open()))
+		return status;
+
+	if ((query = netresolve_query_getnameinfo(channel, sa, salen, flags)))
+		status = netresolve_query_getnameinfo_done(query, &myhost, &myserv, NULL);
+
+	if (!status) {
+		myhostlen = myhost ? strlen(myhost) + 1 : 0;
+		myservlen = myserv ? strlen(myserv) + 1 : 0;
+		if ((host && myhostlen > hostlen) || (serv && myservlen > servlen)) {
+			status = EAI_OVERFLOW;
+			goto out;
+		}
+		if (host) {
+			memset(host, 0, hostlen);
+			if (myhost)
+				memcpy(host, myhost, myhostlen);
+		}
+		if (serv)
+			memset(serv, 0, servlen);
+			if (myserv)
+				memcpy(serv, myserv, myservlen);
+	}
+
+out:
+	netresolve_close(channel);
+	return status;
 }
 
 /* gethostbyname2:
@@ -94,8 +143,8 @@ gethostbyname2(const char *node, int family)
 		return NULL;
 
 	if ((query = netresolve_query_gethostbyname(channel, node, family))) {
-		netresolve_query_gethostbyname_free(he);
-		he = netresolve_query_gethostbyname_done(query, &errno, &h_errno, NULL);
+		netresolve_freehostent(he);
+		he = netresolve_query_gethostbyname_done(query, &h_errno, NULL);
 	}
 
 	netresolve_close(channel);
@@ -129,6 +178,27 @@ gethostbyname(const char *node)
 	return gethostbyname2(node, GETHOSTBYNAME_FAMILY);
 }
 
+struct hostent *
+gethostbyaddr(const void *addr, socklen_t len, int type)
+{
+	static struct hostent *he = NULL;
+
+	netresolve_t channel;
+	netresolve_query_t query;
+
+	if (!(channel = netresolve_open()))
+		return NULL;
+
+	if ((query = netresolve_query_gethostbyaddr(channel, addr, len, type))) {
+		netresolve_freehostent(he);
+		he = netresolve_query_gethostbyaddr_done(query, &h_errno, NULL);
+	}
+
+	netresolve_close(channel);
+	return he;
+}
+
+
 /* gethostbyname2_r:
  *
  * Reentrant version of `gethostbyname2()`, see notes for `gethostbyname()`.
@@ -141,7 +211,6 @@ gethostbyname2_r(const char *name, int family,
 	netresolve_t channel;
 	netresolve_query_t query;
 	struct hostent *tmp;
-	int lerrno;
 
 	if (!(channel = netresolve_open())) {
 		*result = NULL;
@@ -154,7 +223,7 @@ gethostbyname2_r(const char *name, int family,
 		return errno;
 	}
 
-	tmp = netresolve_query_gethostbyname_done(query, &lerrno, h_errnop, NULL);
+	tmp = netresolve_query_gethostbyname_done(query, h_errnop, NULL);
 
 	size_t len_name = tmp->h_name ? strlen(tmp->h_name) + 1 : 0;
 	size_t count = 0;
@@ -187,7 +256,7 @@ gethostbyname2_r(const char *name, int family,
 		memcpy(he->h_addr_list[i], tmp->h_addr_list[i], he->h_length);
 	}
 
-	netresolve_query_gethostbyname_free(tmp);
+	netresolve_freehostent(tmp);
 	netresolve_close(channel);
 
 	*result = he;
@@ -205,4 +274,42 @@ gethostbyname_r(const char *name,
 		struct hostent **result, int *h_errnop)
 {
 	return gethostbyname2_r(name, GETHOSTBYNAME_FAMILY, he, buffer, buflen, result, h_errnop);
+}
+
+static int
+_res_query(const char *dname, int class, int type, bool search, unsigned char *answer, int length)
+{
+	netresolve_t channel;
+	netresolve_query_t query;
+	const char *myanswer;
+	size_t mylength = -1;
+
+	if (!(channel = netresolve_open()))
+		return mylength;
+
+	if ((query = netresolve_query_dns(channel, dname, class, type))) {
+		myanswer = netresolve_query_get_dns_answer(query, &mylength);
+
+		if (mylength > length)
+			goto out;
+
+		memcpy(answer, myanswer, mylength);
+	}
+
+out:
+	netresolve_query_done(query);
+	netresolve_close(channel);
+	return mylength;
+}
+
+int
+res_query(const char *dname, int class, int type, unsigned char *answer, int anslen)
+{
+	return _res_query(dname, class, type, false, answer, anslen);
+}
+
+int
+res_search(const char *dname, int class, int type, unsigned char *answer, int anslen)
+{
+	return _res_query(dname, class, type, true, answer, anslen);
 }

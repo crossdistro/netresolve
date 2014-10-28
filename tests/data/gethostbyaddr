@@ -1,0 +1,10 @@
+query:
+  address = 127.0.0.1
+result:
+  name = localhost
+  aliases:
+  addrtype = 2
+  length = 4
+  address = 7f000001
+  addresses:
+    #0 = 7f000001
