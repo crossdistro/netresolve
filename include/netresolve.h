@@ -82,11 +82,8 @@ void netresolve_query_get_port_info(const netresolve_query_t query, size_t idx,
 void netresolve_query_get_aux_info(const netresolve_query_t query, size_t idx,
 		int *priority, int *weight, int *ttl);
 
-/* Output: Reverse query */
-char *netresolve_query_get_name(const netresolve_query_t query);
-
 /* Output: DNS query */
-void *netresolve_query_get_dns_answer(const netresolve_query_t query, size_t *sizettl);
+const void *netresolve_query_get_dns_answer(const netresolve_query_t query, size_t *size);
 
 /* BSD socket API compatibility */
 const struct sockaddr *netresolve_query_get_sockaddr(const netresolve_query_t query, size_t idx,

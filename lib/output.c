@@ -131,3 +131,11 @@ netresolve_query_get_sockaddr(netresolve_query_t query, size_t idx,
 	return &query->sa_buffer.sa;
 }
 
+const void *
+netresolve_query_get_dns_answer(const netresolve_query_t query, size_t *size)
+{
+	if (size)
+		*size = query->response.dns.length;
+
+	return &query->response.dns.answer;
+}
