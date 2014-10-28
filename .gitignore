@@ -14,14 +14,24 @@ Makefile
 Makefile.in
 stamp-h1
 
-/netresolve
+/getaddrinfo
+/gethostbyaddr
+/gethostbyname
+/getnameinfo
 /netconnect
+/netresolve
+/res_query
 /test-async
+/test-asyncns
 /test-bind-connect
 /test-getaddrinfo
 /test-gethostbyname
+/test-gethostbyname2
+/test-gethostbyname2_r
+/test-gethostbyname_r
 /test-libevent
 /test-sync
+/tools/wrapresolve
 
 /netresolve-*.*.*
 
