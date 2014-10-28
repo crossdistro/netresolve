@@ -400,6 +400,8 @@ netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type)
 	query->request.dns_class = cls;
 	query->request.dns_type = type;
 
+	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
+
 	return netresolve_query_run(query);
 }
 
