@@ -5,7 +5,6 @@
  * Improve path ordering
     - use rules from http://tools.ietf.org/html/rfc6724
     - use /etc/gai.conf
-    - handle :: and 0.0.0.0 queries gracefully
  * Improve socket API and happy eyeballs
     - support TCP application layer happy eyeballs
     - support UDP happy eyeballs
@@ -14,14 +13,13 @@
     - what about any, localhost or numeric addresses
  * Consider using -fvisibility=hidden
  * Consider using a separete libnetresolve-backend.so
- * Allow backend setting at any time or at least check whether they can be changed
+ * Allow backend list setting at any time or at least check whether they can be changed
  * Make /etc/services reading thread safe
  * Read a configuration file in addition to environment variables
 
 ## Tools, wrappers and tests
 
- * Extend `libnetresolve-libc.so` with more functions
-    - `getnameinfo()`, `gethostbyaddr()` (POSIX)
+ * Consider extending `libnetresolve-libc.so` with more functions
     - `getaddrinfo_a()`, `gai_suspend()`, `gai_error()` and `gai_cancel()` (glibc specific)
  * Implement wrappers over netresolve for notable event loops or event connectors
     - GLib main loop
@@ -48,7 +46,8 @@
     - `ai_addrconfig`-like functionality
  * Implement a nonblocking multicast DNS backend
  * Improve `nss` backend
-    - support non-gethostbyname functions
+    - support reverse queries
+    - consider supporting hostent listing
  * Improve `exec` backend
     - make sure it send all request attributes and accepts all response attributes
     - add tests

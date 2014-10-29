@@ -88,8 +88,16 @@ Now you can use the channel to perform your queries.
 
     netresolve_query_t query = netresolve_query(channel, "www.sourceware.org", "http");
 
-In blocking mode, you can pick up the result immediately or via the success callback. In nonblocking mode, it's more practical to use the callback so that you can catch successfully finished queries as the go.
+In nonblocking mode it is useful to associate a context object with the query. Nonblocking mode guarantees that the success callback will not be run until the first `netresolve_dispatch_fd()` called after issuing the query.
 
+    struct your_private_type context;
+
+    netresolve_query_set_user_data(query, &context);
+
+In blocking mode (i.e. when you didn't set the file descriptor callback), you can pick up the result immediately. In nonblocking mode, it's usually more practical to pick up the result
+inside the success callback, where it's often also handy to retrieve the context object.
+
+    struct your_private_type *context = netresolve_query_get_user_data(query); 
     size_t count = netresolve_query_get_count(query);
 
     for (size_t idx = 0; idx < count; idx++) {
@@ -110,9 +118,13 @@ In blocking mode, you can pick up the result immediately or via the success call
         /* do something with the data */
     }
 
+In nonblocking mode, you can issue multiple queries and netresolve will pass back one or more file descriptors using the file descriptor callback. Your program or library needs to implement a file descriptor watch list where you add any file descriptors with events associated, or remove file descriptors when no events are specified. In order to finish the queries, you need to check those file descriptors for the requested events and pass the events back to the respective netresolve channel.
+
+    netresolve_dispatch_fd(channel, fd, events);
+
 When you're done with query object, you need to free it.
 
-    netresolve_query_free(query);
+    netresolve_query_done(query);
 
 The same applies to the channel object.
 
@@ -123,7 +135,7 @@ Examples of blocking and nonblocking use can be found in `tests/test-sync.c` and
 Known issues:
 
  * The current implementation requires additional features like epoll and timerfd and is thus limited to Linux.
- * Error reporting is virtually absent.
+ * Error reporting is currently insufficient.
 
 Thread safety notes:
 
@@ -142,25 +154,21 @@ An alternative querying function lets you use input arguments as with `getaddrin
     struct addrinfo hints = { .ai_family = AF_UNSPEC, .ai_socktype = 0, .ai_protocol = IPPROTO_TCP, .ai_flags = 0 };
     netresolve_query_t query = netresolve_query_addrinfo(channel, "www.sourceware.org", "http", &hints);
 
-And an alternative result function lets you use output arguments as with `getaddrinfo()`.
+And an alternative result function lets you use output arguments as with `getaddrinfo()` and destroys the query object for your convenience.
 
-    struct addrinfo *list;
+    struct addrinfo *result;
     uint32_t ttl;
     int status = netresolve_query_addrinfo_done(query, &list, &ttl);
 
-When you free the query object, you still have the result list allocated.
-
-    netresolve_query_free(query);
-
 When you don't need the result object any more, free it.
 
-    netresolve_query_getaddrinfo_free(list);
+    netresolve_freeaddrinfo(result);
 
 An alternative `getaddrinfo()` implementation using netresolve in `compat/libc.c` serves as an example of how to use this compatibility API.
 
 ## GNU libc nsswitch backend
 
-A backend for glibc nsswitch is provided as `libnss_netresolve.so` that exposes part of netresolve funcionality via the glibc name resolution API. The backend also supports `_nss_*_getaddrinfo()` API proposed by Alexandre Oliva.
+A backend for glibc nsswitch is provided as `libnss_netresolve.so` that exposes part of netresolve funcionality via the glibc name resolution API. The backend also supports a variant of `_nss_*_getaddrinfo()` API proposed by Alexandre Oliva.
 
 ## POSIX/GNU libc API replacement
 
@@ -169,7 +177,10 @@ If your program doesn't need the full power of the provided API but you still wa
 Supported functions:
 
  * `getaddrinfo()`
- * `gethostbyname()`
+ * `getnameinfo()`
+ * `gethostbyname()`, `gethostbyname_r()`
+ * `gethostbyname2()`, `gethostbyname2_r()`
+ * `gethostbyaddr()`
 
 You can use the `wrapresolve` command to start a program with `LD_PRELOAD` configured so that your program uses netresolve functions instead of libc.
 
@@ -181,13 +192,15 @@ You can tweak netresolve configuration via environment variables, or you can use
 
     wrapresolve -6 curl http://www.nix.cz/
 
+The netresolve package also provides a couple of testing tools for the above libc functions that can be used to test both libc and the replacement functions.
+
+    getaddrinfo --node localhost --service http
+
+    wrapresolve getaddrinfo --node localhost --service http
+
 ## Socket API
 
 Support for `socket()`, `bind()` and `connect()` is included. The only thing the application has to do is to register either `on_bind()` or `on_connect()` callback. The resolver is configured with flags suitable for the respective operation. When name resolution is finished, `on_bind()` callback is called for each successfully bound address. The `on_connect()` callback is called once, for the first successfully connected address.
-
-## Tools
-
-The `libnetresolve-libc.so` library together with the `tools/wrapper.sh` script can be used to test any programs calling `getaddrinfo()` and similar.
 
 ## Backends
 
@@ -239,10 +252,7 @@ You can use the nss plugin to test systemd-resolved via `libnss_resolve.so`.
 
     netresolve --backends nss:resolve --node localhost
 
-We have experimental support for new nsswitch API based on `getaddrinfo()`
-proposed by Alexandre Oliva. This proposed API would consolidate the nsswitch
-APIs and overcome some of the limitations describe at the beginning of this
-document.
+We have experimental support for new nsswitch API based on a variant of `getaddrinfo()` proposed by Alexandre Oliva. This proposed API would consolidate the nsswitch APIs and overcome some of the limitations describe at the beginning of this document.
 
 ### Auxiliary backends
 
@@ -257,15 +267,39 @@ That one can be used for interactive testing as well:
 
     netresolve --backends exec:socat:-:/dev/tty --node www.example.com
 
+Note: This backend is untested and maybe not even functional.
+
 ## Writing a custom backend
 
-When a name resolution request is ready, netresolve calls `setup(resolver, settings)`. Backend's `setup()` implementation then has to do one of the following:
+When a name resolution request is ready, netresolve calls one of the setup functions depending on the query type. If any of the setup functions is missing, netresolve assumes that the backend doesn't support the respective query type at all.
 
-1. Add any data items using `netresolve_backend_add_*()` functions and call `netresolve_backend_finished()` to signal that the name resolution has finished and we don't need to run any other backends.
+    setup_forward(channel, settings);
+
+    setup_reverse(channel, settings);
+
+    setup_dns(channel, settings);
+
+The setup function initializes the query using input data from `netresolve_backend_get_*()` functions. It creates a state object using `netresolve_backend_new_priv()` (if necessary) to share its data with the other backend API functions. Finally it does one of the following:
+
+1. Add any data items using `netresolve_backend_add_*()` functions and call `netresolve_backend_finished()` to signal immediate success.
+2. Call `netresolve_backend_failed()` to signal immediate failure.
+3. Add one or more watchers using `netresolve_backend_watch_fd()` and `netresolve_backend_watch_timeout()`.
+
+In the third case, a dispath function is called by netresolve. It is not needed in the other two cases.
+
+    dispatch(channel, settings);
+
+The dispatch function retrieves the state object using `netresolve_backend_get_priv()`. Then it does one of the following:
+
+1. Add any data items and call `netresolve_backend_finished()` to signal success.
 2. Call `netresolve_backend_failed()` to signal failure.
-3. Add one or more file descriptors or timers using `netresolve_backend_watch_fd()` and `netresolve_backend_watch_timeout()`. In that case, the backend must also provide the `dispatch()` function so that the transaction can continue.
+3. Leaves one or more watchers active.
 
-Input data is gathered using `netresolve_backend_get_*()` functions. Internal state accross `setup()` and `dispatch()` calls can be kept using `netresolve_backend_new_priv()` and `netresolve_backend_get_data()`. The backend should provide `cleanup()` function to clean up any resources. It's called by netresolve upon success/failure or when the transaction was cancelled by the application.
+When success or failure was reported by the plugin, or when the query has been cancelled, the cleanup function is called.
+
+    cleanup(channel, settings);
+
+The cleanup function also retrieves the state object, removes remaining watchers using `netresolve_backend_watch_fd()` and/or `netresolve_backend_remove_timeout()`, closes open file descriptors, returns allocated memory (except the context object itself which is freed by netresolve itself).
 
 ## Known bugs
 
