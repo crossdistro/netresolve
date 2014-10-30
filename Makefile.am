@@ -47,12 +47,10 @@ libnetresolve_la_SOURCES = \
 	lib/service.c \
 	lib/socket.c \
 	lib/utils.c \
-	lib/string.c \
-	lib/cli.c
+	lib/string.c
 libnetresolve_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
-	-export-symbols-regex '^netresolve_' \
-	-lldns
+	-export-symbols-regex '^netresolve_'
 
 libnetresolve_libc_la_SOURCES = \
 	compat/netresolve-compat.h \
@@ -110,11 +108,13 @@ libnetresolve_backend_exec_la_SOURCES = backends/exec.c
 bin_PROGRAMS = netresolve netconnect getaddrinfo getnameinfo gethostbyname gethostbyaddr res_query
 bin_SCRIPTS = tools/wrapresolve
 
-netresolve_SOURCES = tools/netresolve.c
+netresolve_SOURCES = tools/netresolve.c tools/common.c
 netresolve_LDADD = libnetresolve.la
+netresolve_LDFLAGS = $(AM_LDFLAGS) -lldns
 
-netconnect_SOURCES = tools/netconnect.c
+netconnect_SOURCES = tools/netconnect.c tools/common.c
 netconnect_LDADD = libnetresolve.la
+netconnect_LDFLAGS = $(AM_LDFLAGS) -lldns
 
 getaddrinfo_SOURCES = tools/getaddrinfo.c tools/compat.c
 
