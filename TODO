@@ -2,29 +2,32 @@
 
 ## Core library
 
+ * Add DNSSEC validation information
+    - what about non-DNS protocols?
+    - what about any, localhost or numeric addresses
  * Improve path ordering
     - use rules from http://tools.ietf.org/html/rfc6724
     - use /etc/gai.conf
  * Improve socket API and happy eyeballs
     - support TCP application layer happy eyeballs
     - support UDP happy eyeballs
- * Add DNSSEC validation information
-    - what about non-DNS protocols?
-    - what about any, localhost or numeric addresses
+ * Allow backend list setting at any time or at least check whether they can be changed
+ * Read a configuration file in `/etc/netresolve` in addition to environment variables
  * Consider using -fvisibility=hidden
  * Consider using a separete libnetresolve-backend.so
- * Allow backend list setting at any time or at least check whether they can be changed
- * Read a configuration file in addition to environment variables
 
-## Tools, wrappers and tests
+## Frontends, integration and testing
 
- * Consider extending `libnetresolve-libc.so` with more functions
+ * Extend the libc API frontend
     - `getaddrinfo_a()`, `gai_suspend()`, `gai_error()` and `gai_cancel()` (glibc specific)
- * Implement wrappers over netresolve for notable event loops or event connectors
+ * Implement more frontends
+    - the getdns API frontend
+ * Integrate with event loops/connectors
     - GLib main loop
     - libevent
     - libverto
     - Python PEP 3156
+    - libsystemd
     - and more...
  * Build a fake ares/libunbound library to support DNS testing
  * A comprehensive dualstack test plan
@@ -39,23 +42,26 @@
 
 ## Backends
 
+ * Improve `getaddrinfo` backend
+    - rename to `posix` or `libc`
+    - support reverse queries
+    - support DNS queries
+ * Improve `nss` backend
+    - support reverse queries
+    - consider supporting hostent listing
  * Improve the DNS backends (mainly libunbound)
     - consider domain search support
     - validation information
     - `ai_addrconfig`-like functionality
- * Implement a nonblocking multicast DNS backend
- * Improve `nss` backend
-    - support reverse queries
-    - consider supporting hostent listing
- * Improve `exec` backend
-    - make sure it send all request attributes and accepts all response attributes
-    - add tests
- * Implement `hostname` backend
- * Provide more backends
-    - POSIX resolver routines
-    - asyncns
-    - getdns
-    - multicast DNS
+ * Fix `exec` backend
+    - it hasn't been tested recently
+    - fix the code, extend the format
+    - add automated tests
+ * Implement more backends
+    - nonblocking systemd-resolved based backend (blocking mode available via nss-resolve)
+    - standalone nonblocking multicast DNS backend
+    - standalone nonblocking LLMNR backend
+    - the getdns API backend
 
 ## Portability
 

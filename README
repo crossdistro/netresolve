@@ -59,6 +59,10 @@ Reverse query:
 
     netresolve --address 2001:503:ba3e::2:30
 
+    netresolve --port 80
+
+    netresolve --address 192.228.79.201 --port 80
+
 DNS style query:
 
     netresolve --type srv --node _xmpp-client._tcp._jabber.com
@@ -68,6 +72,8 @@ DNS style query:
 ## Library API
 
 Program or library using netresolve has to allocate a netresolve channel (or context) which is then used to perform all the queries. You may want to create multiple channels to have different configurations prepared for use.
+
+    #include <netresolve.h>
 
     netresolve_t channel = netresolve_open();
 
@@ -111,9 +117,9 @@ inside the success callback, where it's often also handy to retrieve the context
         int weight;
         uint32_t ttl;
 
-        netresolve_query_get_node_info(query, 0, &family, &address, &ifindex);
-        netresolve_query_get_service_info(query, 0, &family, &address, &ifindex);
-        netresolve_query_get_aux_info(query, 0, &family, &address, &ifindex);
+        netresolve_query_get_node_info(query, idx, &family, &address, &ifindex);
+        netresolve_query_get_service_info(query, idx, &family, &address, &ifindex);
+        netresolve_query_get_aux_info(query, idx, &family, &address, &ifindex);
 
         /* do something with the data */
     }
@@ -149,12 +155,14 @@ The current implementation only registers *one* file descriptor with the applica
 
 You can use a compatibility API most resembling the POSIX one but still allowing for nonblocking mode. The channel object must be created as usual and you can also tweak its configuration and set up nonblocking mode and callbacks.
 
-An alternative querying function lets you use input arguments as with `getaddrinfo()`.
+    #include <netresolve-compat.h>
+
+A special query constructor lets you use input arguments as with `getaddrinfo()`.
 
     struct addrinfo hints = { .ai_family = AF_UNSPEC, .ai_socktype = 0, .ai_protocol = IPPROTO_TCP, .ai_flags = 0 };
     netresolve_query_t query = netresolve_query_addrinfo(channel, "www.sourceware.org", "http", &hints);
 
-And an alternative result function lets you use output arguments as with `getaddrinfo()` and destroys the query object for your convenience.
+A special query result getter lets you use output arguments as with `getaddrinfo()` and destroys the query object for your convenience.
 
     struct addrinfo *result;
     uint32_t ttl;
@@ -197,6 +205,10 @@ The netresolve package also provides a couple of testing tools for the above lib
     getaddrinfo --node localhost --service http
 
     wrapresolve getaddrinfo --node localhost --service http
+
+## libasyncns API replacement
+
+The `wrapresolve` command also pulls in `libnetresolve-asyncns.so` which implements libasyncns API using netresolve.
 
 ## Socket API
 
