@@ -133,12 +133,6 @@ netresolve_set_backend_string(netresolve_t channel, const char *string)
 }
 
 void
-netresolve_query_set_user_data(netresolve_query_t query, void *user_data)
-{
-	query->user_data = user_data;
-}
-
-void
 netresolve_set_default_loopback(netresolve_t channel, bool value)
 {
 	channel->request.default_loopback = value;

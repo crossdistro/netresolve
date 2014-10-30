@@ -67,9 +67,9 @@ void netresolve_set_dns_srv_lookup(netresolve_t channel, bool value);
 
 /* Query user data */
 void netresolve_query_set_user_data(netresolve_query_t query, void *user_data);
+void *netresolve_query_get_user_data(netresolve_query_t query);
 
 /* Output */
-void *netresolve_query_get_user_data(netresolve_query_t query);
 size_t netresolve_query_get_count(const netresolve_query_t query);
 const char *netresolve_query_get_node_name(const netresolve_query_t query);
 const char *netresolve_query_get_service_name(const netresolve_query_t query);

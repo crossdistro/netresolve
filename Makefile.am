@@ -42,7 +42,6 @@ libnetresolve_la_SOURCES = \
 	lib/channel.c \
 	lib/query.c \
 	lib/input.c \
-	lib/output.c \
 	lib/logging.c \
 	lib/backend.c \
 	lib/service.c \
