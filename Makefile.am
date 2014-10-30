@@ -35,10 +35,10 @@ lib_LTLIBRARIES = \
 	libnss_netresolve.la
 
 libnetresolve_la_SOURCES = \
-	lib/netresolve-private.h \
-	lib/netresolve-backend.h \
-	lib/netresolve-string.h \
-	lib/netresolve-cli.h \
+	include/netresolve-private.h \
+	include/netresolve-backend.h \
+	include/netresolve-string.h \
+	include/netresolve-cli.h \
 	lib/backend.c \
 	lib/channel.c \
 	lib/compat.c \
@@ -53,7 +53,7 @@ libnetresolve_la_LDFLAGS = \
 	-export-symbols-regex '^netresolve_'
 
 libnetresolve_libc_la_SOURCES = \
-	compat/netresolve-compat.h \
+	include/netresolve-compat.h \
 	compat/libc.c
 libnetresolve_libc_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
