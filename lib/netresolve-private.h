@@ -165,7 +165,9 @@ struct netresolve_query {
 
 void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
 
+netresolve_query_t netresolve_query_new(netresolve_t channel, enum netresolve_request_type type);
 void netresolve_query_start(netresolve_query_t channel);
+netresolve_query_t netresolve_query_run(netresolve_query_t query);
 bool netresolve_epoll(netresolve_t channel, int timeout);
 void netresolve_watch_fd(netresolve_t channel, int fd, int events);
 int netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec);

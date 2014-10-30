@@ -1,0 +1,232 @@
+/* Copyright (c) 2013 Pavel Šimerda, Red Hat, Inc. (psimerda at redhat.com) and others
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <poll.h>
+#include <errno.h>
+#include <sys/epoll.h>
+#include <sys/timerfd.h>
+#include <sys/eventfd.h>
+
+#include "netresolve-private.h"
+
+static const char *
+state_to_string(enum netresolve_state state)
+{
+	switch (state) {
+	case NETRESOLVE_STATE_NONE:
+		return "none";
+	case NETRESOLVE_STATE_SETUP:
+		return "setup";
+	case NETRESOLVE_STATE_WAITING:
+		return "waiting";
+	case NETRESOLVE_STATE_FINISHED:
+		return "finished";
+	case NETRESOLVE_STATE_FAILED:
+		return "failed";
+	default:
+		/* Shouldn't happen. */
+		return "UNKNOWN";
+	}
+}
+
+void
+netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state)
+{
+	enum netresolve_state old_state = query->state;
+
+	query->state = state;
+
+	debug("state: %s -> %s", state_to_string(old_state), state_to_string(state));
+
+	/* Leaving state... */
+	switch (old_state) {
+	case NETRESOLVE_STATE_WAITING:
+		if (query->channel->callbacks.watch_fd)
+			query->channel->callbacks.watch_fd(query, query->channel->epoll_fd, 0,
+					query->channel->callbacks.user_data_fd);
+		break;
+	default:
+		break;
+	}
+
+	/* Delaying state... */
+	switch (state) {
+	case NETRESOLVE_STATE_FINISHED:
+	case NETRESOLVE_STATE_FAILED:
+		if (old_state != NETRESOLVE_STATE_WAITING) {
+			if ((query->delayed_fd = eventfd(1, EFD_NONBLOCK)) == -1) {
+				error("can't create eventfd");
+				break;
+			}
+			query->delayed_state = state;
+			state = query->state = NETRESOLVE_STATE_WAITING;
+			netresolve_watch_fd(query->channel, query->delayed_fd, POLLIN);
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
+	/* Entering state... */
+	switch (state) {
+	case NETRESOLVE_STATE_NONE:
+		free(query->request.dns_name);
+		free(query->response.paths);
+		free(query->response.nodename);
+		free(query->response.servname);
+		netresolve_service_list_free(query->services);
+		memset(&query->response, 0, sizeof query->response);
+		break;
+	case NETRESOLVE_STATE_SETUP:
+		netresolve_query_start(query);
+	case NETRESOLVE_STATE_WAITING:
+		if (query->channel->callbacks.watch_fd)
+			query->channel->callbacks.watch_fd(query, query->channel->epoll_fd, POLLIN,
+					query->channel->callbacks.user_data_fd);
+		break;
+	case NETRESOLVE_STATE_FINISHED:
+		if (!query->response.nodename)
+			query->response.nodename = query->request.nodename ? strdup(query->request.nodename) : strdup("localhost");
+		if (query->channel->callbacks.on_connect)
+			netresolve_connect_cleanup(query);
+		if (query->channel->callbacks.on_success)
+			query->channel->callbacks.on_success(query, query->channel->callbacks.user_data);
+		break;
+	case NETRESOLVE_STATE_FAILED:
+		if (query->channel->callbacks.on_success)
+			query->channel->callbacks.on_success(query, query->channel->callbacks.user_data);
+		break;
+	}
+}
+
+static int
+state_to_errno(enum netresolve_state state)
+{
+	switch (state) {
+	case NETRESOLVE_STATE_WAITING:
+		return EWOULDBLOCK;
+	case NETRESOLVE_STATE_FINISHED:
+		return 0;
+	case NETRESOLVE_STATE_FAILED:
+		return ENODATA;
+	default:
+		/* Shouldn't happen. */
+		return -1;
+	}
+}
+
+netresolve_query_t
+netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
+{
+	netresolve_query_t query;
+	netresolve_query_t *queries;
+
+	if (!(query = calloc(1, sizeof *query)))
+		return NULL;
+	if (!(queries = realloc(channel->queries, ++channel->nqueries * sizeof *queries))) {
+		free(query);
+		return NULL;
+	}
+
+	query->channel = channel;
+	channel->queries = queries;
+	channel->queries[channel->nqueries - 1] = query;
+
+	if (!channel->backends)
+		netresolve_set_backend_string(channel, secure_getenv("NETRESOLVE_BACKENDS"));
+	if (!channel->backends || !*channel->backends) {
+		netresolve_query_set_state(query, NETRESOLVE_STATE_FINISHED);
+		return query;
+	}
+
+	query->first_connect_timeout = -1;
+	query->backend = channel->backends;
+	memcpy(&query->request, &channel->request, sizeof channel->request);
+
+	query->request.type = type;
+
+	return query;
+}
+
+void
+netresolve_query_start(netresolve_query_t query)
+{
+	struct netresolve_backend *backend = *query->backend;
+	void (*setup)(netresolve_query_t query, char **settings);
+
+	debug("starting backend: %s", backend->settings[0]);
+	setup = backend->setup[query->request.type];
+	if (setup) {
+		setup(query, backend->settings + 1);
+		if (query->state == NETRESOLVE_STATE_SETUP)
+			netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
+	} else
+		netresolve_backend_failed(query);
+}
+
+netresolve_query_t
+netresolve_query_run(netresolve_query_t query)
+{
+	netresolve_t channel = query->channel;
+
+	netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
+
+	/* Blocking mode. */
+	if (!channel->callbacks.watch_fd)
+		while (query->state == NETRESOLVE_STATE_WAITING)
+			netresolve_epoll(channel, -1);
+
+	errno = state_to_errno(query->state);
+	return query;
+}
+
+/* netresolve_query_done:
+ *
+ * Call this function when you are finished with the netresolve query and
+ * don't need to access it any more. It cancels the query if it hasn't been
+ * finished yet, and performs internal cleanups. Don't use the query handle
+ * after calling it.
+ */
+void
+netresolve_query_done(netresolve_query_t query)
+{
+	netresolve_t channel = query->channel;
+	int i;
+
+	netresolve_query_set_state(query, NETRESOLVE_STATE_NONE);
+
+	for (i = 0; i < channel->nqueries; i++)
+		if (channel->queries[i] == query)
+			break;
+	assert(i < channel->nqueries);
+
+	memmove(&channel->queries[i], &channel->queries[i+1], --channel->nqueries - i);
+	channel->queries = realloc(channel->queries, channel->nqueries * sizeof *channel->queries);
+
+	free(query);
+}

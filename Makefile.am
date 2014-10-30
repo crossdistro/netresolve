@@ -40,6 +40,7 @@ libnetresolve_la_SOURCES = \
 	lib/netresolve-string.h \
 	lib/netresolve-cli.h \
 	lib/channel.c \
+	lib/query.c \
 	lib/input.c \
 	lib/output.c \
 	lib/logging.c \
