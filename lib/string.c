@@ -131,8 +131,8 @@ add_path(char **start, char *end, netresolve_query_t query, int i)
 	const char *socktypestr;
 	const char *protocolstr;
 
-	netresolve_query_get_address_info(query, i, &family, &address, &ifindex);
-	netresolve_query_get_port_info(query, i, &socktype, &protocol, &port);
+	netresolve_query_get_node_info(query, i, &family, &address, &ifindex);
+	netresolve_query_get_service_info(query, i, &socktype, &protocol, &port);
 	netresolve_query_get_aux_info(query, i, &priority, &weight, &ttl);
 
 	socktypestr = socktype_to_string(socktype);

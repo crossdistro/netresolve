@@ -181,8 +181,8 @@ get_hostent(netresolve_query_t query, int *h_errnop, int32_t *ttlp)
 		int32_t ttl;
 		const void *address;
 
-		netresolve_query_get_address_info(query, idx, &family, &address, &ifindex);
-		netresolve_query_get_port_info(query, idx, &socktype, &protocol, &port);
+		netresolve_query_get_node_info(query, idx, &family, &address, &ifindex);
+		netresolve_query_get_service_info(query, idx, &socktype, &protocol, &port);
 		netresolve_query_get_aux_info(query, idx, NULL, NULL, &ttl);
 
 		if (ttlp && ttl < *ttlp)

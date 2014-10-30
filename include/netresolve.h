@@ -75,9 +75,9 @@ const char *netresolve_query_get_node_name(const netresolve_query_t query);
 const char *netresolve_query_get_service_name(const netresolve_query_t query);
 
 /* Output: Forward query */
-void netresolve_query_get_address_info(const netresolve_query_t query, size_t idx,
+void netresolve_query_get_node_info(const netresolve_query_t query, size_t idx,
 		int *family, const void **address,  int *ifindex);
-void netresolve_query_get_port_info(const netresolve_query_t query, size_t idx,
+void netresolve_query_get_service_info(const netresolve_query_t query, size_t idx,
 		int *socktype, int *protocol, int *port);
 void netresolve_query_get_aux_info(const netresolve_query_t query, size_t idx,
 		int *priority, int *weight, int *ttl);

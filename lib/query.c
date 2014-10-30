@@ -250,7 +250,7 @@ netresolve_query_get_count(netresolve_query_t query)
 }
 
 void
-netresolve_query_get_address_info(netresolve_query_t query, size_t idx,
+netresolve_query_get_node_info(netresolve_query_t query, size_t idx,
 		int *family, const void **address, int *ifindex)
 {
 	assert (idx < query->response.pathcount);
@@ -264,7 +264,7 @@ netresolve_query_get_address_info(netresolve_query_t query, size_t idx,
 }
 
 void
-netresolve_query_get_port_info(netresolve_query_t query, size_t idx,
+netresolve_query_get_service_info(netresolve_query_t query, size_t idx,
 		int *socktype, int *protocol, int *port)
 {
 	assert (idx < query->response.pathcount);
@@ -310,8 +310,8 @@ netresolve_query_get_sockaddr(netresolve_query_t query, size_t idx,
 	int family, ifindex, port;
 	const void *address;
 
-	netresolve_query_get_address_info(query, idx, &family, &address, &ifindex);
-	netresolve_query_get_port_info(query, idx, socktype, protocol, &port);
+	netresolve_query_get_node_info(query, idx, &family, &address, &ifindex);
+	netresolve_query_get_service_info(query, idx, socktype, protocol, &port);
 	netresolve_query_get_aux_info(query, idx, NULL, NULL, ttl);
 
 	if (!address)
