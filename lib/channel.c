@@ -145,6 +145,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		free(query->response.paths);
 		free(query->response.nodename);
 		free(query->response.servname);
+		netresolve_service_list_free(query->services);
 		memset(&query->response, 0, sizeof query->response);
 		break;
 	case NETRESOLVE_STATE_SETUP:

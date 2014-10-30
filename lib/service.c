@@ -55,8 +55,12 @@ struct netresolve_service {
 	const char *name;
 };
 
-static struct netresolve_service *services = NULL;
-static int servicecount = 0, servicereservedcount = 0;
+struct netresolve_service_list {
+	struct netresolve_service *items;
+	size_t count;
+	size_t reserved;
+
+};
 
 static int
 protocol_from_string(const char *str)
@@ -72,7 +76,7 @@ protocol_from_string(const char *str)
 }
 
 static void
-add_service(int protocol, int port, const char *name)
+add_service(struct netresolve_service_list *services, int protocol, int port, const char *name)
 {
 	struct netresolve_service service;
 
@@ -82,19 +86,19 @@ add_service(int protocol, int port, const char *name)
 	if (name)
 		service.name = strdup(name);
 
-	if (servicecount == servicereservedcount) {
-		if (!servicereservedcount)
-			servicereservedcount = 256;
+	if (services->count == services->reserved) {
+		if (!services->reserved)
+			services->reserved = 256;
 		else
-			servicereservedcount *= 2;
-		services = realloc(services, servicereservedcount * sizeof service);
+			services->reserved *= 2;
+		services->items = realloc(services->items, services->reserved * sizeof service);
 	}
 
-	memcpy(&services[servicecount++], &service, sizeof service);
+	memcpy(&services->items[services->count++], &service, sizeof service);
 }
 
 static void
-read_service(char *line)
+read_service(struct netresolve_service_list *services, char *line)
 {
 	int protocol, port;
 	const char *name, *alias;
@@ -105,26 +109,30 @@ read_service(char *line)
 		return;
 	if (!(protocol = protocol_from_string(strtok(NULL, " \t"))))
 		return;
-	add_service(protocol, port, name);
+	add_service(services, protocol, port, name);
 	while ((alias = strtok(NULL, " \t")))
-		add_service(protocol, port, alias);
+		add_service(services, protocol, port, alias);
 }
 
-#define SERVICES_FILE "/etc/services"
 #define SIZE 1024
 
 static void
-read_services(void)
+read_services(struct netresolve_service_list *services, const char *path)
 {
-	int fd = open(SERVICES_FILE, O_RDONLY);
+	int fd;
 	char buffer[SIZE];
 	char *current = buffer;
 	char *end = buffer + sizeof buffer;
 	char *new;
 	size_t size;
 
-	if (fd == -1)
-		return;
+	if (path) {
+		if ((fd = open(path, O_RDONLY)) == -1)
+			return;
+	} else {
+		if ((fd = open("/etc/netresolve/services", O_RDONLY)) == -1 && (fd = open("/etc/services", O_RDONLY)) == -1)
+			return;
+	}
 
 	while (true) {
 		if (current == end)
@@ -147,7 +155,7 @@ read_services(void)
 			/* New line */
 			if (*new == '\n') {
 				*new++ = '\0';
-				read_service(buffer);
+				read_service(services, buffer);
 				memmove(buffer, new, current - new);
 				current = buffer + (current - new);
 				new = buffer - 1;
@@ -156,9 +164,35 @@ read_services(void)
 	}
 out:
 	close(fd);
-	add_service(0, 0, NULL);
-	servicereservedcount = servicecount;
-	services = realloc(services, servicereservedcount * sizeof *services);
+	add_service(services, 0, 0, NULL);
+	services->reserved = services->count;
+	services->items = realloc(services->items, services->reserved * sizeof *services->items);
+}
+
+struct netresolve_service_list *
+netresolve_service_list_new(const char *path)
+{
+	struct netresolve_service_list *services;
+
+	if (!path)
+		path = secure_getenv("NETRESOLVE_SERVICES");
+
+	if (!(services = calloc(1, sizeof *services)))
+		return NULL;
+
+	read_services(services, path);
+
+	return services;
+}
+
+void
+netresolve_service_list_free(struct netresolve_service_list *services)
+{
+	if (!services)
+		return;
+
+	free(services->items);
+	free(services);
 }
 
 static void
@@ -179,7 +213,8 @@ found_port(const char *name, int socktype, int proto, int port,
 }
 
 void
-netresolve_get_service_info(const char *name, int socktype, int protocol, int port,
+netresolve_service_list_query(struct netresolve_service_list **services,
+		const char *name, int socktype, int protocol, int port,
 		netresolve_service_callback callback, void *user_data)
 {
 	const struct netresolve_service *service;
@@ -195,18 +230,19 @@ netresolve_get_service_info(const char *name, int socktype, int protocol, int po
 		}
 	}
 
-	if (!services)
-		read_services();
+	*services = netresolve_service_list_new(NULL);
 
-	for (service = services; service->name; service++) {
-		if (name && strcmp(name, service->name))
-			continue;
-		if (protocol && protocol != service->protocol)
-			continue;
-		if ((port || !name) && port != service->port)
-			continue;
-		count++;
-		found_port(service->name, socktype, service->protocol, service->port, callback, user_data);
+	if (*services && (*services)->items) {
+		for (service = (*services)->items; service->name; service++) {
+			if (name && strcmp(name, service->name))
+				continue;
+			if (protocol && protocol != service->protocol)
+				continue;
+			if ((port || !name) && port != service->port)
+				continue;
+			count++;
+			found_port(service->name, socktype, service->protocol, service->port, callback, user_data);
+		}
 	}
 
 	if (!count) {

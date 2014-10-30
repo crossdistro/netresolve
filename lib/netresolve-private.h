@@ -153,6 +153,8 @@ struct netresolve_query {
 		} dns;
 	} response;
 
+	struct netresolve_service_list *services;
+
 	union {
 		struct sockaddr sa;
 		struct sockaddr_in sin;
@@ -176,8 +178,12 @@ void netresolve_connect_start(netresolve_query_t query);
 bool netresolve_connect_dispatch(netresolve_query_t query, int fd, int events);
 void netresolve_connect_cleanup(netresolve_query_t query);
 
+struct netresolve_service_list;
 typedef void (*netresolve_service_callback)(const char *name, int socktype, int protocol, int port, void *user_data);
-void netresolve_get_service_info(const char *name, int socktype, int protocol, int port,
+struct netresolve_service_list *netresolve_service_list_new(const char *path);
+void netresolve_service_list_free(struct netresolve_service_list *services);
+void netresolve_service_list_query(struct netresolve_service_list **services,
+		const char *name, int socktype, int protocol, int port,
 		netresolve_service_callback callback, void *user_data);
 
 int netresolve_family_from_string(const char *str);

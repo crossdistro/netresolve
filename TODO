@@ -14,7 +14,6 @@
  * Consider using -fvisibility=hidden
  * Consider using a separete libnetresolve-backend.so
  * Allow backend list setting at any time or at least check whether they can be changed
- * Make /etc/services reading thread safe
  * Read a configuration file in addition to environment variables
 
 ## Tools, wrappers and tests

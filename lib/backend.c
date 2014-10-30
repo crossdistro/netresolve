@@ -212,8 +212,8 @@ netresolve_backend_add_path(netresolve_query_t query,
 	if (query->request.servname && (!socktype || !protocol || !port)) {
 		struct path_data data = { .query = query, .path = &path };
 
-		netresolve_get_service_info(request->servname,
-				path.service.socktype, path.service.protocol, 0,
+		netresolve_service_list_query(&query->services,
+				request->servname, path.service.socktype, path.service.protocol, 0,
 				path_callback, &data);
 		return;
 	}
@@ -248,7 +248,8 @@ netresolve_backend_add_name_info(netresolve_query_t query, const char *nodename,
 	query->response.nodename = nodename ? strdup(nodename) : NULL;
 
 	if (!query->response.servname)
-		netresolve_get_service_info(NULL, 0, 0, query->request.port,
+		netresolve_service_list_query(&query->services,
+				NULL, 0, 0, query->request.port,
 				service_callback, query);
 }
 
