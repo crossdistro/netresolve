@@ -28,7 +28,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-/* Channels and queries */
+/* Channel manipulation */
 typedef struct netresolve_channel *netresolve_t;
 typedef struct netresolve_query *netresolve_query_t;
 
@@ -36,12 +36,7 @@ netresolve_t netresolve_open(void);
 void netresolve_close(netresolve_t channel);
 bool netresolve_dispatch_fd(netresolve_t channel, int fd, int events);
 
-netresolve_query_t netresolve_query(netresolve_t channel, const char *node, const char *service);
-netresolve_query_t netresolve_query_reverse(netresolve_t channel, int family, const void *address, int ifindex, int port);
-netresolve_query_t netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type);
-void netresolve_query_done(netresolve_query_t query);
-
-/* Callbacks */
+/* Channel callback settings */
 typedef void (*netresolve_callback_t)(netresolve_query_t query, void *user_data);
 typedef void (*netresolve_fd_callback_t)(netresolve_query_t query, int fd, int events, void *user_data);
 typedef void (*netresolve_socket_callback_t)(netresolve_query_t query, int idx, int sock, void *user_data);
@@ -55,26 +50,30 @@ void netresolve_set_bind_callback(netresolve_t channel,
 void netresolve_set_connect_callback(netresolve_t channel,
 		netresolve_socket_callback_t on_connect, void *user_data);
 
-/* Configuration */
+/* Channel configuration */
 void netresolve_set_backend_string(netresolve_t channel, const char *string);
-
-/* Input */
 void netresolve_set_family(netresolve_t channel, int family);
 void netresolve_set_socktype(netresolve_t channel, int socktype);
 void netresolve_set_protocol(netresolve_t channel, int protocol);
 void netresolve_set_default_loopback(netresolve_t channel, bool value);
 void netresolve_set_dns_srv_lookup(netresolve_t channel, bool value);
 
+/* Query constructors and destructors */
+netresolve_query_t netresolve_query(netresolve_t channel, const char *node, const char *service);
+netresolve_query_t netresolve_query_reverse(netresolve_t channel, int family, const void *address, int ifindex, int port);
+netresolve_query_t netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type);
+void netresolve_query_done(netresolve_query_t query);
+
 /* Query user data */
 void netresolve_query_set_user_data(netresolve_query_t query, void *user_data);
 void *netresolve_query_get_user_data(netresolve_query_t query);
 
-/* Output */
+/* Query result getters (universal) */
 size_t netresolve_query_get_count(const netresolve_query_t query);
 const char *netresolve_query_get_node_name(const netresolve_query_t query);
 const char *netresolve_query_get_service_name(const netresolve_query_t query);
 
-/* Output: Forward query */
+/* Query result getters (forward queries) */
 void netresolve_query_get_node_info(const netresolve_query_t query, size_t idx,
 		int *family, const void **address,  int *ifindex);
 void netresolve_query_get_service_info(const netresolve_query_t query, size_t idx,
@@ -82,12 +81,8 @@ void netresolve_query_get_service_info(const netresolve_query_t query, size_t id
 void netresolve_query_get_aux_info(const netresolve_query_t query, size_t idx,
 		int *priority, int *weight, int *ttl);
 
-/* Output: DNS query */
+/* Query result getters (DNS queries) */
 const void *netresolve_query_get_dns_answer(const netresolve_query_t query, size_t *size);
-
-/* BSD socket API compatibility */
-const struct sockaddr *netresolve_query_get_sockaddr(const netresolve_query_t query, size_t idx,
-		socklen_t *salen, int *socktype, int *protocol, int32_t *ttl);
 
 /* Logging */
 enum netresolve_log_level {

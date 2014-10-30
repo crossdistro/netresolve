@@ -23,6 +23,7 @@
  */
 #include <netresolve.h>
 #include <netresolve-backend.h>
+#include <netresolve-compat.h>
 #include <netresolve-cli.h>
 #include <nss.h>
 #include <netdb.h>

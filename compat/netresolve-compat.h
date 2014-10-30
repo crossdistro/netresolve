@@ -27,27 +27,35 @@
 #include <netresolve.h>
 #include <netdb.h>
 
+/* Utility functions */
+const struct sockaddr *netresolve_query_get_sockaddr(const netresolve_query_t query, size_t idx,
+		socklen_t *salen, int *socktype, int *protocol, int32_t *ttl);
+
+/* Functions resembling modern POSIX host/service resolution API */
 netresolve_query_t netresolve_query_getaddrinfo(netresolve_t channel,
 		const char *node, const char *service, const struct addrinfo *hints);
-int netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **res, int32_t *ttlp);
+int netresolve_query_getaddrinfo_done(netresolve_query_t query,
+		struct addrinfo **res, int32_t *ttlp);
+netresolve_query_t netresolve_query_getnameinfo(netresolve_t channel,
+		const struct sockaddr *sa, socklen_t salen, int flags);
+int netresolve_query_getnameinfo_done(netresolve_query_t query,
+		char **host, char **serv, int32_t *ttlp);
 
-netresolve_query_t netresolve_query_getnameinfo(netresolve_t channel, const struct sockaddr *sa, socklen_t salen, int flags);
-int netresolve_query_getnameinfo_done(netresolve_query_t query, char **host, char **serv, int32_t *ttlp);
+/* Functions resembling obsolete POSIX host/service resolution API */
+netresolve_query_t netresolve_query_gethostbyname(netresolve_t channel,
+		const char *name, int family);
+struct hostent *netresolve_query_gethostbyname_done(netresolve_query_t query,
+		int *h_errnop, int32_t *ttlp);
+netresolve_query_t netresolve_query_gethostbyaddr(netresolve_t channel,
+		const void *address, int length, int family);
+struct hostent *netresolve_query_gethostbyaddr_done(netresolve_query_t query,
+		int *h_errnop, int32_t *ttlp);
 
+/* Functions resembling POSIX DNS resolver API */
 netresolve_query_t netresolve_query_res_query(netresolve_t channel, const char *dname, int cls, int type);
 int netresolve_query_res_query_done(netresolve_query_t query, uint8_t **answer);
 
-netresolve_query_t netresolve_query_getnameinfo(netresolve_t channel, const struct sockaddr *sa, socklen_t salen, int flags);
-int netresolve_query_getnameinfo_done(netresolve_query_t query, char **host, char **serv, int32_t *ttlp);
-
-netresolve_query_t netresolve_query_res_query(netresolve_t channel, const char *dname, int cls, int type);
-int netresolve_query_res_query_done(netresolve_query_t query, uint8_t **answer);
-
-netresolve_query_t netresolve_query_gethostbyname(netresolve_t channel, const char *name, int family);
-struct hostent *netresolve_query_gethostbyname_done(netresolve_query_t query, int *h_errnop, int32_t *ttlp);
-netresolve_query_t netresolve_query_gethostbyaddr(netresolve_t channel, const void *address, int length, int family);
-struct hostent *netresolve_query_gethostbyaddr_done(netresolve_query_t query, int *h_errnop, int32_t *ttlp);
-
+/* Destructors */
 void netresolve_freeaddrinfo(struct addrinfo *ai);
 void netresolve_freehostent(struct hostent *he);
 
