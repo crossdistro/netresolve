@@ -39,22 +39,22 @@ libnetresolve_la_SOURCES = \
 	lib/netresolve-backend.h \
 	lib/netresolve-string.h \
 	lib/netresolve-cli.h \
-	lib/channel.c \
-	lib/query.c \
-	lib/logging.c \
 	lib/backend.c \
+	lib/channel.c \
+	lib/compat.c \
+	lib/logging.c \
+	lib/query.c \
 	lib/service.c \
 	lib/socket.c \
-	lib/utils.c \
-	lib/string.c
+	lib/string.c \
+	lib/utils.c
 libnetresolve_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	-export-symbols-regex '^netresolve_'
 
 libnetresolve_libc_la_SOURCES = \
 	compat/netresolve-compat.h \
-	compat/libc.c \
-	compat/compat.c
+	compat/libc.c
 libnetresolve_libc_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	--export-all-symbols
@@ -70,8 +70,7 @@ libnetresolve_asyncns_la_LIBADD = \
 	libnetresolve.la
 
 libnss_netresolve_la_SOURCES = \
-	compat/nsswitch.c \
-	compat/compat.c
+	compat/nsswitch.c
 libnss_netresolve_la_LDFLAGS = $(AM_LDFLAGS) -version-info 2:0:0
 
 lib_LTLIBRARIES += \
