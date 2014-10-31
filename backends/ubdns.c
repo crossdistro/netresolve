@@ -210,6 +210,7 @@ bool
 setup(netresolve_query_t query, char **settings)
 {
 	struct priv_ubdns *priv = netresolve_backend_new_priv(query, sizeof *priv);
+	int status;
 
 	if (!priv)
 		goto fail;
@@ -223,7 +224,10 @@ setup(netresolve_query_t query, char **settings)
 	if(!priv->ctx)
 		goto fail;
 
-	ub_ctx_resolvconf(priv->ctx, NULL);
+	if ((status = ub_ctx_resolvconf(priv->ctx, NULL)) != 0) {
+		error("libunbound: %s", ub_strerror(status));
+		goto fail;
+	}
 	netresolve_backend_watch_fd(query, ub_fd(priv->ctx), POLLIN);
 
 	return true;
