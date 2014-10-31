@@ -160,7 +160,7 @@ You can use a compatibility API most resembling the POSIX one but still allowing
 A special query constructor lets you use input arguments as with `getaddrinfo()`.
 
     struct addrinfo hints = { .ai_family = AF_UNSPEC, .ai_socktype = 0, .ai_protocol = IPPROTO_TCP, .ai_flags = 0 };
-    netresolve_query_t query = netresolve_query_addrinfo(channel, "www.sourceware.org", "http", &hints);
+    netresolve_query_t query = netresolve_query_getaddrinfo(channel, "www.sourceware.org", "http", &hints);
 
 A special query result getter lets you use output arguments as with `getaddrinfo()` and destroys the query object for your convenience.
 
