@@ -37,7 +37,6 @@ lib_LTLIBRARIES = \
 libnetresolve_la_SOURCES = \
 	include/netresolve-private.h \
 	include/netresolve-backend.h \
-	include/netresolve-string.h \
 	include/netresolve-cli.h \
 	lib/backend.c \
 	lib/channel.c \
