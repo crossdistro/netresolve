@@ -132,6 +132,7 @@ TESTS = \
 	test-bind-connect \
 	tests/test-compat.sh
 EXTRA_DIST = \
+	tools/compat.h \
 	tests/test-netresolve.sh \
 	tests/data/any \
 	tests/data/localhost \
