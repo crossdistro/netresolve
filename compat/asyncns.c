@@ -1,13 +1,12 @@
 #include <netresolve-private.h>
 #include <netresolve-compat.h>
+#include <netresolve-epoll.h>
 //#include <libasyncns.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
 #include <poll.h>
-#include <sys/epoll.h>
-#include <sys/eventfd.h>
 
 typedef struct netresolve_asyncns asyncns_t;
 typedef struct netresolve_asyncns_query asyncns_query_t;
@@ -23,8 +22,7 @@ struct netresolve_asyncns_query {
 
 struct netresolve_asyncns {
 	netresolve_t channel;
-	int epoll_fd;
-	int epoll_count;
+	struct netresolve_epoll epoll;
 	asyncns_query_t queries;
 };
 
@@ -46,26 +44,6 @@ dequeue(asyncns_query_t *q)
 }
 
 static void
-watch_fd(netresolve_query_t query, int fd, int events, void *user_data)
-{
-	asyncns_t *asyncns = user_data;
-	struct epoll_event event = { .events = events, .data = { .fd = fd } };
-
-	if (epoll_ctl(asyncns->epoll_fd, EPOLL_CTL_DEL, fd, &event) != -1)
-		asyncns->epoll_count--;
-	else if (errno != ENOENT && errno != EBADF)
-		error("epoll_ctl: %s", strerror(errno));
-
-	if (!events)
-		return;
-
-	if (epoll_ctl(asyncns->epoll_fd, EPOLL_CTL_ADD, fd, &event) != -1)
-		asyncns->epoll_count++;
-	else
-		error("epoll_ctl: %s", strerror(errno));
-}
-
-static void
 on_success(netresolve_query_t query, void *user_data)
 {
 	asyncns_query_t *q = netresolve_query_get_user_data(query);
@@ -82,21 +60,20 @@ asyncns_new (unsigned n_proc)
 	if (!(asyncns = calloc(1, sizeof *asyncns)))
 		goto fail_asyncns;
 
-    if (!(asyncns->channel = netresolve_open()))
-		goto fail_channel;
-
-	if ((asyncns->epoll_fd = epoll_create1(0)) == -1)
+	if ((asyncns->epoll.fd = epoll_create1(0)) == -1)
 		goto fail_epoll;
 
-	netresolve_set_fd_callback(asyncns->channel, watch_fd, asyncns);
+    if (!(asyncns->channel = netresolve_epoll_open(&asyncns->epoll)))
+		goto fail_channel;
+
 	netresolve_set_success_callback(asyncns->channel, on_success, asyncns);
 
 	asyncns->queries.previous = asyncns->queries.next = &asyncns->queries;
 
 	return asyncns;
-fail_epoll:
-	netresolve_close(asyncns->channel);
 fail_channel:
+	close(asyncns->epoll.fd);
+fail_epoll:
 	free(asyncns);
 fail_asyncns:
 	return NULL;
@@ -105,19 +82,13 @@ fail_asyncns:
 int
 asyncns_fd(asyncns_t *asyncns)
 {
-	return asyncns->epoll_fd;
+	return asyncns->epoll.fd;
 }
 
 int
 asyncns_wait(asyncns_t *asyncns, int block)
 {
-	struct epoll_event event;
-	int count;
-
-	count = epoll_wait(asyncns->epoll_fd, &event, 1, block ? -1 : 0);
-
-	if (count)
-		netresolve_dispatch_fd(asyncns->channel, event.data.fd, event.events);
+	netresolve_epoll_wait(asyncns->channel, &asyncns->epoll, block);
 
 	/* undocumented return value */
 	return 0;
@@ -260,7 +231,7 @@ asyncns_free (asyncns_t *asyncns)
 {
 	asyncns_query_t *list = &asyncns->queries;
 
-	close(asyncns->epoll_fd);
+	close(asyncns->epoll.fd);
 
 	while (list->next != list)
 		asyncns_cancel(asyncns, list->next);

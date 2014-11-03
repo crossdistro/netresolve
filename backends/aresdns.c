@@ -214,11 +214,11 @@ setup_forward(netresolve_query_t query, char **settings)
 
 	if (!priv)
 		goto fail;
-	if (!node)
-		goto fail;
-
 
 	priv->ptfd = -1;
+
+	if (!node)
+		goto fail;
 
 	FD_ZERO(&priv->rfds);
 	FD_ZERO(&priv->wfds);

@@ -65,9 +65,6 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 	/* Leaving state... */
 	switch (old_state) {
 	case NETRESOLVE_STATE_WAITING:
-		if (query->channel->callbacks.watch_fd)
-			query->channel->callbacks.watch_fd(query, query->channel->epoll_fd, 0,
-					query->channel->callbacks.user_data_fd);
 		break;
 	default:
 		break;
@@ -103,11 +100,8 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		memset(&query->response, 0, sizeof query->response);
 		break;
 	case NETRESOLVE_STATE_SETUP:
-		netresolve_query_start(query);
+		netresolve_query_setup(query);
 	case NETRESOLVE_STATE_WAITING:
-		if (query->channel->callbacks.watch_fd)
-			query->channel->callbacks.watch_fd(query, query->channel->epoll_fd, POLLIN,
-					query->channel->callbacks.user_data_fd);
 		break;
 	case NETRESOLVE_STATE_FINISHED:
 		if (!query->response.nodename)
@@ -174,12 +168,14 @@ netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
 }
 
 void
-netresolve_query_start(netresolve_query_t query)
+netresolve_query_setup(netresolve_query_t query)
 {
 	struct netresolve_backend *backend = *query->backend;
 	void (*setup)(netresolve_query_t query, char **settings);
 
 	debug("starting backend: %s", backend->settings[0]);
+	assert(query->state == NETRESOLVE_STATE_SETUP);
+
 	setup = backend->setup[query->request.type];
 	if (setup) {
 		setup(query, backend->settings + 1);
@@ -189,17 +185,60 @@ netresolve_query_start(netresolve_query_t query)
 		netresolve_backend_failed(query);
 }
 
+void
+netresolve_query_clear_delayed_state(netresolve_query_t query)
+{
+	query->delayed_state = NETRESOLVE_STATE_NONE;
+	netresolve_watch_fd(query->channel, query->delayed_fd, 0);
+	close(query->delayed_fd);
+	query->delayed_fd = -1;
+}
+
+void
+netresolve_query_apply_delayed_state(netresolve_query_t query)
+{
+	enum netresolve_state state = query->delayed_state;
+
+	netresolve_query_clear_delayed_state(query);
+
+	netresolve_query_set_state(query, state);
+}
+
+bool
+netresolve_query_dispatch_fd(netresolve_query_t query, int fd, int events)
+{
+	struct netresolve_backend *backend = *query->backend;
+
+	if (query->state != NETRESOLVE_STATE_WAITING)
+		return false;
+
+	if (query->delayed_state && fd == query->delayed_fd) {
+		netresolve_query_apply_delayed_state(query);
+		return true;
+	}
+
+	if (!backend && netresolve_connect_dispatch(query, fd, events))
+		return true;
+
+	if (backend && backend->dispatch) {
+		backend->dispatch(query, fd, events);
+		return true;
+	}
+
+	return false;
+}
+
 netresolve_query_t
 netresolve_query_run(netresolve_query_t query)
 {
 	netresolve_t channel = query->channel;
 
-	netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
+	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
 
 	/* Blocking mode. */
-	if (!channel->callbacks.watch_fd)
+	if (!channel->fd_callbacks.watch_fd)
 		while (query->state == NETRESOLVE_STATE_WAITING)
-			netresolve_epoll(channel, -1);
+			netresolve_epoll(channel, true);
 
 	errno = state_to_errno(query->state);
 	return query;
@@ -218,14 +257,16 @@ netresolve_query_done(netresolve_query_t query)
 	netresolve_t channel = query->channel;
 	int i;
 
+	if (query->delayed_state)
+		netresolve_query_clear_delayed_state(query);
+
 	netresolve_query_set_state(query, NETRESOLVE_STATE_NONE);
 
 	for (i = 0; i < channel->nqueries; i++)
 		if (channel->queries[i] == query)
 			break;
-	assert(i < channel->nqueries);
-
-	memmove(&channel->queries[i], &channel->queries[i+1], --channel->nqueries - i);
+	if (i < channel->nqueries)
+		memmove(&channel->queries[i], &channel->queries[i+1], --channel->nqueries - i);
 	channel->queries = realloc(channel->queries, channel->nqueries * sizeof *channel->queries);
 
 	free(query);

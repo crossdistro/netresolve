@@ -87,36 +87,16 @@ dispatch_fd(netresolve_t channel, int fd, int events)
 
 	for (i = 0; i < channel->nqueries; i++) {
 		netresolve_query_t query = channel->queries[i];
-		struct netresolve_backend *backend = *query->backend;
 
-		if (query->state != NETRESOLVE_STATE_WAITING)
-			continue;
-
-		if (query->delayed_state && fd == query->delayed_fd) {
-			enum netresolve_state state = query->delayed_state;
-
-			query->delayed_state = NETRESOLVE_STATE_NONE;
-			close(query->delayed_fd);
-			query->delayed_fd = -1;
-
-			netresolve_query_set_state(query, state);
+		if (netresolve_query_dispatch_fd(query, fd, events))
 			return true;
-		}
-
-		if (!backend && netresolve_connect_dispatch(query, fd, events))
-			return true;
-
-		if (backend && backend->dispatch) {
-			backend->dispatch(query, fd, events);
-			return true;
-		}
 	}
 
 	return false;
 }
 
 bool
-netresolve_epoll(netresolve_t channel, int timeout)
+netresolve_epoll(netresolve_t channel, bool block)
 {
 	static const int maxevents = 10;
 	struct epoll_event events[maxevents];
@@ -125,7 +105,7 @@ netresolve_epoll(netresolve_t channel, int timeout)
 
 	assert(channel->epoll_count > 0);
 
-	nevents = epoll_wait(channel->epoll_fd, events, maxevents, channel->callbacks.watch_fd ? 0 : -1);
+	nevents = epoll_wait(channel->epoll_fd, events, maxevents, block ? -1 : 0);
 	if (nevents == -1)
 		return false;
 	for (i = 0; i < nevents; i++)
@@ -134,25 +114,45 @@ netresolve_epoll(netresolve_t channel, int timeout)
 	return true;
 }
 
-void
-netresolve_watch_fd(netresolve_t channel, int fd, int events)
+static void
+_netresolve_watch_fd(netresolve_t channel, int fd, int events)
 {
 	struct epoll_event event = { .events = events, .data = { .fd = fd} };
 
 	debug("watching file descriptor: %d %d", fd, events);
 
-	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_DEL, fd, &event) != -1)
-		channel->epoll_count--;
-	else if (errno != ENOENT && errno != EBADF)
+	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1)
 		error("epoll_ctl: %s", strerror(errno));
 
-	if (!events)
-		return;
+	channel->epoll_count++;
 
-	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_ADD, fd, &event) != -1)
-		channel->epoll_count++;
+	if (channel->epoll_count == 1 && channel->fd_callbacks.watch_fd)
+		channel->epoll_handle = channel->fd_callbacks.watch_fd(channel, channel->epoll_fd, POLLIN, channel, channel->fd_callbacks.user_data);
+}
+
+static void
+_netresolve_unwatch_fd(netresolve_t channel, int fd)
+{
+	debug("not watching file descriptor: %d", fd);
+
+	assert(channel->epoll_count > 0);
+
+	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == -1)
+		error("epoll_ctl: %s", strerror(errno));
+
+	channel->epoll_count--;
+
+	if (channel->epoll_count == 0 && channel->fd_callbacks.watch_fd)
+		channel->fd_callbacks.unwatch_fd(channel, channel->epoll_fd, channel->epoll_handle, channel->fd_callbacks.user_data);
+}
+
+void
+netresolve_watch_fd(netresolve_t channel, int fd, int events)
+{
+	if (events)
+		_netresolve_watch_fd(channel, fd, events);
 	else
-		error("epoll_ctl: %s", strerror(errno));
+		_netresolve_unwatch_fd(channel, fd);
 }
 
 int
@@ -195,8 +195,6 @@ netresolve_query(netresolve_t channel, const char *nodename, const char *servnam
 	query->request.nodename = nodename;
 	query->request.servname = servname;
 
-	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
-
 	return netresolve_query_run(query);
 }
 
@@ -213,8 +211,6 @@ netresolve_query_reverse(netresolve_t channel, int family, const void *address, 
 	memcpy(query->request.address, address, size);
 	query->request.port = port;
 
-	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
-
 	return netresolve_query_run(query);
 }
 
@@ -230,16 +226,14 @@ netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type)
 	query->request.dns_class = cls;
 	query->request.dns_type = type;
 
-	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
-
 	return netresolve_query_run(query);
 }
 
 bool
-netresolve_dispatch_fd(netresolve_t channel, int fd, int events)
+netresolve_dispatch_fd(netresolve_t channel, void *data, int events)
 {
-	if (fd != channel->epoll_fd && fd != -1) {
-		errno = EBADF;
+	if (data != channel) {
+		errno = EINVAL;
 		return false;
 	}
 	if (events != EPOLLIN) {
@@ -247,7 +241,7 @@ netresolve_dispatch_fd(netresolve_t channel, int fd, int events)
 		return false;
 	}
 
-	return netresolve_epoll(channel, 0);
+	return netresolve_epoll(channel, false);
 }
 
 static void
@@ -396,12 +390,9 @@ netresolve_set_success_callback(netresolve_t channel,
 }
 
 void
-netresolve_set_fd_callback(netresolve_t channel,
-		netresolve_fd_callback_t watch_fd,
-		void *user_data)
+netresolve_set_fd_callbacks(netresolve_t channel, const struct netresolve_fd_callbacks *callbacks)
 {
-	channel->callbacks.watch_fd = watch_fd;
-	channel->callbacks.user_data_fd = user_data;
+	memcpy(&channel->fd_callbacks, callbacks, sizeof *callbacks);
 }
 
 void

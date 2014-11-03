@@ -21,38 +21,15 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-epoll.h>
 #include <sys/epoll.h>
 
 #include "common.h"
 
 struct priv_async {
-	int epoll_fd;
-	int epoll_count;
+	struct netresolve_epoll epoll;
 	int finished;
 };
-
-static void
-watch_fd(netresolve_query_t query, int fd, int events, void *user_data)
-{
-	struct priv_async *priv = user_data;
-
-	struct epoll_event event = { .events = events, .data = { .fd = fd} };
-
-	if (epoll_ctl(priv->epoll_fd, EPOLL_CTL_DEL, fd, &event) != -1)
-		priv->epoll_count--;
-	else if (errno != ENOENT) {
-		perror("epoll_ctl");
-		abort();
-	}
-	if (!events)
-		return;
-	if (epoll_ctl(priv->epoll_fd, EPOLL_CTL_ADD, fd, &event) != -1)
-		priv->epoll_count++;
-	else {
-		perror("epoll_ctl");
-		abort();
-	}
-}
 
 static void
 on_success(netresolve_query_t query, void *user_data)
@@ -77,7 +54,7 @@ on_success(netresolve_query_t query, void *user_data)
 int
 main(int argc, char **argv)
 {
-	struct priv_async priv = { 0 };
+	struct priv_async priv = { { 0 } };
 	netresolve_t channel;
 	netresolve_query_t query1, query2;
 	const char *node1 = "1:2:3:4:5:6:7:8%999999";
@@ -90,22 +67,20 @@ main(int argc, char **argv)
 	int protocol = IPPROTO_TCP;
 
 	/* Create epoll file descriptor. */
-	priv.epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-	if (priv.epoll_fd == -1) {
+	priv.epoll.fd = epoll_create1(EPOLL_CLOEXEC);
+	if (priv.epoll.fd == -1) {
 		perror("epoll_create1");
 		abort();
 	}
-	priv.epoll_count = 0;
 
 	/* Create a channel. */
-	channel = netresolve_open();
+	channel = netresolve_epoll_open(&priv.epoll);
 	if (!channel) {
 		perror("netresolve_open");
 		abort();
 	}
 
 	/* Set callbacks. */
-	netresolve_set_fd_callback(channel, watch_fd, &priv);
 	netresolve_set_success_callback(channel, on_success, &priv);
 
 	/* Resolver configuration. */
@@ -116,37 +91,20 @@ main(int argc, char **argv)
 	/* Start name resolution. */
 	query1 = netresolve_query(channel, node1, service);
 	query2 = netresolve_query(channel, node2, service);
+	assert(query1 && query2);
 
 	/* Set user data */
 	netresolve_query_set_user_data(query1, &data1);
 	netresolve_query_set_user_data(query2, &data2);
 
-	assert(query1 && query2);
-
-	/* Run the main loop. */
-	while (priv.epoll_count > 0) {
-		static const int maxevents = 10;
-		struct epoll_event events[maxevents];
-		int nevents;
-		int i;
-
-		nevents = epoll_wait(priv.epoll_fd, events, maxevents, -1);
-		if (nevents == -1) {
-			perror("epoll_wait");
-			abort();
-		}
-
-		for (i = 0; i < nevents; i++)
-			netresolve_dispatch_fd(channel, events[i].data.fd, events[i].events);
-	}
-
+	netresolve_epoll_wait(channel, &priv.epoll, true);
 	assert(priv.finished == 2);
 
 	/* Clean up. */
 	netresolve_close(channel);
-	close(priv.epoll_fd);
+	close(priv.epoll.fd);
 
-	assert(priv.epoll_count == 0);
+	assert(priv.epoll.count == 0);
 
 	exit(EXIT_SUCCESS);
 }

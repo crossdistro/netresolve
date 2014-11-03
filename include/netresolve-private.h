@@ -21,6 +21,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef NETRESOLVE_PRIVATE_H
+#define NETRESOLVE_PRIVATE_H
+
 #include <netresolve.h>
 #include <netresolve-backend.h>
 #include <netresolve-compat.h>
@@ -84,17 +87,17 @@ struct netresolve_path {
 struct netresolve_channel {
 	int epoll_fd;
 	int epoll_count;
+	void *epoll_handle;
 	struct netresolve_backend **backends;
 	struct {
 		netresolve_callback_t on_success;
 		netresolve_callback_t on_failure;
 		void *user_data;
-		netresolve_fd_callback_t watch_fd;
-		void *user_data_fd;
 		netresolve_socket_callback_t on_bind;
 		netresolve_socket_callback_t on_connect;
 		void *user_data_sock;
 	} callbacks;
+	struct netresolve_fd_callbacks fd_callbacks;
 	struct netresolve_request {
 		enum netresolve_request_type type;
 		/* Perform L3 address resolution using 'nodename' if not NULL. Use
@@ -166,10 +169,15 @@ struct netresolve_query {
 
 void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
 
+void netresolve_query_clear_delayed_state(netresolve_query_t query);
+void netresolve_query_apply_delayed_state(netresolve_query_t query);
+
+bool netresolve_query_dispatch_fd(netresolve_query_t query, int fd, int events);
+
 netresolve_query_t netresolve_query_new(netresolve_t channel, enum netresolve_request_type type);
-void netresolve_query_start(netresolve_query_t channel);
+void netresolve_query_setup(netresolve_query_t channel);
 netresolve_query_t netresolve_query_run(netresolve_query_t query);
-bool netresolve_epoll(netresolve_t channel, int timeout);
+bool netresolve_epoll(netresolve_t channel, bool block);
 void netresolve_watch_fd(netresolve_t channel, int fd, int events);
 int netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec);
 void netresolve_remove_timeout(netresolve_t channel, int fd);
@@ -196,3 +204,5 @@ int netresolve_protocol_from_string(const char *str);
 const char * netresolve_get_request_string(netresolve_query_t query);
 const char * netresolve_get_path_string(netresolve_query_t query, int i);
 const char * netresolve_get_response_string(netresolve_query_t query);
+
+#endif /* NETRESOLVE_PRIVATE_H */

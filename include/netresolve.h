@@ -34,17 +34,21 @@ typedef struct netresolve_query *netresolve_query_t;
 
 netresolve_t netresolve_open(void);
 void netresolve_close(netresolve_t channel);
-bool netresolve_dispatch_fd(netresolve_t channel, int fd, int events);
+bool netresolve_dispatch_fd(netresolve_t channel, void *data, int events);
 
 /* Channel callback settings */
+struct netresolve_fd_callbacks {
+	void *(*watch_fd)(netresolve_t channel, int fd, int events, void *data, void *user_data);
+	void (*unwatch_fd)(netresolve_t channel, int fd, void *handle, void *user_data);
+	void *user_data;
+};
+
 typedef void (*netresolve_callback_t)(netresolve_query_t query, void *user_data);
-typedef void (*netresolve_fd_callback_t)(netresolve_query_t query, int fd, int events, void *user_data);
 typedef void (*netresolve_socket_callback_t)(netresolve_query_t query, int idx, int sock, void *user_data);
 
 void netresolve_set_success_callback(netresolve_t channel,
 		netresolve_callback_t on_success, void *user_data);
-void netresolve_set_fd_callback(netresolve_t channel,
-		netresolve_fd_callback_t watch_fd, void *user_data);
+void netresolve_set_fd_callbacks(netresolve_t channel, const struct netresolve_fd_callbacks *callbacks);
 void netresolve_set_bind_callback(netresolve_t channel,
 		netresolve_socket_callback_t on_bind, void *user_data);
 void netresolve_set_connect_callback(netresolve_t channel,

@@ -326,7 +326,7 @@ netresolve_backend_finished(netresolve_query_t query)
 	/* Restart with the next *mandatory* backend. */
 	while (*++query->backend) {
 		if ((*query->backend)->mandatory) {
-			netresolve_query_start(query);
+			netresolve_query_setup(query);
 			return;
 		}
 	}
@@ -359,7 +359,7 @@ netresolve_backend_failed(netresolve_query_t query)
 
 	/* Restart with the next backend. */
 	if (*++query->backend) {
-		netresolve_query_start(query);
+		netresolve_query_setup(query);
 		return;
 	}
 

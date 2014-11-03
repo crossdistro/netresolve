@@ -21,27 +21,64 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <asyncns.h>
+#include <poll.h>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <asyncns.h>
-#include <poll.h>
+#include <stdbool.h>
+
+static void
+check(int status, struct addrinfo *result, int family, const char *nodename)
+{
+	assert(status == 0);
+	assert(result);
+	struct { struct addrinfo ai; struct sockaddr_in sa4; struct sockaddr_in6 sa6; } expected = {
+		.ai = {
+			.ai_family = family,
+			.ai_socktype = SOCK_STREAM,
+			.ai_protocol = IPPROTO_TCP,
+			.ai_addr = result->ai_addr,
+			.ai_addrlen = family == AF_INET6 ? sizeof expected.sa6 : sizeof expected.sa4,
+			.ai_canonname = result->ai_canonname
+		},
+		.sa4 = {
+			.sin_family = AF_INET,
+			.sin_port = htons(80),
+			.sin_addr = { htonl(0x01020304) }
+		},
+		.sa6 = {
+			.sin6_family = AF_INET6,
+			.sin6_port = htons(80),
+			.sin6_addr = { .s6_addr = { 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8 } },
+			.sin6_scope_id = 999999
+		}
+	};
+	/* getaddrinfo returns original ai_flags */
+	if (result->ai_flags == 2)
+		result->ai_flags = 0;
+
+	assert(!memcmp(result, &expected.ai, sizeof expected.ai));
+	assert(result->ai_canonname && !strcmp(result->ai_canonname, nodename));
+	assert(!memcmp(result->ai_addr, family == AF_INET6 ? (void *) &expected.sa6 : (void *) &expected.sa4, expected.ai.ai_addrlen));
+}
 
 int
 main(int argc, char **argv)
 {
-	const char *node = "1:2:3:4:5:6:7:8%999999";
-	const char *service = "80";
+	const char *nodename1 = "1:2:3:4:5:6:7:8%999999";
+	const char *nodename2 = "1.2.3.4";
+	const char *servname = "80";
 	struct addrinfo hints = {
 		.ai_family = AF_UNSPEC,
 		.ai_socktype = 0,
 		.ai_protocol = IPPROTO_TCP,
 		.ai_flags = AI_CANONNAME,
 	};
-	struct addrinfo *result = NULL;
-	int status;
+	struct addrinfo *result1 = NULL, *result2 = NULL;
+	int status, status1, status2;
 	asyncns_t *asyncns;
-	asyncns_query_t *q;
+	asyncns_query_t *q1, *q2;
 	int fd;
 
 	asyncns = asyncns_new(10);
@@ -51,32 +88,48 @@ main(int argc, char **argv)
 	assert(asyncns_getnqueries(asyncns) == 0);
 	assert(asyncns_getnext(asyncns) == NULL);
 
-	q = asyncns_getaddrinfo(asyncns, node, service, &hints);
+	/* Start a query and cancel it */
+	q1 = asyncns_getaddrinfo(asyncns, nodename1, servname, &hints);
 	assert(asyncns_getnqueries(asyncns) == 1);
 	assert(asyncns_getnext(asyncns) == NULL);
-	assert(!asyncns_isdone(asyncns, q));
+	assert(!asyncns_isdone(asyncns, q1));
 
-	asyncns_cancel(asyncns, q);
+	asyncns_cancel(asyncns, q1);
 	assert(asyncns_getnqueries(asyncns) == 0);
 	assert(asyncns_getnext(asyncns) == NULL);
-	assert(!asyncns_isdone(asyncns, q));
+	assert(!asyncns_isdone(asyncns, q1));
 
-	q = asyncns_getaddrinfo(asyncns, node, service, &hints);
+	/* Start first query */
+	q1 = asyncns_getaddrinfo(asyncns, nodename1, servname, &hints);
 	assert(asyncns_getnqueries(asyncns) == 1);
 	assert(asyncns_getnext(asyncns) == NULL);
-	assert(!asyncns_isdone(asyncns, q));
+	assert(!asyncns_isdone(asyncns, q1));
 
+	/* Start second query */
+	q2 = asyncns_getaddrinfo(asyncns, nodename2, servname, &hints);
+	assert(q2 != q1);
+	assert(asyncns_getnqueries(asyncns) == 2);
+	assert(asyncns_getnext(asyncns) == NULL);
+	assert(!asyncns_isdone(asyncns, q2));
+
+	/* Poll for the results */
 	struct pollfd pollfd = { .fd = fd, .events = POLLIN };
 	status = poll(&pollfd, 1, 1);
 	assert(status == 1);
 	status = asyncns_wait(asyncns, 0);
 	assert(status == 0);
-	assert(asyncns_getnqueries(asyncns) == 1);
-	assert(asyncns_getnext(asyncns) == q);
-	assert(asyncns_isdone(asyncns, q));
+	assert(asyncns_isdone(asyncns, q1));
+	assert(asyncns_isdone(asyncns, q2));
+	assert(asyncns_getnqueries(asyncns) == 2);
+	assert(asyncns_getnext(asyncns) == q1 || asyncns_getnext(asyncns) == q2);
 
-	status = asyncns_getaddrinfo_done(asyncns, q, &result);
+	status1 = asyncns_getaddrinfo_done(asyncns, q1, &result1);
+	assert(asyncns_getnqueries(asyncns) == 1);
+	assert(asyncns_getnext(asyncns) == q2);
+
+	status2 = asyncns_getaddrinfo_done(asyncns, q2, &result2);
 	assert(asyncns_getnqueries(asyncns) == 0);
+	assert(asyncns_getnext(asyncns) == NULL);
 	/* Looks like there's a bug in the upstram implementation.
 	 *
 	 * assert(asyncns_getnext(asyncns) == NULL);
@@ -84,33 +137,11 @@ main(int argc, char **argv)
 
 	asyncns_free(asyncns);
 
-	assert(status == 0);
-	assert(result);
-	struct { struct addrinfo ai; struct sockaddr_in6 sa; } expected = {
-		.ai = {
-			.ai_family = AF_INET6,
-			.ai_socktype = SOCK_STREAM,
-			.ai_protocol = IPPROTO_TCP,
-			.ai_addr = result->ai_addr,
-			.ai_addrlen = sizeof expected.sa,
-			.ai_canonname = result->ai_canonname
-		},
-		.sa = {
-			.sin6_family = AF_INET6,
-			.sin6_port = htons(80),
-			.sin6_addr = { .s6_addr = { 0, 1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8 } },
-			.sin6_scope_id = 999999
-		}
-	};
-	/* Another bugs in upstream asyncns */
-	if (result->ai_flags == 2)
-		result->ai_flags = 0;
+	check(status1, result1, AF_INET6, nodename1);
+	check(status2, result2, AF_INET, nodename2);
 
-	assert(!memcmp(result, &expected.ai, sizeof expected.ai));
-	assert(result->ai_canonname && !strcmp(result->ai_canonname, node));
-	assert(!memcmp(result->ai_addr, &expected.sa, sizeof expected.sa));
-
-	asyncns_freeaddrinfo(result);
+	asyncns_freeaddrinfo(result1);
+	asyncns_freeaddrinfo(result2);
 
 	return EXIT_SUCCESS;
 }

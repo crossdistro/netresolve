@@ -21,37 +21,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <event2/event.h>
-
-/* FIXME: Improve the API so that this is not needed! */
-#include "netresolve-private.h"
+#include <netresolve-event.h>
 
 #include "common.h"
-
-static void
-handler(int fd, short events, void *user_data)
-{
-	netresolve_t channel = user_data;
-
-	netresolve_dispatch_fd(channel, fd, 0x01);
-}
-
-static void
-watch_fd(netresolve_query_t query, int fd, int events, void *user_data)
-{
-	struct event_base *base = user_data;
-	netresolve_t channel = query->channel;
-
-	/* FIXME: Improve the API so that this is not needed! */
-	static struct event *event = NULL;
-
-	if (events)
-		event = event_new(base, fd, EV_READ | EV_TIMEOUT, handler, channel);
-	else {
-		event_free(event);
-		event = NULL;
-	}
-}
 
 static void
 on_success(netresolve_query_t query, void *user_data)
@@ -97,14 +69,13 @@ main(int argc, char **argv)
 	}
 
 	/* Create a channel. */
-	channel = netresolve_open();
+	channel = netresolve_event_open(base);
 	if (!channel) {
 		perror("netresolve_open");
 		abort();
 	}
 
 	/* Set callbacks. */
-	netresolve_set_fd_callback(channel, watch_fd, base);
 	netresolve_set_success_callback(channel, on_success, &finished);
 
 	/* Resolver configuration. */
