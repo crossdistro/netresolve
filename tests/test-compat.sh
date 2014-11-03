@@ -13,6 +13,7 @@ for name in getaddrinfo gethostbyname{,2,_r,2_r}; do
     ./wrapresolve ./test-$name
 done
 
+./test-asyncns --skip-cancel
 ./wrapresolve ./test-asyncns
 
 test_command getnameinfo --address 127.0.0.1 --port 80
