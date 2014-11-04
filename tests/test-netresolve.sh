@@ -33,11 +33,11 @@ $DIFF <($NR --backend getaddrinfo --service http) $DATA/services
 $DIFF <($NR --node 1.2.3.4) $DATA/numeric4
 $DIFF <($NR --node 1.2.3.4%lo) $DATA/numeric4lo
 $DIFF <($NR --node 1.2.3.4%999999) $DATA/numeric4nines
-$DIFF <($NR --node 1.2.3.4%999999x) $DATA/failed
+$DIFF <($NR --node 1.2.3.4%999999x) $DATA/numeric4failed
 $DIFF <($NR --node 1:2:3:4:5:6:7:8) $DATA/numeric6
 $DIFF <($NR --node 1:2:3:4:5:6:7:8%lo) $DATA/numeric6lo
 $DIFF <($NR --node 1:2:3:4:5:6:7:8%999999) $DATA/numeric6nines
-$DIFF <($NR --node 1:2:3:4:5:6:7:8%999999x) $DATA/failed
+$DIFF <($NR --node 1:2:3:4:5:6:7:8%999999x) $DATA/numeric6failed
 
 # localhost
 $DIFF <($NR --node localhost) $DATA/localhost

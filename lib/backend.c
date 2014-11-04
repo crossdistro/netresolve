@@ -383,6 +383,14 @@ netresolve_backend_parse_address(const char *string_orig, Address *address, int 
 		*ifname++ = '\0';
 	if (!ifname)
 		ifname = "";
+
+	if (inet_pton(AF_INET, string, address) == 1)
+		*family = AF_INET;
+	else if (inet_pton(AF_INET6, string, address) == 1)
+		*family = AF_INET6;
+	else
+		return false;
+
 	if (ifindex) {
 		*ifindex = if_nametoindex(ifname);
 		if (!*ifindex) {
@@ -390,20 +398,11 @@ netresolve_backend_parse_address(const char *string_orig, Address *address, int 
 
 			*ifindex = strtol(ifname, &endptr, 10);
 			if (*endptr)
-				return false;
+				*ifindex = -1;
 		}
 	}
 
-	if (inet_pton(AF_INET, string, address) == 1) {
-		*family = AF_INET;
-		return true;
-	}
-	if (inet_pton(AF_INET6, string, address) == 1) {
-		*family = AF_INET6;
-		return true;
-	}
-
-	return false;
+	return true;
 }
 
 struct enum_item {
