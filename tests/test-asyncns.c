@@ -143,7 +143,8 @@ main(int argc, char **argv)
 	status = asyncns_wait(asyncns, 0);
 	assert(status == 0);
 
-	/* Check that the first query is no longer there */
+	/* Check that the old queries are no longer there */
+	assert(asyncns_getnext(asyncns) != q0);
 	assert(asyncns_getnext(asyncns) != q1);
 
 	/* Now second query should be available via `asycns_getnext()` */
@@ -160,6 +161,7 @@ main(int argc, char **argv)
 	assert(status == 0);
 
 	/* Check that the old queries are no longer there */
+	assert(asyncns_getnext(asyncns) != q0);
 	assert(asyncns_getnext(asyncns) != q1);
 	assert(asyncns_getnext(asyncns) != q2);
 
