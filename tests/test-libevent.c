@@ -95,6 +95,7 @@ main(int argc, char **argv)
 
 	/* Run the main loop. */
 	event_base_dispatch(base);
+	assert(finished == 2);
 
 	/* Clean up. */
 	netresolve_close(channel);

@@ -26,20 +26,52 @@
 
 #include <netresolve.h>
 #include <event2/event.h>
+#include <poll.h>
+#include <assert.h>
 
 /* FIXME: This header file should be turned in a library to avoid symbol name clashes. */
 
-static void
-handler(int fd, short events, void *data)
+static int
+condition_to_events(short condition)
 {
-	netresolve_dispatch_fd(NULL, data, 0x01);
+	int events = 0;
+
+	if (condition & EV_READ)
+		events |= POLLIN;
+	if (condition & EV_WRITE)
+		events |= POLLOUT;
+
+	return events;
+}
+
+static short
+events_to_condition(int events)
+{
+	short condition = 0;
+
+	if (events & POLLIN)
+		condition |= EV_READ;
+	if (events & POLLOUT)
+		condition |= EV_WRITE;
+
+	return condition;
+}
+
+static void
+handler(int fd, short condition, void *data)
+{
+	bool dispatched = netresolve_dispatch_fd(data, data, condition_to_events(condition));
+
+	assert(dispatched);
 }
 
 static void*
 watch_fd(netresolve_t channel, int fd, int events, void *data, void *user_data)
 {
 	struct event_base *base = user_data;
-	struct event *event = event_new(base, fd, EV_READ | EV_TIMEOUT, handler, data);
+	struct event *event = event_new(base, fd, events_to_condition(events), handler, data);
+
+	event_add(event, NULL);
 
 	return event;
 }
