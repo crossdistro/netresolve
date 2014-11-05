@@ -102,7 +102,6 @@ main(int argc, char **argv)
 		asyncns_cancel(asyncns, q0);
 		assert(asyncns_getnqueries(asyncns) == 0);
 		assert(asyncns_getnext(asyncns) == NULL);
-		assert(!asyncns_isdone(asyncns, q0));
 	}
 
 	/* Start first real query */
@@ -144,6 +143,9 @@ main(int argc, char **argv)
 	status = asyncns_wait(asyncns, 0);
 	assert(status == 0);
 
+	/* Check that the first query is no longer there */
+	assert(asyncns_getnext(asyncns) != q1);
+
 	/* Now second query should be available via `asycns_getnext()` */
 	assert(asyncns_getnext(asyncns) == q2);
 
@@ -156,6 +158,10 @@ main(int argc, char **argv)
 	 */
 	status = asyncns_wait(asyncns, 0);
 	assert(status == 0);
+
+	/* Check that the old queries are no longer there */
+	assert(asyncns_getnext(asyncns) != q1);
+	assert(asyncns_getnext(asyncns) != q2);
 
 	/* Now no more queries should be available via `asycns_getnext()` */
 	assert(asyncns_getnext(asyncns) == NULL);
