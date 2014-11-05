@@ -164,7 +164,8 @@ noinst_PROGRAMS = \
 	test-gethostbyname2 \
 	test-gethostbyname_r \
 	test-gethostbyname2_r \
-	test-asyncns
+	test-asyncns \
+	test-asyncns-cancel
 
 test_sync_SOURCES = tests/test-sync.c tests/common.c tests/common.h
 test_sync_LDADD = libnetresolve.la
@@ -194,3 +195,6 @@ test_gethostbyname2_r_CFLAGS = -DGETHOSTBYNAME2 -DREENTRANT
 
 test_asyncns_SOURCES = tests/test-asyncns.c
 test_asyncns_LDFLAGS = -lasyncns
+
+test_asyncns_cancel_SOURCES = tests/test-asyncns-cancel.c
+test_asyncns_cancel_LDFLAGS = -lasyncns

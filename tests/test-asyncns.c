@@ -27,6 +27,7 @@
 #include <string.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <unistd.h>
 
 static void
 check(int status, struct addrinfo *result, int family, const char *nodename)
@@ -78,8 +79,8 @@ main(int argc, char **argv)
 	struct addrinfo *result1 = NULL, *result2 = NULL;
 	int status, status1, status2;
 	asyncns_t *asyncns;
-	asyncns_query_t *q0, *q1, *q2;
-	int fd;
+	asyncns_query_t *q1, *q2;
+	struct pollfd pollfd = { .fd = -1, .events = POLLIN };
 
 	/* Create the thread pool */
 	asyncns = asyncns_new(10);
@@ -88,45 +89,32 @@ main(int argc, char **argv)
 	assert(asyncns_getnext(asyncns) == NULL);
 
 	/* Acquire the file descriptor */
-	fd = asyncns_fd(asyncns);
-	assert(fd > 2);
+	pollfd.fd = asyncns_fd(asyncns);
+	assert(pollfd.fd > 2);
 
-	/* Start a query and cancel it */
-	if (!argv[1] || strcmp(argv[1], "--skip-cancel")) {
-		/* Start a query and cancel it */
-		q0 = asyncns_getaddrinfo(asyncns, nodename1, servname, &hints);
-		assert(asyncns_getnqueries(asyncns) == 1);
-		assert(asyncns_getnext(asyncns) == NULL);
-		assert(!asyncns_isdone(asyncns, q0));
+	/* Check that there are no events */
+	status = poll(&pollfd, 1, 100);
+	assert(status == 0);
 
-		asyncns_cancel(asyncns, q0);
-		assert(asyncns_getnqueries(asyncns) == 0);
-		assert(asyncns_getnext(asyncns) == NULL);
-	}
-
-	/* Start first real query */
+	/* Start first query */
 	q1 = asyncns_getaddrinfo(asyncns, nodename1, servname, &hints);
 	assert(asyncns_getnqueries(asyncns) == 1);
 	assert(asyncns_getnext(asyncns) == NULL);
 	assert(!asyncns_isdone(asyncns, q1));
 
-	/* Start second real query */
+	/* Start second query */
 	q2 = asyncns_getaddrinfo(asyncns, nodename2, servname, &hints);
 	assert(q2 != q1);
 	assert(asyncns_getnqueries(asyncns) == 2);
 	assert(asyncns_getnext(asyncns) == NULL);
 	assert(!asyncns_isdone(asyncns, q2));
 
-	/* Poll for the results */
-	while (!asyncns_isdone(asyncns, q1) || !asyncns_isdone(asyncns, q2)) {
-		struct pollfd pollfd = { .fd = fd, .events = POLLIN };
-
-		status = poll(&pollfd, 1, -1);
-		assert(status == 1);
-
-		status = asyncns_wait(asyncns, 0);
-		assert(status == 0);
-	}
+	/* Make sure the results are ready */
+	usleep(100000);
+	status = poll(&pollfd, 1, 0);
+	assert(status == 1);
+	status = asyncns_wait(asyncns, 0);
+	assert(status == 0);
 
 	/* Both queries are finished and one is available via `asyncns_getnext()` */
 	assert(asyncns_getnqueries(asyncns) == 2);
@@ -137,33 +125,12 @@ main(int argc, char **argv)
 	status1 = asyncns_getaddrinfo_done(asyncns, q1, &result1);
 	assert(asyncns_getnqueries(asyncns) == 1);
 
-	/* The docs seem to require `asyncns_wait()` before `asyncns_getnext()`
-	 * so lets' call it just in case.
-	 */
-	status = asyncns_wait(asyncns, 0);
-	assert(status == 0);
-
-	/* Check that the old queries are no longer there */
-	assert(asyncns_getnext(asyncns) != q0);
-	assert(asyncns_getnext(asyncns) != q1);
-
 	/* Now second query should be available via `asycns_getnext()` */
 	assert(asyncns_getnext(asyncns) == q2);
 
 	/* Destry the second query */
 	status2 = asyncns_getaddrinfo_done(asyncns, q2, &result2);
 	assert(asyncns_getnqueries(asyncns) == 0);
-
-	/* The docs seem to require `asyncns_wait()` before `asyncns_getnext()`
-	 * so lets' call it just in case.
-	 */
-	status = asyncns_wait(asyncns, 0);
-	assert(status == 0);
-
-	/* Check that the old queries are no longer there */
-	assert(asyncns_getnext(asyncns) != q0);
-	assert(asyncns_getnext(asyncns) != q1);
-	assert(asyncns_getnext(asyncns) != q2);
 
 	/* Now no more queries should be available via `asycns_getnext()` */
 	assert(asyncns_getnext(asyncns) == NULL);
