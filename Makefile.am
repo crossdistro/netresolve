@@ -129,6 +129,7 @@ TESTS = \
 	test-sync \
 	test-async \
 	test-libevent \
+	test-glib \
 	test-bind-connect \
 	tests/test-compat.sh
 EXTRA_DIST = \
@@ -158,6 +159,7 @@ noinst_PROGRAMS = \
 	test-sync \
 	test-async \
 	test-libevent \
+	test-glib \
 	test-bind-connect \
 	test-getaddrinfo \
 	test-gethostbyname \
@@ -176,6 +178,11 @@ test_async_LDADD = libnetresolve.la
 test_libevent_SOURCES = tests/test-libevent.c tests/common.c tests/common.h
 test_libevent_LDADD = libnetresolve.la
 test_libevent_LDFLAGS = $(AM_LDFLAGS) $(EVENT_LIBS)
+
+test_glib_SOURCES = tests/test-glib.c tests/common.c tests/common.h
+test_glib_LDADD = libnetresolve.la
+test_glib_CFLAGS = $(AM_CFLAGS) $(GLIB_CFLAGS)
+test_glib_LDFLAGS = $(AM_LDFLAGS) $(GLIB_LIBS)
 
 test_bind_connect_SOURCES = tests/test-bind-connect.c
 test_bind_connect_LDADD = libnetresolve.la
