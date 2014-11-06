@@ -157,20 +157,28 @@ netresolve_unwatch_fd(netresolve_t channel, int fd)
 int
 netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec)
 {
-	int fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
+	int fd;
 	struct itimerspec timerspec = {{0, 0}, {sec, nsec}};
 
-	if (fd != -1) {
-		if (timerfd_settime(fd, 0, &timerspec, NULL) == -1) {
-			close(fd);
-			return -1;
-		}
-		netresolve_watch_fd(channel, fd, POLLIN);
+	if ((fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK)) == -1)
+		return -1;
+
+	if (timerfd_settime(fd, 0, &timerspec, NULL) == -1) {
+		close(fd);
+		return -1;
 	}
 
-	debug("added timeout: %d %d %d", fd, (int) sec, (int) nsec);
+	debug("adding timeout: %d %d %ld", fd, (int) sec, nsec);
+
+	netresolve_watch_fd(channel, fd, POLLIN);
 
 	return fd;
+}
+
+int
+netresolve_add_timeout_ms(netresolve_t channel, time_t msec)
+{
+	return netresolve_add_timeout(channel, msec / 1000, (msec % 1000) * 1000000L);
 }
 
 void
