@@ -179,6 +179,7 @@ void netresolve_query_setup(netresolve_query_t channel);
 netresolve_query_t netresolve_query_run(netresolve_query_t query);
 bool netresolve_epoll(netresolve_t channel, bool block);
 void netresolve_watch_fd(netresolve_t channel, int fd, int events);
+void netresolve_unwatch_fd(netresolve_t channel, int fd);
 int netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec);
 void netresolve_remove_timeout(netresolve_t channel, int fd);
 

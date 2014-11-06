@@ -116,12 +116,16 @@ netresolve_epoll(netresolve_t channel, bool block)
 	return true;
 }
 
-static void
-_netresolve_watch_fd(netresolve_t channel, int fd, int events)
+void
+netresolve_watch_fd(netresolve_t channel, int fd, int events)
 {
-	struct epoll_event event = { .events = events, .data = { .fd = fd} };
+	/* FIXME: Should be removed together with code relying on it. */
+	if (!events) {
+		netresolve_unwatch_fd(channel, fd);
+		return;
+	}
 
-	debug("watching file descriptor: %d %d", fd, events);
+	struct epoll_event event = { .events = events, .data = { .fd = fd} };
 
 	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1)
 		error("epoll_ctl: %s", strerror(errno));
@@ -130,13 +134,13 @@ _netresolve_watch_fd(netresolve_t channel, int fd, int events)
 
 	if (channel->epoll_count == 1 && channel->fd_callbacks.watch_fd)
 		channel->epoll_handle = channel->fd_callbacks.watch_fd(channel, channel->epoll_fd, POLLIN, channel, channel->fd_callbacks.user_data);
+
+	debug("added file descriptor: fd=%d events=%d (total %d)", fd, events, channel->epoll_count);
 }
 
-static void
-_netresolve_unwatch_fd(netresolve_t channel, int fd)
+void
+netresolve_unwatch_fd(netresolve_t channel, int fd)
 {
-	debug("not watching file descriptor: %d", fd);
-
 	assert(channel->epoll_count > 0);
 
 	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == -1)
@@ -146,15 +150,8 @@ _netresolve_unwatch_fd(netresolve_t channel, int fd)
 
 	if (channel->epoll_count == 0 && channel->fd_callbacks.watch_fd)
 		channel->fd_callbacks.unwatch_fd(channel, channel->epoll_fd, channel->epoll_handle, channel->fd_callbacks.user_data);
-}
 
-void
-netresolve_watch_fd(netresolve_t channel, int fd, int events)
-{
-	if (events)
-		_netresolve_watch_fd(channel, fd, events);
-	else
-		_netresolve_unwatch_fd(channel, fd);
+	debug("removed file descriptor: fd=%d (total %d)", fd, channel->epoll_count);
 }
 
 int
