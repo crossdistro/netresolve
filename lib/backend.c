@@ -300,71 +300,16 @@ netresolve_backend_remove_timeout(netresolve_query_t query, int fd)
 	netresolve_remove_timeout(query->channel, fd);
 }
 
-static void
-backend_cleanup(netresolve_query_t query)
-{
-	struct netresolve_backend *backend = *query->backend;
-
-	if (backend && backend->data) {
-		if (backend->cleanup)
-			backend->cleanup(query);
-		free(backend->data);
-		backend->data = NULL;
-	}
-}
-
 void
 netresolve_backend_finished(netresolve_query_t query)
 {
-	if (!*query->backend) {
-		error("Out of order backend callback.");
-		goto fail;
-	}
-
-	backend_cleanup(query);
-
-	/* Restart with the next *mandatory* backend. */
-	while (*++query->backend) {
-		if ((*query->backend)->mandatory) {
-			netresolve_query_setup(query);
-			return;
-		}
-	}
-
-	if (query->channel->callbacks.on_connect) {
-		netresolve_connect_start(query);
-		return;
-	}
-
-	netresolve_query_set_state(query, NETRESOLVE_STATE_FINISHED);
-	return;
-
-fail:
-	netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
+	netresolve_query_finished(query);
 }
 
 void
 netresolve_backend_failed(netresolve_query_t query)
 {
-	if (!*query->backend) {
-		error("Out of order backend callback.");
-		goto fail;
-	}
-
-	if (query->response.pathcount)
-		error("Non-empty failed reply.");
-
-	debug("failed");
-	backend_cleanup(query);
-
-	/* Restart with the next backend. */
-	if (*++query->backend) {
-		netresolve_query_setup(query);
-		return;
-	}
-
-fail:
-	netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
+	netresolve_query_failed(query);
 }
 
 bool

@@ -185,25 +185,6 @@ netresolve_query_setup(netresolve_query_t query)
 		netresolve_backend_failed(query);
 }
 
-void
-netresolve_query_clear_delayed_state(netresolve_query_t query)
-{
-	query->delayed_state = NETRESOLVE_STATE_NONE;
-	netresolve_watch_fd(query->channel, query->delayed_fd, 0);
-	close(query->delayed_fd);
-	query->delayed_fd = -1;
-}
-
-void
-netresolve_query_apply_delayed_state(netresolve_query_t query)
-{
-	enum netresolve_state state = query->delayed_state;
-
-	netresolve_query_clear_delayed_state(query);
-
-	netresolve_query_set_state(query, state);
-}
-
 bool
 netresolve_query_dispatch_fd(netresolve_query_t query, int fd, int events)
 {
@@ -226,6 +207,92 @@ netresolve_query_dispatch_fd(netresolve_query_t query, int fd, int events)
 	}
 
 	return false;
+}
+
+void
+netresolve_query_cleanup(netresolve_query_t query)
+{
+	struct netresolve_backend *backend = *query->backend;
+
+	if (backend && backend->data) {
+		if (backend->cleanup)
+			backend->cleanup(query);
+		free(backend->data);
+		backend->data = NULL;
+	}
+}
+
+void
+netresolve_query_finished(netresolve_query_t query)
+{
+	if (!*query->backend) {
+		error("Out of order backend callback.");
+		goto fail;
+	}
+
+	netresolve_query_cleanup(query);
+
+	/* Restart with the next *mandatory* backend. */
+	while (*++query->backend) {
+		if ((*query->backend)->mandatory) {
+			netresolve_query_setup(query);
+			return;
+		}
+	}
+
+	if (query->channel->callbacks.on_connect) {
+		netresolve_connect_start(query);
+		return;
+	}
+
+	netresolve_query_set_state(query, NETRESOLVE_STATE_FINISHED);
+	return;
+
+fail:
+	netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
+}
+
+void
+netresolve_query_failed(netresolve_query_t query)
+{
+	if (!*query->backend) {
+		error("Out of order backend callback.");
+		goto fail;
+	}
+
+	if (query->response.pathcount)
+		error("Non-empty failed reply.");
+
+	debug("failed");
+	netresolve_query_cleanup(query);
+
+	/* Restart with the next backend. */
+	if (*++query->backend) {
+		netresolve_query_setup(query);
+		return;
+	}
+
+fail:
+	netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
+}
+
+void
+netresolve_query_clear_delayed_state(netresolve_query_t query)
+{
+	query->delayed_state = NETRESOLVE_STATE_NONE;
+	netresolve_watch_fd(query->channel, query->delayed_fd, 0);
+	close(query->delayed_fd);
+	query->delayed_fd = -1;
+}
+
+void
+netresolve_query_apply_delayed_state(netresolve_query_t query)
+{
+	enum netresolve_state state = query->delayed_state;
+
+	netresolve_query_clear_delayed_state(query);
+
+	netresolve_query_set_state(query, state);
 }
 
 netresolve_query_t

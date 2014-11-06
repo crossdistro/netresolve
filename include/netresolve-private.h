@@ -172,10 +172,13 @@ void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state 
 void netresolve_query_clear_delayed_state(netresolve_query_t query);
 void netresolve_query_apply_delayed_state(netresolve_query_t query);
 
-bool netresolve_query_dispatch_fd(netresolve_query_t query, int fd, int events);
-
 netresolve_query_t netresolve_query_new(netresolve_t channel, enum netresolve_request_type type);
-void netresolve_query_setup(netresolve_query_t channel);
+void netresolve_query_setup(netresolve_query_t query);
+bool netresolve_query_dispatch_fd(netresolve_query_t query, int fd, int events);
+void netresolve_query_cleanup(netresolve_query_t query);
+void netresolve_query_finished(netresolve_query_t query);
+void netresolve_query_failed(netresolve_query_t query);
+
 netresolve_query_t netresolve_query_run(netresolve_query_t query);
 bool netresolve_epoll(netresolve_t channel, bool block);
 void netresolve_watch_fd(netresolve_t channel, int fd, int events);
