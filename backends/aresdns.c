@@ -27,9 +27,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-/* A timeout starting when the first successful answer has been received. */
-static int partial_timeout = 5;
-
 struct priv_dns {
 	ares_channel query;
 	fd_set rfds;
@@ -85,7 +82,6 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 	struct priv_address_lookup *lookup_data = arg;
 	netresolve_query_t query = lookup_data->query;
 	struct ares_srv_reply *srv = lookup_data->srv;
-	struct priv_dns *priv = netresolve_backend_get_priv(query);
 	int socktype = 0;
 	int protocol = 0;
 	int port = 0;
@@ -105,9 +101,6 @@ host_callback(void *arg, int status, int timeouts, struct hostent *he)
 	case ARES_EDESTRUCTION:
 		break;
 	case ARES_SUCCESS:
-		priv->ptfd = netresolve_backend_add_timeout(query, partial_timeout, 0);
-		if (priv->ptfd == -1)
-			error("timer: %s", strerror(errno));
 		netresolve_backend_apply_hostent(query, he, socktype, protocol, port, priority, weight, ttl);
 		break;
 	default:
@@ -251,12 +244,6 @@ dispatch(netresolve_query_t query, int fd, int events)
 
 	int rfd = events & POLLIN ? fd : ARES_SOCKET_BAD;
 	int wfd = events & POLLOUT ? fd : ARES_SOCKET_BAD;
-
-	if (fd == priv->ptfd) {
-		error("partial response used due to a timeout");
-		netresolve_backend_finished(query);
-		return;
-	}
 
 	ares_process_fd(priv->query, rfd, wfd);
 	register_fds(query);
