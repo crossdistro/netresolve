@@ -35,16 +35,18 @@
 #include "netresolve-private.h"
 
 static bool
-strtob(const char *string)
+getenv_bool(const char *name, bool def)
 {
-	return string && (!strcasecmp(string, "yes") || !strcasecmp(string, "true") || !strcasecmp(string, "1"));
+	const char *value = secure_getenv(name);
+
+	return value ? (!strcasecmp(value, "yes") || !strcasecmp(value, "true") || !strcasecmp(value, "1")) : def;
 }
 
 netresolve_t
 netresolve_open(void)
 {
 	/* FIXME: this should probably be only called once */
-	netresolve_set_log_level(strtob(secure_getenv("NETRESOLVE_VERBOSE")) ? NETRESOLVE_LOG_LEVEL_DEBUG : NETRESOLVE_LOG_LEVEL_QUIET);
+	netresolve_set_log_level(getenv_bool("NETRESOLVE_VERBOSE", false) ? NETRESOLVE_LOG_LEVEL_DEBUG : NETRESOLVE_LOG_LEVEL_QUIET);
 
 	netresolve_t channel = calloc(1, sizeof *channel);
 	if (!channel)
@@ -56,8 +58,9 @@ netresolve_open(void)
 		return NULL;
 	}
 
-	channel->request.default_loopback = strtob(secure_getenv("NETRESOLVE_FLAG_DEFAULT_LOOPBACK"));
 	channel->config.force_family = netresolve_family_from_string(secure_getenv("NETRESOLVE_FORCE_FAMILY"));
+
+	channel->request.default_loopback = getenv_bool("NETRESOLVE_FLAG_DEFAULT_LOOPBACK", false);
 
 	return channel;
 }
