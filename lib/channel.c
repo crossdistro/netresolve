@@ -103,13 +103,15 @@ netresolve_epoll(netresolve_t channel, bool block)
 	int nevents;
 	int i;
 
-	assert(channel->epoll_count > 0);
-
-	nevents = epoll_wait(channel->epoll_fd, events, maxevents, block ? -1 : 0);
-	if (nevents == -1)
-		return false;
-	for (i = 0; i < nevents; i++)
-		dispatch_fd(channel, events[i].data.fd, events[i].events);
+	if (channel->epoll_count > 0) {
+		nevents = epoll_wait(channel->epoll_fd, events, maxevents, block ? -1 : 0);
+		if (nevents == -1) {
+			error("epoll_wait: %s", strerror(errno));
+			return false;
+		}
+		for (i = 0; i < nevents; i++)
+			dispatch_fd(channel, events[i].data.fd, events[i].events);
+	}
 
 	return true;
 }
