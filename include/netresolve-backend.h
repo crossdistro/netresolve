@@ -73,7 +73,7 @@ void netresolve_backend_add_path(netresolve_query_t query,
 		int priority, int weight, int32_t ttl);
 void netresolve_backend_add_name_info(netresolve_query_t query, const char *nodename, const char *servname);
 void netresolve_backend_set_canonical_name(netresolve_query_t query, const char *canonical_name);
-void netresolve_backend_set_dns_answer(netresolve_query_t query, void *answer, size_t length);
+void netresolve_backend_set_dns_answer(netresolve_query_t query, const void *answer, size_t length);
 
 /* Convenience output */
 void netresolve_backend_apply_addrinfo(netresolve_query_t query,

@@ -257,7 +257,7 @@ netresolve_backend_add_name_info(netresolve_query_t query, const char *nodename,
 }
 
 void
-netresolve_backend_set_dns_answer(netresolve_query_t query, void *answer, size_t length)
+netresolve_backend_set_dns_answer(netresolve_query_t query, const void *answer, size_t length)
 {
 	query->response.dns.answer = malloc(length);
 	memcpy(query->response.dns.answer, answer, length);

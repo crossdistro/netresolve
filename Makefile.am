@@ -91,11 +91,12 @@ libnetresolve_backend_loopback_la_SOURCES = backends/loopback.c
 libnetresolve_backend_numerichost_la_SOURCES = backends/numerichost.c
 libnetresolve_backend_hosts_la_SOURCES = backends/hosts.c
 libnetresolve_backend_hostname_la_SOURCES = backends/hostname.c
-libnetresolve_backend_aresdns_la_SOURCES = backends/aresdns.c
-libnetresolve_backend_aresdns_la_CPPFLAGS = $(AM_CPPFLAGS) $(ARES_CFLAGS)
+libnetresolve_backend_aresdns_la_SOURCES = backends/dns.c
+libnetresolve_backend_aresdns_la_CPPFLAGS = $(AM_CPPFLAGS) $(ARES_CFLAGS) -DUSE_ARES=1
 libnetresolve_backend_aresdns_la_LDFLAGS = $(AM_LDFLAGS) $(ARES_LIBS)
-libnetresolve_backend_ubdns_la_SOURCES = backends/ubdns.c
+libnetresolve_backend_ubdns_la_SOURCES = backends/dns.c
 libnetresolve_backend_ubdns_la_LDFLAGS = $(AM_LDFLAGS) $(UNBOUND_LIBS) -lldns
+libnetresolve_backend_ubdns_la_CPPFLAGS = $(AM_CPPFLAGS) -DUSE_UNBOUND=1
 libnetresolve_backend_getaddrinfo_la_SOURCES = backends/getaddrinfo.c
 libnetresolve_backend_asyncns_la_SOURCES = backends/asyncns.c
 libnetresolve_backend_asyncns_la_LDFLAGS = -lasyncns
