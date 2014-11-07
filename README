@@ -313,6 +313,8 @@ When success or failure was reported by the plugin, or when the query has been c
 
 The cleanup function also retrieves the state object, removes remaining watchers using `netresolve_backend_watch_fd()` and/or `netresolve_backend_remove_timeout()`, closes open file descriptors, returns allocated memory (except the context object itself which is freed by netresolve itself).
 
+Calls to the above functions in a single backend are serialized, calling a backend API function doesn't cause any side effects for the backend.
+
 ## Known bugs
 
 The library doesn't currently sort paths according to their priority and/or RFC rules. The c-ares library blocks when /etc/resolv.conf is empty instead of quitting immediately, which in turn breaks tests when offline. The DNS backend doesn't support search domains. For more information, see the `TODO` file. 

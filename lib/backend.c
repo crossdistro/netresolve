@@ -312,7 +312,7 @@ netresolve_backend_finished(netresolve_query_t query)
 void
 netresolve_backend_failed(netresolve_query_t query)
 {
-	netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
+	netresolve_query_set_state(query, NETRESOLVE_STATE_ERROR);
 }
 
 bool

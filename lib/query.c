@@ -51,6 +51,8 @@ state_to_string(enum netresolve_state state)
 		return "connecting";
 	case NETRESOLVE_STATE_DONE:
 		return "done";
+	case NETRESOLVE_STATE_ERROR:
+		return "error";
 	case NETRESOLVE_STATE_FAILED:
 		return "failed";
 	}
@@ -115,6 +117,8 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 				setup(query, backend->settings + 1);
 				if (query->state == NETRESOLVE_STATE_SETUP)
 					netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
+				if (query->state == NETRESOLVE_STATE_ERROR)
+					netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
 			} else
 				netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
 		}
@@ -130,8 +134,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 				abort();
 			}
 			netresolve_watch_fd(query->channel, query->delayed_fd, POLLIN);
-		} else
-			netresolve_query_set_state(query, NETRESOLVE_STATE_CONNECTING);
+		}
 		break;
 	case NETRESOLVE_STATE_CONNECTING:
 		cleanup_query(query);
@@ -156,6 +159,8 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 			netresolve_connect_cleanup(query);
 		if (query->channel->callbacks.on_success)
 			query->channel->callbacks.on_success(query, query->channel->callbacks.user_data);
+		break;
+	case NETRESOLVE_STATE_ERROR:
 		break;
 	case NETRESOLVE_STATE_FAILED:
 		if (query->response.pathcount)
@@ -241,7 +246,15 @@ netresolve_query_dispatch(netresolve_query_t query, int fd, int events)
 	switch (query->state) {
 	case NETRESOLVE_STATE_WAITING_MORE:
 	case NETRESOLVE_STATE_WAITING:
-		return backend && backend->dispatch && (backend->dispatch(query, fd, events), true);
+		if (backend && backend->dispatch) {
+			backend->dispatch(query, fd, events);
+			if (query->state == NETRESOLVE_STATE_RESOLVED)
+				netresolve_query_set_state(query, NETRESOLVE_STATE_CONNECTING);
+			if (query->state == NETRESOLVE_STATE_ERROR)
+				netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
+			return true;
+		}
+		return false;
 	case NETRESOLVE_STATE_RESOLVED:
 		return dispatch_timeout(query, &query->delayed_fd, NETRESOLVE_STATE_CONNECTING, fd, events);
 	case NETRESOLVE_STATE_CONNECTING:
