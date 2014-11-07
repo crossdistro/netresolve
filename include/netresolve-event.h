@@ -47,7 +47,7 @@ condition_to_events(short condition)
 static short
 events_to_condition(int events)
 {
-	short condition = 0;
+	short condition = EV_PERSIST;
 
 	if (events & POLLIN)
 		condition |= EV_READ;
