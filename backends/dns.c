@@ -67,11 +67,6 @@ static void lookup(struct priv_dns *priv, int family);
 #if defined(USE_UNBOUND)
 #elif defined(USE_ARES)
 
-struct priv_address_lookup {
-	netresolve_query_t query;
-	struct ares_srv_reply *srv;
-};
-
 static void
 register_fds(netresolve_query_t query)
 {
