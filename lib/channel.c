@@ -86,9 +86,12 @@ netresolve_close(netresolve_t channel)
 static bool
 dispatch_fd(netresolve_t channel, int fd, int events)
 {
-	int i;
+	assert(fd >= 0);
+	assert(events);
 
-	for (i = 0; i < channel->nqueries; i++) {
+	debug_channel(channel, "dispatching: fd=%d events=%d", fd, events);
+
+	for (int i = 0; i < channel->nqueries; i++) {
 		netresolve_query_t query = channel->queries[i];
 
 		if (netresolve_query_dispatch_fd(query, fd, events))
@@ -107,6 +110,8 @@ netresolve_epoll(netresolve_t channel, bool block)
 	int i;
 
 	if (channel->epoll_count > 0) {
+		debug_channel(channel, "running epoll...");
+
 		nevents = epoll_wait(channel->epoll_fd, events, maxevents, block ? -1 : 0);
 		if (nevents == -1) {
 			error("epoll_wait: %s", strerror(errno));
@@ -138,7 +143,7 @@ netresolve_watch_fd(netresolve_t channel, int fd, int events)
 	if (channel->epoll_count == 1 && channel->fd_callbacks.watch_fd)
 		channel->epoll_handle = channel->fd_callbacks.watch_fd(channel, channel->epoll_fd, POLLIN, channel, channel->fd_callbacks.user_data);
 
-	debug("added file descriptor: fd=%d events=%d (total %d)", fd, events, channel->epoll_count);
+	debug_channel(channel, "added file descriptor: fd=%d events=%d (total %d)", fd, events, channel->epoll_count);
 }
 
 void
@@ -154,7 +159,7 @@ netresolve_unwatch_fd(netresolve_t channel, int fd)
 	if (channel->epoll_count == 0 && channel->fd_callbacks.watch_fd)
 		channel->fd_callbacks.unwatch_fd(channel, channel->epoll_fd, channel->epoll_handle, channel->fd_callbacks.user_data);
 
-	debug("removed file descriptor: fd=%d (total %d)", fd, channel->epoll_count);
+	debug_channel(channel, "removed file descriptor: fd=%d (total %d)", fd, channel->epoll_count);
 }
 
 int
@@ -171,7 +176,7 @@ netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec)
 		return -1;
 	}
 
-	debug("adding timeout: %d %d %ld", fd, (int) sec, nsec);
+	debug_channel(channel, "adding timeout: fd=%d sec=%d nsec=%ld", fd, (int) sec, nsec);
 
 	netresolve_watch_fd(channel, fd, POLLIN);
 
@@ -188,8 +193,22 @@ void
 netresolve_remove_timeout(netresolve_t channel, int fd)
 {
 	netresolve_watch_fd(channel, fd, 0);
-	debug("removed timeout: %d", fd);
+	debug_channel(channel, "removed timeout: fd=%d", fd);
 	close(fd);
+}
+
+static netresolve_query_t
+start_query(netresolve_t channel, netresolve_query_t query)
+{
+	netresolve_query_start(query);
+
+	/* Wait for the channel in blocking mode. */
+	if (!channel->fd_callbacks.watch_fd)
+		while (channel->epoll_count > 0)
+			if (!netresolve_epoll(channel, true))
+				abort();
+
+	return query;
 }
 
 netresolve_query_t
@@ -205,7 +224,7 @@ netresolve_query(netresolve_t channel, const char *nodename, const char *servnam
 	query->request.nodename = nodename;
 	query->request.servname = servname;
 
-	return netresolve_query_run(query);
+	return start_query(channel, query);
 }
 
 netresolve_query_t
@@ -221,7 +240,7 @@ netresolve_query_reverse(netresolve_t channel, int family, const void *address, 
 	memcpy(query->request.address, address, size);
 	query->request.port = port;
 
-	return netresolve_query_run(query);
+	return start_query(channel, query);
 }
 
 netresolve_query_t
@@ -236,7 +255,7 @@ netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type)
 	query->request.dns_class = cls;
 	query->request.dns_type = type;
 
-	return netresolve_query_run(query);
+	return start_query(channel, query);
 }
 
 bool
