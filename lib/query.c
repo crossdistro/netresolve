@@ -43,14 +43,13 @@ state_to_string(enum netresolve_state state)
 		return "setup";
 	case NETRESOLVE_STATE_WAITING:
 		return "waiting";
-	case NETRESOLVE_STATE_FINISHED:
-		return "finished";
+	case NETRESOLVE_STATE_DONE:
+		return "done";
 	case NETRESOLVE_STATE_FAILED:
 		return "failed";
-	default:
-		/* Shouldn't happen. */
-		return "UNKNOWN";
 	}
+
+	abort();
 }
 
 void
@@ -72,7 +71,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 
 	/* Delaying state... */
 	switch (state) {
-	case NETRESOLVE_STATE_FINISHED:
+	case NETRESOLVE_STATE_DONE:
 	case NETRESOLVE_STATE_FAILED:
 		if (old_state != NETRESOLVE_STATE_WAITING) {
 			if ((query->delayed_fd = eventfd(1, EFD_NONBLOCK)) == -1) {
@@ -103,7 +102,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		netresolve_query_setup(query);
 	case NETRESOLVE_STATE_WAITING:
 		break;
-	case NETRESOLVE_STATE_FINISHED:
+	case NETRESOLVE_STATE_DONE:
 		if (!query->response.nodename)
 			query->response.nodename = query->request.nodename ? strdup(query->request.nodename) : strdup("localhost");
 		if (query->channel->callbacks.on_connect)
@@ -124,7 +123,7 @@ state_to_errno(enum netresolve_state state)
 	switch (state) {
 	case NETRESOLVE_STATE_WAITING:
 		return EWOULDBLOCK;
-	case NETRESOLVE_STATE_FINISHED:
+	case NETRESOLVE_STATE_DONE:
 		return 0;
 	case NETRESOLVE_STATE_FAILED:
 		return ENODATA;
@@ -154,7 +153,7 @@ netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
 	if (!channel->backends)
 		netresolve_set_backend_string(channel, secure_getenv("NETRESOLVE_BACKENDS"));
 	if (!channel->backends || !*channel->backends) {
-		netresolve_query_set_state(query, NETRESOLVE_STATE_FINISHED);
+		netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 		return query;
 	}
 
@@ -251,7 +250,7 @@ netresolve_query_finished(netresolve_query_t query)
 		return;
 	}
 
-	netresolve_query_set_state(query, NETRESOLVE_STATE_FINISHED);
+	netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 	return;
 
 fail:

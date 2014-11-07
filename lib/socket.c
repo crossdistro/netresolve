@@ -92,13 +92,13 @@ connect_check(netresolve_query_t query)
 	for (idx = 0; idx < query->response.pathcount; idx++) {
 		struct netresolve_path *path = &query->response.paths[idx];
 
-		if (path->socket.state < NETRESOLVE_STATE_FINISHED)
+		if (path->socket.state < NETRESOLVE_STATE_DONE)
 			break;
 
-		if (path->socket.state == NETRESOLVE_STATE_FINISHED) {
+		if (path->socket.state == NETRESOLVE_STATE_DONE) {
 			query->channel->callbacks.on_connect(query, idx, path->socket.fd, query->channel->callbacks.user_data_sock);
 			path->socket.state = NETRESOLVE_STATE_NONE;
-			netresolve_query_set_state(query, NETRESOLVE_STATE_FINISHED);
+			netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 			break;
 		}
 	}
@@ -107,7 +107,7 @@ connect_check(netresolve_query_t query)
 static void
 connect_finished(netresolve_query_t query, struct netresolve_path *path)
 {
-	path->socket.state = NETRESOLVE_STATE_FINISHED;
+	path->socket.state = NETRESOLVE_STATE_DONE;
 
 	if (query->first_connect_timeout == -1)
 		query->first_connect_timeout = netresolve_add_timeout(query->channel, FIRST_CONNECT_TIMEOUT, 0);
@@ -215,7 +215,7 @@ netresolve_connect_cleanup(netresolve_query_t query)
 
 		switch (path->socket.state) {
 		case NETRESOLVE_STATE_WAITING:
-		case NETRESOLVE_STATE_FINISHED:
+		case NETRESOLVE_STATE_DONE:
 			close(path->socket.fd);
 			/* pass through */
 		default:
