@@ -76,6 +76,8 @@ cleanup_query(netresolve_query_t query)
 	struct netresolve_backend *backend = query->backend ? *query->backend : NULL;
 
 	clear_timeout(query, &query->delayed_fd);
+	clear_timeout(query, &query->timeout_fd);
+	clear_timeout(query, &query->partial_timeout_fd);
 
 	if (backend && backend->data) {
 		if (backend->cleanup)
@@ -119,7 +121,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 			if (setup) {
 				setup(query, backend->settings + 1);
 				if (query->state == NETRESOLVE_STATE_SETUP)
-					netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING);
+					netresolve_query_set_state(query, query->request.timeout ? NETRESOLVE_STATE_WAITING : NETRESOLVE_STATE_FAILED);
 				if (query->state == NETRESOLVE_STATE_ERROR)
 					netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
 			} else
@@ -127,8 +129,14 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		}
 		break;
 	case NETRESOLVE_STATE_WAITING:
+		if (query->request.timeout > 0)
+			query->timeout_fd = netresolve_add_timeout_ms(query->channel, query->request.timeout);
 		break;
 	case NETRESOLVE_STATE_WAITING_MORE:
+		if (query->request.partial_timeout == 0)
+			netresolve_query_set_state(query, NETRESOLVE_STATE_CONNECTING);
+		if (query->request.partial_timeout > 0)
+			query->partial_timeout_fd = netresolve_add_timeout_ms(query->channel, query->request.partial_timeout);
 		break;
 	case NETRESOLVE_STATE_RESOLVED:
 		if (old_state == NETRESOLVE_STATE_SETUP) {
@@ -202,6 +210,8 @@ netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
 
 	query->first_connect_timeout = -1;
 	query->delayed_fd = -1;
+	query->timeout_fd = -1;
+	query->partial_timeout_fd = -1;
 	query->backend = channel->backends;
 	memcpy(&query->request, &channel->request, sizeof channel->request);
 
@@ -246,7 +256,16 @@ netresolve_query_dispatch(netresolve_query_t query, int fd, int events)
 
 	switch (query->state) {
 	case NETRESOLVE_STATE_WAITING_MORE:
+		if (dispatch_timeout(query, &query->partial_timeout_fd, NETRESOLVE_STATE_CONNECTING, fd, events)) {
+			debug_query(query, "partial result timed out");
+			return true;
+		}
+		/* fall through */
 	case NETRESOLVE_STATE_WAITING:
+		if (dispatch_timeout(query, &query->timeout_fd, NETRESOLVE_STATE_FAILED, fd, events)) {
+			debug_query(query, "timed out");
+			return true;
+		}
 		if (backend && backend->dispatch) {
 			backend->dispatch(query, fd, events);
 			if (query->state == NETRESOLVE_STATE_RESOLVED)
