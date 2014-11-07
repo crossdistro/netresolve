@@ -94,7 +94,7 @@ dispatch_fd(netresolve_t channel, int fd, int events)
 	for (int i = 0; i < channel->nqueries; i++) {
 		netresolve_query_t query = channel->queries[i];
 
-		if (netresolve_query_dispatch_fd(query, fd, events))
+		if (netresolve_query_dispatch(query, fd, events))
 			return true;
 	}
 

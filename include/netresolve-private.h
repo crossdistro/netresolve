@@ -40,10 +40,19 @@
 		channel, \
 		##__VA_ARGS__)
 
+#define debug_query(query, format, ...) debug( \
+		"[query %p %s] " format, \
+		query, \
+		query->backend  && *query->backend ? (*query->backend)->settings[0] : "-", \
+		##__VA_ARGS__)
+
 enum netresolve_state {
 	NETRESOLVE_STATE_NONE,
 	NETRESOLVE_STATE_SETUP,
 	NETRESOLVE_STATE_WAITING,
+	NETRESOLVE_STATE_WAITING_MORE,
+	NETRESOLVE_STATE_RESOLVED,
+	NETRESOLVE_STATE_CONNECTING,
 	NETRESOLVE_STATE_DONE,
 	NETRESOLVE_STATE_FAILED
 };
@@ -146,7 +155,6 @@ struct netresolve_query {
 	struct netresolve_channel *channel;
 	void *user_data;
 	enum netresolve_state state;
-	enum netresolve_state delayed_state;
 	int delayed_fd;
 	int first_connect_timeout;
 	struct netresolve_backend **backend;
@@ -172,19 +180,7 @@ struct netresolve_query {
 	char buffer[1024];
 };
 
-void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
-
-void netresolve_query_clear_delayed_state(netresolve_query_t query);
-void netresolve_query_apply_delayed_state(netresolve_query_t query);
-
-netresolve_query_t netresolve_query_new(netresolve_t channel, enum netresolve_request_type type);
-void netresolve_query_start(netresolve_query_t query);
-void netresolve_query_setup(netresolve_query_t query);
-bool netresolve_query_dispatch_fd(netresolve_query_t query, int fd, int events);
-void netresolve_query_cleanup(netresolve_query_t query);
-void netresolve_query_finished(netresolve_query_t query);
-void netresolve_query_failed(netresolve_query_t query);
-
+/* Channel */
 bool netresolve_epoll(netresolve_t channel, bool block);
 void netresolve_watch_fd(netresolve_t channel, int fd, int events);
 void netresolve_unwatch_fd(netresolve_t channel, int fd);
@@ -192,13 +188,14 @@ int netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec);
 int netresolve_add_timeout_ms(netresolve_t channel, time_t msec);
 void netresolve_remove_timeout(netresolve_t channel, int fd);
 
-void netresolve_query_bind(netresolve_query_t query, size_t idx);
-void netresolve_query_connect(netresolve_query_t query, size_t idx);
+/* Query */
+void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
+netresolve_query_t netresolve_query_new(netresolve_t channel, enum netresolve_request_type type);
+void netresolve_query_start(netresolve_query_t query);
+bool netresolve_query_dispatch(netresolve_query_t query, int fd, int events);
+void netresolve_query_cleanup(netresolve_query_t query);
 
-void netresolve_connect_start(netresolve_query_t query);
-bool netresolve_connect_dispatch(netresolve_query_t query, int fd, int events);
-void netresolve_connect_cleanup(netresolve_query_t query);
-
+/* Services */
 struct netresolve_service_list;
 typedef void (*netresolve_service_callback)(const char *name, int socktype, int protocol, int port, void *user_data);
 struct netresolve_service_list *netresolve_service_list_new(const char *path);
@@ -207,12 +204,22 @@ void netresolve_service_list_query(struct netresolve_service_list **services,
 		const char *name, int socktype, int protocol, int port,
 		netresolve_service_callback callback, void *user_data);
 
+/* Utilities */
 int netresolve_family_from_string(const char *str);
 int netresolve_socktype_from_string(const char *str);
 int netresolve_protocol_from_string(const char *str);
 
+/* String output */
 const char * netresolve_get_request_string(netresolve_query_t query);
 const char * netresolve_get_path_string(netresolve_query_t query, int i);
 const char * netresolve_get_response_string(netresolve_query_t query);
+
+/* Socket */
+void netresolve_query_bind(netresolve_query_t query, size_t idx);
+void netresolve_query_connect(netresolve_query_t query, size_t idx);
+
+void netresolve_connect_start(netresolve_query_t query);
+bool netresolve_connect_dispatch(netresolve_query_t query, int fd, int events);
+void netresolve_connect_cleanup(netresolve_query_t query);
 
 #endif /* NETRESOLVE_PRIVATE_H */

@@ -146,10 +146,13 @@ add_path(netresolve_query_t query, const struct netresolve_path *path)
 			(response->pathcount++ - i) * sizeof *response->paths);
 	memcpy(&response->paths[i], path, sizeof *path);
 
-	debug("added path: %s", netresolve_get_path_string(query, response->pathcount - 1));
+	debug_query(query, "added path: %s", netresolve_get_path_string(query, response->pathcount - 1));
 
 	if (query->channel->callbacks.on_bind)
 		netresolve_query_bind(query, response->pathcount - 1);
+
+	if (query->state == NETRESOLVE_STATE_WAITING)
+		netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING_MORE);
 }
 
 struct path_data {
@@ -303,13 +306,13 @@ netresolve_backend_remove_timeout(netresolve_query_t query, int fd)
 void
 netresolve_backend_finished(netresolve_query_t query)
 {
-	netresolve_query_finished(query);
+	netresolve_query_set_state(query, NETRESOLVE_STATE_RESOLVED);
 }
 
 void
 netresolve_backend_failed(netresolve_query_t query)
 {
-	netresolve_query_failed(query);
+	netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
 }
 
 bool

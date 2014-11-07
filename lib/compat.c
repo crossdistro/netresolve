@@ -27,6 +27,50 @@
 /* FIXME: Would be nicer to only require `netresolve-compat.h`. */
 #include <netresolve-private.h>
 
+/* netresolve_query_get_sockaddr:
+ *
+ * Retrieve the address information as `struct sockaddr` and a couple of
+ * separate values typically used with the BSD socket API.
+ */
+const struct sockaddr *
+netresolve_query_get_sockaddr(netresolve_query_t query, size_t idx,
+		socklen_t *salen, int *socktype, int *protocol, int32_t *ttl)
+{
+	int family, ifindex, port;
+	const void *address;
+
+	netresolve_query_get_node_info(query, idx, &family, &address, &ifindex);
+	netresolve_query_get_service_info(query, idx, socktype, protocol, &port);
+	netresolve_query_get_aux_info(query, idx, NULL, NULL, ttl);
+
+	if (!address)
+		return NULL;
+
+	memset(&query->sa_buffer, 0, sizeof query->sa_buffer);
+
+	switch (family) {
+	case AF_INET:
+		query->sa_buffer.sin.sin_family = family;
+		query->sa_buffer.sin.sin_port = htons(port);
+		query->sa_buffer.sin.sin_addr = *(struct in_addr *) address;
+		if (salen)
+			*salen = sizeof query->sa_buffer.sin;
+		break;
+	case AF_INET6:
+		query->sa_buffer.sin6.sin6_family = family;
+		query->sa_buffer.sin6.sin6_port = htons(port);
+		query->sa_buffer.sin6.sin6_scope_id = ifindex;
+		query->sa_buffer.sin6.sin6_addr = *(struct in6_addr *) address;
+		if (salen)
+			*salen = sizeof query->sa_buffer.sin6;
+		break;
+	default:
+		return NULL;
+	}
+
+	return &query->sa_buffer.sa;
+}
+
 /* netresolve_query_getaddrinfo:
  *
  * Configures the channel and calls `netresolve_query()` according to the
