@@ -164,18 +164,17 @@ netresolve_connect_dispatch(netresolve_query_t query, int fd, int events)
 		struct netresolve_path *path = &query->response.paths[i];
 
 		if (fd == path->socket.fd) {
-			netresolve_watch_fd(query->channel, path->socket.fd, 0);
+			netresolve_unwatch_fd(query->channel, path->socket.fd);
 
-			if (events & POLLOUT) {
-				socklen_t len = sizeof(errno);
+			assert(events & POLLOUT);
 
-				getsockopt(path->socket.fd, SOL_SOCKET, SO_ERROR, &errno, &len);
+			socklen_t len = sizeof(errno);
+			getsockopt(path->socket.fd, SOL_SOCKET, SO_ERROR, &errno, &len);
 
-				if (errno)
-					connect_failed(query, path);
-				else
-					connect_finished(query, path);
-			}
+			if (errno)
+				connect_failed(query, path);
+			else
+				connect_finished(query, path);
 
 			return true;
 		}
