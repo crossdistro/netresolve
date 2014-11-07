@@ -78,6 +78,8 @@ netresolve_open(void)
 
 	channel->request.default_loopback = getenv_bool("NETRESOLVE_FLAG_DEFAULT_LOOPBACK", false);
 	channel->request.clamp_ttl = getenv_int("NETRESOLVE_CLAMP_TTL", -1);
+	channel->request.timeout = getenv_int("NETRESOLVE_TIMEOUT", 15000);
+	channel->request.partial_timeout = getenv_int("NETRESOLVE_PARTIAL_TIMEOUT", 5000);
 
 	return channel;
 }

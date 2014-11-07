@@ -144,6 +144,9 @@ struct netresolve_channel {
 		char *dns_name;
 		int dns_class;
 		int dns_type;
+		/* Timeout configuration */
+		int timeout;
+		int partial_timeout;
 	} request;
 	struct netresolve_config {
 		int force_family;
@@ -159,6 +162,8 @@ struct netresolve_query {
 	enum netresolve_state state;
 	int nfds;
 	int delayed_fd;
+	int timeout_fd;
+	int partial_timeout_fd;
 	int first_connect_timeout;
 	struct netresolve_backend **backend;
 	struct netresolve_request request;
