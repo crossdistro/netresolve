@@ -61,8 +61,6 @@ struct priv_dns {
 #endif
 };
 
-static void lookup(struct priv_dns *priv, int family);
-
 #if defined(USE_ARES)
 
 static void
@@ -101,6 +99,8 @@ register_fds(netresolve_query_t query)
 }
 
 #endif
+
+static void lookup_host(struct priv_dns *priv);
 
 static void
 #if defined(USE_UNBOUND)
@@ -171,8 +171,7 @@ callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 		priv->weight = ldns_rdf2native_int16(pkt->_answer->_rrs[0]->_rdata_fields[1]);
 		priv->port = ldns_rdf2native_int16(pkt->_answer->_rrs[0]->_rdata_fields[2]);
 		priv->name = ldns_rdf2str(pkt->_answer->_rrs[0]->_rdata_fields[3]);
-		lookup(priv, AF_INET);
-		lookup(priv, AF_INET6);
+		lookup_host(priv);
 		break;
 	case LDNS_RR_TYPE_PTR:
 		/* FIXME: We only support one PTR record. */
@@ -193,17 +192,6 @@ callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 	ldns_pkt_free(pkt);
 }
 
-static void
-resolve(struct priv_dns *priv, const char *name, int type, int class)
-{
-	debug("looking up %s record for %s", ldns_rr_descript(type)->_name, priv->name);
-#if defined(USE_UNBOUND)
-	ub_resolve_async(priv->ctx, name, type, class, priv, callback, NULL);
-#elif defined(USE_ARES)
-	ares_query(priv->channel, name, class, type, callback, priv);
-#endif
-}
-
 static const char *
 protocol_to_string(int proto)
 {
@@ -220,25 +208,14 @@ protocol_to_string(int proto)
 }
 
 static void
-lookup(struct priv_dns *priv, int family)
+lookup(struct priv_dns *priv, const char *name, int type, int class)
 {
-	int type;
-
-	if (priv->family != AF_UNSPEC && priv->family != family)
-		return;
-
-	switch (family) {
-	case AF_INET:
-		type = LDNS_RR_TYPE_A;
-		break;
-	case AF_INET6:
-		type = LDNS_RR_TYPE_AAAA;
-		break;
-	default:
-		return;
-	}
-
-	resolve(priv, priv->name, type, LDNS_RR_CLASS_IN);
+	debug("looking up %s record for %s", ldns_rr_descript(type)->_name, priv->name);
+#if defined(USE_UNBOUND)
+	ub_resolve_async(priv->ctx, name, type, class, priv, callback, NULL);
+#elif defined(USE_ARES)
+	ares_query(priv->channel, name, class, type, callback, priv);
+#endif
 }
 
 static void
@@ -257,11 +234,22 @@ lookup_srv(struct priv_dns *priv)
 		return;
 	}
 
-	resolve(priv, name, LDNS_RR_TYPE_SRV, LDNS_RR_CLASS_IN);
+	lookup(priv, name, LDNS_RR_TYPE_SRV, LDNS_RR_CLASS_IN);
+
+	free(name);
 }
 
 static void
-lookup_reverse(struct priv_dns *priv)
+lookup_host(struct priv_dns *priv)
+{
+	if (priv->family == AF_INET || priv->family == AF_UNSPEC)
+		lookup(priv, priv->name, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN);
+	if (priv->family == AF_INET6 || priv->family == AF_UNSPEC)
+		lookup(priv, priv->name, LDNS_RR_TYPE_AAAA, LDNS_RR_CLASS_IN);
+}
+
+static void
+lookup_address(struct priv_dns *priv)
 {
 	/* Large enough to hold nibble format representation of an IPv4/IPv6 address  */
 	char name[128];
@@ -299,19 +287,22 @@ lookup_reverse(struct priv_dns *priv)
 		return;
 	}
 
-	resolve(priv, name, LDNS_RR_TYPE_PTR, LDNS_RR_CLASS_IN);
+	lookup(priv, name, LDNS_RR_TYPE_PTR, LDNS_RR_CLASS_IN);
 }
 
 static void
 lookup_dns(struct priv_dns *priv)
 {
-	resolve(priv, priv->name, priv->type, priv->cls);
+	lookup(priv, priv->name, priv->type, priv->cls);
 }
 
 
 static bool
 apply_pkt(netresolve_query_t query, const ldns_pkt *pkt)
 {
+	if (!pkt)
+		return true;
+
 	struct priv_dns *priv = netresolve_backend_get_priv(query);
 	int rcode = ldns_pkt_get_rcode(pkt);
 
@@ -423,10 +414,8 @@ setup_forward(netresolve_query_t query, char **settings)
 
 	if (netresolve_backend_get_dns_srv_lookup(query))
 		lookup_srv(priv);
-	else {
-		lookup(priv, AF_INET);
-		lookup(priv, AF_INET6);
-	}
+	else
+		lookup_host(priv);
 
 #if defined(USE_ARES)
 	register_fds(query);
@@ -441,14 +430,12 @@ setup_reverse(netresolve_query_t query, char **settings)
 	if (!(priv = setup(query, settings)))
 		return;
 
-	priv->address = netresolve_backend_get_address(query);
-
-	if (!priv->address) {
+	if (!(priv->address = netresolve_backend_get_address(query))) {
 		netresolve_backend_failed(query);
 		return;
 	}
 
-	lookup_reverse(priv);
+	lookup_address(priv);
 
 #if defined(USE_ARES)
 	register_fds(query);
@@ -495,30 +482,17 @@ dispatch(netresolve_query_t query, int fd, int events)
 	bool ip4_done = !!priv->ip4_pkt;
 	bool ip6_done = !!priv->ip6_pkt;
 
-	switch (priv->family) {
-	case AF_UNSPEC:
-		break;
-	case AF_INET:
+	if (priv->family == AF_INET)
 		ip6_done = true;
-		break;
-	case AF_INET6:
+	if (priv->family == AF_INET6)
 		ip4_done = true;
-		break;
-	default:
-		netresolve_backend_failed(query);
-		return;
-	}
 
 	if (ip4_done && ip6_done) {
-		if (priv->ip4_pkt && !apply_pkt(query, priv->ip4_pkt)) {
+		if (apply_pkt(query, priv->ip4_pkt) && apply_pkt(query, priv->ip6_pkt))
+			netresolve_backend_finished(query);
+		else
 			netresolve_backend_failed(query);
-			return;
-		}
-		if (priv->ip6_pkt && !apply_pkt(query, priv->ip6_pkt)) {
-			netresolve_backend_failed(query);
-			return;
-		}
-		netresolve_backend_finished(query);
+		return;
 	}
 }
 
