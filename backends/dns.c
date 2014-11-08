@@ -261,24 +261,40 @@ lookup_srv(struct priv_dns *priv)
 }
 
 static void
-lookup_reverse(struct priv_dns *priv, int family)
+lookup_reverse(struct priv_dns *priv)
 {
-	char *name;
+	/* Large enough to hold nibble format representation of an IPv4/IPv6 address  */
+	char name[128];
 
-	switch (family) {
+	switch (priv->family) {
 	case AF_INET:
-		if (asprintf(&name, "%d.%d.%d.%d.in-addr.arpa.",
+		snprintf(name, sizeof name, "%d.%d.%d.%d.in-addr.arpa.",
 				priv->address[3],
 				priv->address[2],
 				priv->address[1],
-				priv->address[0]) == -1) {
-			error("memory allocation failed");
-			netresolve_backend_failed(priv->query);
-			return;
-		}
+				priv->address[0]);
+		break;
+	case AF_INET6:
+		snprintf(name, sizeof name, "%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.%x.ip6.arpa",
+				priv->address[0xf] & 0x0f, priv->address[0xf] >> 4,
+				priv->address[0xe] & 0x0f, priv->address[0xe] >> 4,
+				priv->address[0xd] & 0x0f, priv->address[0xd] >> 4,
+				priv->address[0xc] & 0x0f, priv->address[0xc] >> 4,
+				priv->address[0xb] & 0x0f, priv->address[0xb] >> 4,
+				priv->address[0xa] & 0x0f, priv->address[0xa] >> 4,
+				priv->address[0x9] & 0x0f, priv->address[0x9] >> 4,
+				priv->address[0x8] & 0x0f, priv->address[0x8] >> 4,
+				priv->address[0x7] & 0x0f, priv->address[0x7] >> 4,
+				priv->address[0x6] & 0x0f, priv->address[0x6] >> 4,
+				priv->address[0x5] & 0x0f, priv->address[0x5] >> 4,
+				priv->address[0x4] & 0x0f, priv->address[0x4] >> 4,
+				priv->address[0x3] & 0x0f, priv->address[0x3] >> 4,
+				priv->address[0x2] & 0x0f, priv->address[0x2] >> 4,
+				priv->address[0x1] & 0x0f, priv->address[0x1] >> 4,
+				priv->address[0x0] & 0x0f, priv->address[0x0] >> 4);
 		break;
 	default:
-		debug("unknown address family: %d", family);
+		error("unknown address family: %d", priv->family);
 		netresolve_backend_failed(priv->query);
 		return;
 	}
@@ -427,7 +443,7 @@ setup_reverse(netresolve_query_t query, char **settings)
 		return;
 	}
 
-	lookup_reverse(priv, AF_INET);
+	lookup_reverse(priv);
 
 #if defined(USE_ARES)
 	register_fds(query);
