@@ -64,38 +64,35 @@ struct priv_dns {
 #if defined(USE_ARES)
 
 static void
-register_fds(netresolve_query_t query)
+watch_file_descriptors(struct priv_dns *priv)
 {
-	struct priv_dns *priv = netresolve_backend_get_priv(query);
-	fd_set rfds;
-	fd_set wfds;
-	int nfds, fd;
+	assert(priv->nfds == 0);
 
-	FD_ZERO(&rfds);
-	FD_ZERO(&wfds);
-	nfds = ares_fds(priv->channel, &rfds, &wfds);
+	priv->nfds = ares_fds(priv->channel, &priv->rfds, &priv->wfds);
 
-	for (fd = 0; fd < nfds || fd < priv->nfds; fd++) {
-		if (!FD_ISSET(fd, &rfds) && FD_ISSET(fd, &priv->rfds)) {
-			FD_CLR(fd, &priv->rfds);
-			netresolve_backend_watch_fd(query, fd, 0);
-		} else if (FD_ISSET(fd, &rfds) && !FD_ISSET(fd, &priv->rfds)) {
-			FD_SET(fd, &priv->rfds);
-			netresolve_backend_watch_fd(query, fd, POLLIN);
-		}
-		if (!FD_ISSET(fd, &wfds) && FD_ISSET(fd, &priv->wfds)) {
-			FD_CLR(fd, &priv->wfds);
-			netresolve_backend_watch_fd(query, fd, 0);
-		} else if (FD_ISSET(fd, &wfds) && !FD_ISSET(fd, &priv->wfds)) {
-			FD_SET(fd, &priv->wfds);
-			netresolve_backend_watch_fd(query, fd, POLLOUT);
-		}
+	for (int fd = 0; fd < priv->nfds; fd++) {
+		if (FD_ISSET(fd, &priv->rfds))
+			netresolve_backend_watch_fd(priv->query, fd, POLLIN);
+		if (FD_ISSET(fd, &priv->wfds))
+			netresolve_backend_watch_fd(priv->query, fd, POLLOUT);
 	}
 
-	priv->nfds = nfds;
+	/* FIXME: In some cases this might rather be failed. */
+	if (!priv->nfds)
+		netresolve_backend_finished(priv->query);
+}
 
-	if (!nfds)
-		netresolve_backend_finished(query);
+static void
+unwatch_file_descriptors(struct priv_dns *priv)
+{
+	assert(priv->nfds != 0);
+
+	for (int fd = 0; fd < priv->nfds; fd++)
+		if (FD_ISSET(fd, &priv->rfds))
+			netresolve_backend_watch_fd(priv->query, fd, 0);
+	FD_ZERO(&priv->rfds);
+	FD_ZERO(&priv->wfds);
+	priv->nfds = 0;
 }
 
 #endif
@@ -378,9 +375,6 @@ setup(netresolve_query_t query, char **settings)
 		.lookups = "b"
 	};
 
-	FD_ZERO(&priv->rfds);
-	FD_ZERO(&priv->wfds);
-
 	status = ares_library_init(ARES_LIB_INIT_ALL);
 	if (status != ARES_SUCCESS)
 		goto fail_ares;
@@ -418,7 +412,7 @@ setup_forward(netresolve_query_t query, char **settings)
 		lookup_host(priv);
 
 #if defined(USE_ARES)
-	register_fds(query);
+	watch_file_descriptors(priv);
 #endif
 }
 
@@ -438,7 +432,7 @@ setup_reverse(netresolve_query_t query, char **settings)
 	lookup_address(priv);
 
 #if defined(USE_ARES)
-	register_fds(query);
+	watch_file_descriptors(priv);
 #endif
 }
 
@@ -456,11 +450,10 @@ setup_dns(netresolve_query_t query, char **settings)
 	}
 
 	netresolve_backend_get_dns_query(query, &priv->cls, &priv->type);
-
 	lookup_dns(priv);
 
 #if defined(USE_ARES)
-	register_fds(query);
+	watch_file_descriptors(priv);
 #endif
 }
 
@@ -475,8 +468,8 @@ dispatch(netresolve_query_t query, int fd, int events)
 	int rfd = events & POLLIN ? fd : ARES_SOCKET_BAD;
 	int wfd = events & POLLOUT ? fd : ARES_SOCKET_BAD;
 
+	unwatch_file_descriptors(priv);
 	ares_process_fd(priv->channel, rfd, wfd);
-	register_fds(query);
 #endif
 
 	bool ip4_done = !!priv->ip4_pkt;
@@ -494,6 +487,10 @@ dispatch(netresolve_query_t query, int fd, int events)
 			netresolve_backend_failed(query);
 		return;
 	}
+
+#if defined(USE_ARES)
+	watch_file_descriptors(priv);
+#endif
 }
 
 void
@@ -514,13 +511,8 @@ cleanup(netresolve_query_t query)
 		ub_ctx_delete(priv->ctx);
 	}
 #elif defined(USE_ARES)
-	for (int fd = 0; fd < priv->nfds; fd++) {
-		if (FD_ISSET(fd, &priv->rfds) || FD_ISSET(fd, &priv->wfds)) {
-			FD_CLR(fd, &priv->rfds);
-			netresolve_backend_watch_fd(query, fd, 0);
-		}
-	}
-
+	if (priv->nfds)
+		unwatch_file_descriptors(priv);
 	ares_destroy(priv->channel);
 #endif
 }
