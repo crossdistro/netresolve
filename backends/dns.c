@@ -58,14 +58,12 @@ struct priv_dns {
 	fd_set rfds;
 	fd_set wfds;
 	int nfds;
-	int ptfd;
 #endif
 };
 
 static void lookup(struct priv_dns *priv, int family);
 
-#if defined(USE_UNBOUND)
-#elif defined(USE_ARES)
+#if defined(USE_ARES)
 
 static void
 register_fds(netresolve_query_t query)
@@ -192,7 +190,6 @@ callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 	default:
 		error("received unknown response");
 		netresolve_backend_failed(query);
-		break;
 	}
 
 	ldns_pkt_free(pkt);
@@ -373,8 +370,6 @@ setup(netresolve_query_t query, char **settings)
 		.lookups = "b"
 	};
 
-	priv->ptfd = -1;
-
 	FD_ZERO(&priv->rfds);
 	FD_ZERO(&priv->wfds);
 
@@ -437,7 +432,6 @@ setup_reverse(netresolve_query_t query, char **settings)
 	}
 
 	lookup_reverse(priv, AF_INET);
-	//lookup_reverse(priv, AF_INET6);
 
 #if defined(USE_ARES)
 	register_fds(query);
@@ -536,10 +530,6 @@ cleanup(netresolve_query_t query)
 		}
 	}
 
-	if (priv->ptfd != -1)
-		netresolve_backend_remove_timeout(query, priv->ptfd);
-
 	ares_destroy(priv->channel);
-	//ares_library_cleanup();
 #endif
 }
