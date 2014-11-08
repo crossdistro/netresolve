@@ -327,6 +327,11 @@ apply_pkt(netresolve_query_t query, const ldns_pkt *pkt)
 
 		switch (rr->_rr_type) {
 		case LDNS_RR_TYPE_CNAME:
+			{
+				char *name = ldns_rdf2str(rr->_rdata_fields[0]);
+				netresolve_backend_set_canonical_name(query, name);
+				free(name);
+			}
 			break;
 		case LDNS_RR_TYPE_A:
 			netresolve_backend_add_path(query,
