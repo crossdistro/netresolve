@@ -135,8 +135,10 @@ netresolve_watch_fd(netresolve_t channel, int fd, int events)
 
 	struct epoll_event event = { .events = events, .data = { .fd = fd} };
 
-	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1)
-		error("epoll_ctl: %s", strerror(errno));
+	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1) {
+		error("epoll_ctl: %s (fd=%d)", strerror(errno), fd);
+		abort();
+	}
 
 	channel->epoll_count++;
 
@@ -151,8 +153,10 @@ netresolve_unwatch_fd(netresolve_t channel, int fd)
 {
 	assert(channel->epoll_count > 0);
 
-	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == -1)
-		error("epoll_ctl: %s", strerror(errno));
+	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == -1) {
+		error("epoll_ctl: %s (fd=%d}", strerror(errno), fd);
+		abort();
+	}
 
 	channel->epoll_count--;
 
