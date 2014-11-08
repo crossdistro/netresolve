@@ -146,7 +146,7 @@ callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 	ldns_pkt *pkt;
 
 	if (ldns_wire2pkt(&pkt, answer, length)) {
-		debug("can't parse the DNS answer");
+		error("can't parse the DNS answer");
 		netresolve_backend_failed(query);
 		return;
 	}
@@ -155,18 +155,17 @@ callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 	ub_resolve_free(result);
 #endif
 
+	debug("received %s record", ldns_rr_descript(pkt->_question->_rrs[0]->_rr_type)->_name);
+
 	switch (pkt->_question->_rrs[0]->_rr_type) {
 	case LDNS_RR_TYPE_A:
-		debug("received A resonse");
 		priv->ip4_pkt = pkt;
 		return;
 	case LDNS_RR_TYPE_AAAA:
-		debug("received AAAA resonse");
 		priv->ip6_pkt = pkt;
 		return;
 	case LDNS_RR_TYPE_SRV:
 		/* FIXME: We only support one SRV record per name. */
-		debug("received SRV response");
 		free(priv->name);
 		priv->priority = ldns_rdf2native_int16(pkt->_answer->_rrs[0]->_rdata_fields[0]);
 		priv->weight = ldns_rdf2native_int16(pkt->_answer->_rrs[0]->_rdata_fields[1]);
@@ -177,7 +176,6 @@ callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 		break;
 	case LDNS_RR_TYPE_PTR:
 		/* FIXME: We only support one PTR record. */
-		debug("received PTR response");
 		if (!pkt->_answer->_rr_count) {
 			netresolve_backend_failed(query);
 			break;
@@ -188,7 +186,7 @@ callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 		netresolve_backend_finished(query);
 		break;
 	default:
-		error("received unknown response");
+		error("ignoring unknown response");
 		netresolve_backend_failed(query);
 	}
 
@@ -198,6 +196,7 @@ callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 static void
 resolve(struct priv_dns *priv, const char *name, int type, int class)
 {
+	debug("looking up %s record for %s", ldns_rr_descript(type)->_name, priv->name);
 #if defined(USE_UNBOUND)
 	ub_resolve_async(priv->ctx, name, type, class, priv, callback, NULL);
 #elif defined(USE_ARES)
@@ -224,7 +223,6 @@ static void
 lookup(struct priv_dns *priv, int family)
 {
 	int type;
-	const char *type_name;
 
 	if (priv->family != AF_UNSPEC && priv->family != family)
 		return;
@@ -232,17 +230,14 @@ lookup(struct priv_dns *priv, int family)
 	switch (family) {
 	case AF_INET:
 		type = LDNS_RR_TYPE_A;
-		type_name = "A";
 		break;
 	case AF_INET6:
 		type = LDNS_RR_TYPE_AAAA;
-		type_name = "AAAA";
 		break;
 	default:
 		return;
 	}
 
-	debug("looking up %s record for %s", type_name, priv->name);
 	resolve(priv, priv->name, type, LDNS_RR_CLASS_IN);
 }
 
@@ -261,7 +256,7 @@ lookup_srv(struct priv_dns *priv)
 		netresolve_backend_failed(priv->query);
 		return;
 	}
-	debug("looking up SRV record for %s", name);
+
 	resolve(priv, name, LDNS_RR_TYPE_SRV, LDNS_RR_CLASS_IN);
 }
 
@@ -288,14 +283,12 @@ lookup_reverse(struct priv_dns *priv, int family)
 		return;
 	}
 
-	debug("looking up PTR record for %s", name);
 	resolve(priv, name, LDNS_RR_TYPE_PTR, LDNS_RR_CLASS_IN);
 }
 
 static void
 lookup_dns(struct priv_dns *priv)
 {
-	debug("looking up %d record for %s", priv->type, priv->name);
 	resolve(priv, priv->name, priv->type, priv->cls);
 }
 
@@ -304,9 +297,12 @@ static bool
 apply_pkt(netresolve_query_t query, const ldns_pkt *pkt)
 {
 	struct priv_dns *priv = netresolve_backend_get_priv(query);
+	int rcode = ldns_pkt_get_rcode(pkt);
 
-	if (ldns_pkt_get_rcode(pkt))
+	if (rcode) {
+		error("rcode: %d", rcode);
 		return false;
+	}
 
 	ldns_rr_list *answer = ldns_pkt_answer(pkt);
 
