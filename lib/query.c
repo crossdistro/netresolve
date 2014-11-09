@@ -153,8 +153,6 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 			netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 		break;
 	case NETRESOLVE_STATE_DONE:
-		if (!query->response.nodename)
-			query->response.nodename = query->request.nodename ? strdup(query->request.nodename) : strdup("localhost");
 		if (query->channel->callbacks.on_connect)
 			netresolve_connect_cleanup(query);
 		if (query->channel->callbacks.on_success)
@@ -386,7 +384,13 @@ netresolve_query_get_aux_info(netresolve_query_t query, size_t idx,
 const char *
 netresolve_query_get_node_name(const netresolve_query_t query)
 {
-	return query->response.nodename;
+	if (query->response.nodename)
+		return query->response.nodename;
+	if (query->state != NETRESOLVE_STATE_DONE)
+		return NULL;
+	if (query->request.type != NETRESOLVE_REQUEST_FORWARD)
+		return NULL;
+	return query->request.nodename ? query->request.nodename : "localhost";
 }
 
 /* netresolve_query_get_service_name:
