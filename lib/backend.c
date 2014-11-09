@@ -250,10 +250,13 @@ netresolve_backend_add_name_info(netresolve_query_t query, const char *nodename,
 
 	query->response.nodename = nodename ? strdup(nodename) : NULL;
 
-	if (!query->response.servname)
+	if (!query->response.servname) {
+		int protocol = netresolve_backend_get_protocol(query);
+
 		netresolve_service_list_query(&query->services,
-				NULL, 0, 0, query->request.port,
+				NULL, 0, protocol, query->request.port,
 				service_callback, query);
+	}
 }
 
 void

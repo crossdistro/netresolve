@@ -150,6 +150,8 @@ netresolve_query_getnameinfo(netresolve_t channel, const struct sockaddr *sa, so
 	struct sockaddr_in *sa4 = (void *) sa;
 	struct sockaddr_in6 *sa6 = (void *) sa;
 
+	netresolve_set_protocol(channel, flags & NI_DGRAM ? IPPROTO_UDP : IPPROTO_TCP);
+
 	switch (sa->sa_family) {
 	case AF_INET:
 		if (salen != sizeof *sa4)

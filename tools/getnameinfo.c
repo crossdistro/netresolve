@@ -31,11 +31,12 @@ main(int argc, char **argv)
 	static const struct option longopts[] = {
 		{ "help", 0, 0, 'h' },
 		{ "verbose", 0, 0, 'v' },
+		{ "udp", 0, 0, 'u' },
 		{ "address", 1, 0, 'a' },
 		{ "port", 1, 0, 'p' },
 		{ NULL, 0, 0, 0 }
 	};
-	static const char *opts = "hva:46";
+	static const char *opts = "hvua:46";
 	int opt, idx = 0;
 	char *address_str = NULL;
 	char address[16];
@@ -57,9 +58,13 @@ main(int argc, char **argv)
 		case 'h':
 			fprintf(stderr,
 					"-h,--help -- help\n"
+					"-u,--udp -- query UDP instead of TCP\n"
 					"-a,--address <address> -- node name\n"
 					"-p,--port <port>\n");
 			exit(EXIT_SUCCESS);
+		case 'u':
+			flags |= NI_DGRAM;
+			break;
 		case 'a':
 			address_str = optarg;
 			break;
