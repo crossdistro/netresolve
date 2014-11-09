@@ -80,7 +80,7 @@ main(int argc, char **argv)
 	if (argv[optind])
 		address_str = argv[optind++];
 	if (argv[optind])
-		port = htons(strtoll(argv[optind++], NULL, 10));
+		port = strtoll(argv[optind++], NULL, 10);
 	if (argv[optind]) {
 		fprintf(stderr, "Too many arguments.");
 		exit(1);
@@ -88,6 +88,8 @@ main(int argc, char **argv)
 
 	printf("query:\n");
 	printf("  address = %s\n", address_str);
+	if (port)
+		printf("  port = %d\n", port);
 
 	if (!address_str) {
 		fprintf(stderr, "Cannot query an empty address.\n");
@@ -103,13 +105,13 @@ main(int argc, char **argv)
 			exit(1);
 		}
 		memcpy(&sa.sa4.sin_addr, &address, sizeof sa.sa4.sin_addr);
-		sa.sa4.sin_port = port;
+		sa.sa4.sin_port = htons(port);
 		salen = sizeof sa.sa4;
 		break;
 	case AF_INET6:
 		memcpy(&sa.sa6.sin6_addr, &address, sizeof sa.sa6.sin6_addr);
 		sa.sa6.sin6_scope_id = ifindex;
-		sa.sa6.sin6_port = port;
+		sa.sa6.sin6_port = htons(port);
 		salen = sizeof sa.sa6;
 		break;
 	default:
