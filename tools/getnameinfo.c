@@ -69,7 +69,7 @@ main(int argc, char **argv)
 			address_str = optarg;
 			break;
 		case 'p':
-			port = htons(strtoll(optarg, NULL, 10));
+			port = strtoll(optarg, NULL, 10);
 			break;
 		case '4':
 			family = AF_INET;
