@@ -1,0 +1,5 @@
+response netresolve 0.0.1
+name perseus.jabber.org
+ip 2001:4800:7810:512:14e1:b81:ff05:8bb stream tcp 5269 0 0 1
+ip 64.49.234.240 stream tcp 5269 0 0 1
+

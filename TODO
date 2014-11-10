@@ -49,7 +49,7 @@
  * Improve `nss` backend
     - support reverse queries
     - consider supporting hostent listing
- * Improve the DNS backends (mainly libunbound)
+ * Improve the DNS backends
     - consider domain search support
     - validation information
     - `ai_addrconfig`-like functionality
