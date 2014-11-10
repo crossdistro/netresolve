@@ -68,12 +68,12 @@ add_addresses(netresolve_query_t query, struct ifaddrs *list, bool filter)
 void
 setup_forward(netresolve_query_t query, char **settings)
 {
-	const char *node = netresolve_backend_get_nodename(query);
+	const char *nodename = netresolve_backend_get_nodename(query);
 	struct ifaddrs *list;
 	struct utsname name;
 
 	uname(&name);
-	if (strcmp(node, name.nodename)) {
+	if (!nodename || strcmp(nodename, name.nodename)) {
 		netresolve_backend_failed(query);
 		return;
 	}
@@ -86,6 +86,6 @@ setup_forward(netresolve_query_t query, char **settings)
 	if (!add_addresses(query, list, true))
 		add_addresses(query, list, false);
 
-	netresolve_backend_set_canonical_name(query, node);
+	netresolve_backend_set_canonical_name(query, nodename);
 	netresolve_backend_finished(query);
 }
