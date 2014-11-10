@@ -1,0 +1,4 @@
+response netresolve 0.0.1
+name ds0039.flosoft-servers.net
+ip 91.121.109.155 dgram udp 0 40 10 1
+
