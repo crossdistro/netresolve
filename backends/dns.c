@@ -397,7 +397,7 @@ void
 setup_forward(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv;
-	
+
 	if (!(priv = setup(query, settings)))
 		return;
 
@@ -420,7 +420,7 @@ void
 setup_reverse(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv;
-	
+
 	if (!(priv = setup(query, settings)))
 		return;
 
@@ -440,7 +440,7 @@ void
 setup_dns(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv;
-	
+
 	if (!(priv = setup(query, settings)))
 		return;
 
