@@ -292,6 +292,18 @@ void
 netresolve_backend_watch_fd(netresolve_query_t query, int fd, int events)
 {
 	netresolve_watch_fd(query->channel, fd, events);
+
+	query->nfds++;
+}
+
+void
+netresolve_backend_unwatch_fd(netresolve_query_t query, int fd)
+{
+	assert(query->nfds > 0);
+
+	netresolve_unwatch_fd(query->channel, fd);
+
+	query->nfds--;
 }
 
 int

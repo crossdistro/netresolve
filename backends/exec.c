@@ -97,7 +97,7 @@ send_stdin(netresolve_query_t query, struct priv_exec *priv)
 		debug("write failed: %s", strerror(errno));
 	}
 
-	netresolve_backend_watch_fd(query, priv->infd, 0);
+	netresolve_backend_unwatch_fd(query, priv->infd);
 	close(priv->infd);
 	priv->infd = -1;
 }
@@ -219,11 +219,11 @@ cleanup(netresolve_query_t query)
 	struct priv_exec *priv = netresolve_backend_get_priv(query);
 
 	if (priv->infd != -1) {
-		netresolve_backend_watch_fd(query, priv->infd, 0);
+		netresolve_backend_unwatch_fd(query, priv->infd);
 		close(priv->infd);
 	}
 	if (priv->outfd != -1) {
-		netresolve_backend_watch_fd(query, priv->outfd, 0);
+		netresolve_backend_unwatch_fd(query, priv->outfd);
 		close(priv->outfd);
 	}
 	/* TODO: Implement proper child handling. */

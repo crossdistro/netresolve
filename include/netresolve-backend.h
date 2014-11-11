@@ -90,6 +90,7 @@ void netresolve_backend_apply_hostent(netresolve_query_t query,
 void *netresolve_backend_new_priv(netresolve_query_t query, size_t size);
 void *netresolve_backend_get_priv(netresolve_query_t query);
 void netresolve_backend_watch_fd(netresolve_query_t query, int fd, int events);
+void netresolve_backend_unwatch_fd(netresolve_query_t query, int fd);
 int netresolve_backend_add_timeout(netresolve_query_t query, time_t sec, long nsec);
 void netresolve_backend_remove_timeout(netresolve_query_t query, int fd);
 void netresolve_backend_finished(netresolve_query_t query);
