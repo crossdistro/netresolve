@@ -1,0 +1,6 @@
+response netresolve 0.0.1
+name www.nic.cz
+ip 2001:1488:0:3::2 any any 0 0 0 1
+ip 217.31.205.50 any any 0 0 0 1
+secure
+

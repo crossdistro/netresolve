@@ -50,6 +50,7 @@ struct priv_dns {
 	int pending;
 	bool answered;
 	bool failed;
+	bool secure;
 #if defined(USE_UNBOUND)
 	struct ub_ctx* ctx;
 #elif defined(USE_ARES)
@@ -290,6 +291,9 @@ apply_answer(struct priv_dns *priv, uint8_t *data, size_t length)
 	ldns_rr_type type = ldns_pkt_question(pkt)->_rrs[0]->_rr_type;
 	ldns_rr_list *answer = ldns_pkt_answer(pkt);
 
+	if (!ldns_pkt_ad(pkt))
+		priv->secure = false;
+
 	switch (rcode) {
 	case 0:
 		break;
@@ -354,6 +358,11 @@ setup(netresolve_query_t query, char **settings)
 
 	if (!priv)
 		return NULL;;
+
+	for (; *settings; settings++) {
+		if (!strcmp(*settings, "trust"))
+			priv->secure = true;
+	}
 
 	const char *name = netresolve_backend_get_nodename(query);
 	priv->name = name ? strdup(name) : NULL;
@@ -467,7 +476,6 @@ dispatch(netresolve_query_t query, int fd, int events)
 
 	if (!priv->pending) {
 		if (priv->answered) {
-
 			if (priv->name) {
 				char *last = priv->name + strlen(priv->name) - 1;
 
@@ -476,6 +484,9 @@ dispatch(netresolve_query_t query, int fd, int events)
 
 				netresolve_backend_add_name_info(query, priv->name, NULL);
 			}
+
+			if (priv->secure)
+				netresolve_backend_set_secure(query);
 		}
 
 		if (priv->failed)

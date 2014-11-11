@@ -38,6 +38,9 @@ pavlix at IRC Freenode
  * TCP happy eyeballs implementation
    - concurrent IPv4/IPv6 connect
    - quick timeout when there's no answer to one of IPv4/IPv6 TCP SYN packets
+ * Security information
+   - well-known and locally configured data is considered secure
+   - experimental support for DNSSEC authenticated data
 
 ## Command line tool
 
@@ -68,6 +71,12 @@ DNS style query:
     netresolve --type srv --node _xmpp-client._tcp._jabber.com
 
     netresolve --class ch --type txt --node version.bind
+
+## Experimental DNSSEC support via command line
+
+Query information using a DNS backend and trust the AD flag:
+
+    netresolve --backends aresdns:trust --node www.dnssec.cz
 
 ## Library API
 
