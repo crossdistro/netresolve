@@ -112,6 +112,9 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 			struct netresolve_backend *backend = *query->backend;
 			void (*setup)(netresolve_query_t query, char **settings);
 
+			if (query->request.dns_srv_lookup && !query->request.protocol)
+				query->request.protocol = IPPROTO_TCP;
+
 			setup = backend->setup[query->request.type];
 			if (setup) {
 				setup(query, backend->settings + 1);
