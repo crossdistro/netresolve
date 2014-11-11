@@ -375,7 +375,7 @@ netresolve_query_get_aux_info(netresolve_query_t query, size_t idx,
 	if (weight)
 		*weight = query->response.paths[idx].weight;
 	if (ttl)
-		*ttl = query->response.paths[idx].ttl;
+		*ttl = query->request.clamp_ttl >= 0 ? query->request.clamp_ttl : query->response.paths[idx].ttl;
 }
 
 /* netresolve_query_get_node_name:
