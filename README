@@ -84,39 +84,23 @@ Query information using a validating DNS backend:
 
 ## Library API
 
-Program or library using netresolve has to allocate a netresolve channel (or context) which is then used to perform all the queries. You may want to create multiple channels to have different configurations prepared for use.
+Program or library using netresolve has to allocate a netresolve channel (or context) which is then used to perform all the queries. You may want to create multiple channels to have different configurations prepared for use. By default the netresolve channel is in blocking mode. Consult the next section about event loop integration on how to create a netresolve channel in nonblocking mode.
 
     #include <netresolve.h>
 
     netresolve_t channel = netresolve_open();
 
-Then it's possible to tweak the channel configuration to your liking.
+Then you tweak the channel configuration to your liking.
 
     netresolve_set_protocol(channel, IPPROTO_TCP);
     netresolve_set_dns_srv_lookup(channel, true);
 
-Now you choose whether you want to use blocking or nonblocking mode. Blocking mode is default, nonblocking mode requires a callback that installs and uninstalls file descriptors. In nonblocking mode, it's often useful to set another callback to pick up the results.
-
-    static void watch_fd(netresolve_query_t query, int fd, int events, void *user_data)
-    static void on_success(netresolve_query_t query, void *user_data);
-
-    netresolve_set_fd_callbacks(channel, watch_fd, user_data);
-    netresolve_set_success_callback(channel, on_success, user_data);
-
-Now you can use the channel to perform your queries.
+When you're happy with the configuration, you can run your queries using `netresolve_query()`, `netresolve_query_reverse()` or `netresolve_query_dns()`.
 
     netresolve_query_t query = netresolve_query(channel, "www.sourceware.org", "http");
 
-In nonblocking mode it is useful to associate a context object with the query. Nonblocking mode guarantees that the success callback will not be run until the first `netresolve_dispatch_fd()` called after issuing the query.
+In blocking mode you can pick up the result immediately.
 
-    struct your_private_type context;
-
-    netresolve_query_set_user_data(query, &context);
-
-In blocking mode (i.e. when you didn't set the file descriptor callback), you can pick up the result immediately. In nonblocking mode, it's usually more practical to pick up the result
-inside the success callback, where it's often also handy to retrieve the context object.
-
-    struct your_private_type *context = netresolve_query_get_user_data(query); 
     size_t count = netresolve_query_get_count(query);
 
     for (size_t idx = 0; idx < count; idx++) {
@@ -137,19 +121,45 @@ inside the success callback, where it's often also handy to retrieve the context
         /* do something with the data */
     }
 
-In nonblocking mode, you can issue multiple queries and netresolve will pass back one or more file descriptors using the file descriptor callback. Your program or library needs to implement a file descriptor watch list where you add any file descriptors with events associated, or remove file descriptors when no events are specified. In order to finish the queries, you need to check those file descriptors for the requested events and pass the events back to the respective netresolve channel.
-
-    netresolve_dispatch_fd(channel, fd, events);
-
-When you're done with query object, you need to free it.
+When you're done with query object, you can free it.
 
     netresolve_query_done(query);
 
-The same applies to the channel object.
+When you're not going to use the channel to perform any queries nor use the existing query objects to examine the results, you can free the channel
+together with all queries that haven't been freed as written above.
 
     netresolve_close(channel);
 
-Examples of blocking and nonblocking use can be found in `tests/test-sync.c` and `tests/test-async.c`.
+An example of using netresolve in blocking mode can be found in `test/test-sync.c`.
+
+## Event loop integration
+
+You can easily integrate netresolve into a number of well known event loop libraries including *libevent* and *glib* as well as basic event loops based on `epoll()`. Just include the respective header file, call the included `netresolve_*_open()` function and issues queries as in the blocking mode.
+
+    #include <netresolve-epoll.h>
+
+    struct netresolve_epoll loop = { .fd = your_epoll_fd };
+
+    netresolve_t channel = netresolve_epoll_open(&loop);
+
+    netresolve_query_t query = netresolve_query(channel, "www.sourceware.org", "http");
+
+Set a query specific `callback()` together with a `user_data` pointer. It will be called by `netresolve_dispatch_fd()` once the query processing has been finished with `query`, `status` and `user_data` arguments. Non-zero status implies an error and should be interpreted the same way as errno after `netresolve_query()` in blocking mode. The callback then examines the data just as in blocking mode and either calls `netresolve_query_done()` or stores the query to be examined later.
+
+    static void callback(netresolve_query_t query, int status, void *user_data);
+
+    netresolve_query_set_callback(query, callback, user_data);
+
+If none of the included integration functions match your needs, you can create the channel using `netresolve_open()` and then attach your own set of callbacks using `netresolve_set_fd_callbacks()`. You need to provide two callbacks. The `watch_fd()` function adds an event source consisting of a file descriptor, and a set of events (subset of `POLLIN | POLLOUT`) and an opaque pointer `data` and the `unwatch_fd()` function that removes it. When a file descriptor event occurs, the application's event loop calls `netresolve_dispatch_fd()` with the respective `data` pointer and the subset of events that occured. The integration code can optionally provide a `user_data` pointer that will be available in `watch_fd()` and `unwatch_fd()` and one pointer for each event source returned by `watch_fd()` to be passed to `unwatch_fd()` as `handle`. The `user_data` pointer typically points to an object representing the event loop and the `handle` pointer points to an object representing the event source.
+
+    static void *watch_fd(netresolve_t channel, int fd, int events, void *data, void *user_data);
+    static void unwatch_fd(netresolve_t channel, int fd, void *handle, void *user_data);
+
+    struct netresolve_fd_callbacks callbacks = { watch_fd, unwatch_fd, loop };
+
+    netresolve_set_fd_callbacks(channel, &callbacks);
+
+Examples of nonblocking use can be found in `test-async.c`, `test-libevent.c` and `test-glib.c`.
 
 Known issues:
 

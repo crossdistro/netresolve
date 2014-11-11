@@ -434,14 +434,6 @@ netresolve_set_protocol(netresolve_t channel, int protocol)
 }
 
 void
-netresolve_set_success_callback(netresolve_t channel,
-		netresolve_callback_t on_success, void *user_data)
-{
-	channel->callbacks.on_success = on_success;
-	channel->callbacks.user_data = user_data;
-}
-
-void
 netresolve_set_fd_callbacks(netresolve_t channel, const struct netresolve_fd_callbacks *callbacks)
 {
 	memcpy(&channel->fd_callbacks, callbacks, sizeof *callbacks);

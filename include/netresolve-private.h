@@ -110,9 +110,6 @@ struct netresolve_channel {
 	void *epoll_handle;
 	struct netresolve_backend **backends;
 	struct {
-		netresolve_callback_t on_success;
-		netresolve_callback_t on_failure;
-		void *user_data;
 		netresolve_socket_callback_t on_bind;
 		netresolve_socket_callback_t on_connect;
 		void *user_data_sock;
@@ -163,6 +160,7 @@ struct netresolve_channel {
 
 struct netresolve_query {
 	struct netresolve_channel *channel;
+	netresolve_query_callback callback;
 	void *user_data;
 	enum netresolve_state state;
 	int nfds;

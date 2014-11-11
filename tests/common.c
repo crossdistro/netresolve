@@ -18,3 +18,25 @@ check_address(netresolve_query_t query, int exp_family, const char *exp_address_
 	assert(!memcmp(address, exp_address, family == AF_INET6 ? 16 : 4));
 	assert(ifindex == exp_ifindex);
 }
+
+void
+on_success1(netresolve_query_t query, int status, void *user_data)
+{
+	struct priv_common *priv = user_data;
+
+	assert(!status);
+	check_address(query, AF_INET6, "1:2:3:4:5:6:7:8", 999999);
+
+	priv->finished++;
+}
+
+void
+on_success2(netresolve_query_t query, int status, void *user_data)
+{
+	struct priv_common *priv = user_data;
+
+	assert(!status);
+	check_address(query, AF_INET, "1.2.3.4", 999999);
+
+	priv->finished++;
+}

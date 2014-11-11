@@ -44,11 +44,14 @@ dequeue(asyncns_query_t *q)
 }
 
 static void
-on_success(netresolve_query_t query, void *user_data)
+on_success(netresolve_query_t query, int status, void *user_data)
 {
-	asyncns_query_t *q = netresolve_query_get_user_data(query);
+	asyncns_query_t *q = user_data;
 
-	debug("asyncns query successful");
+	if (status)
+		debug("asyncns query failed");
+	else
+		debug("asyncns query successful");
 	q->done = true;
 }
 
@@ -65,8 +68,6 @@ asyncns_new (unsigned n_proc)
 
     if (!(asyncns->channel = netresolve_epoll_open(&asyncns->epoll)))
 		goto fail_channel;
-
-	netresolve_set_success_callback(asyncns->channel, on_success, asyncns);
 
 	asyncns->queries.previous = asyncns->queries.next = &asyncns->queries;
 
@@ -105,7 +106,7 @@ add_query(asyncns_t *asyncns, netresolve_query_t query)
 	if (!(q = calloc(1, sizeof *q)))
 		goto fail_alloc;
 
-	netresolve_query_set_user_data(query, q);
+	netresolve_query_set_callback(query, on_success, q);
 
 	q->asyncns = asyncns;
 	q->query = query;

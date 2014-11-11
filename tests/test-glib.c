@@ -25,43 +25,18 @@
 
 #include "common.h"
 
-static void
-on_success(netresolve_query_t query, void *user_data)
-{
-	int which = *(int *) netresolve_query_get_user_data(query);
-	int *count = user_data;
-
-	switch (which) {
-	case 1:
-		check_address(query, AF_INET6, "1:2:3:4:5:6:7:8", 999999);
-		break;
-	case 2:
-		check_address(query, AF_INET, "1.2.3.4", 999999);
-		break;
-	default:
-		abort();
-	}
-
-	(*count)++;
-}
-
 int
 main(int argc, char **argv)
 {
 	netresolve_t channel = netresolve_glib_open();
 	netresolve_query_t query1, query2;
-	int finished = 0;
+	struct priv_common priv = { 0 };
 	const char *node1 = "1:2:3:4:5:6:7:8%999999";
 	const char *node2 = "1.2.3.4%999999";
-	int data1 = 1;
-	int data2 = 2;
 	const char *service = "80";
 	int family = AF_UNSPEC;
 	int socktype = 0;
 	int protocol = IPPROTO_TCP;
-
-	/* Set callbacks. */
-	netresolve_set_success_callback(channel, on_success, &finished);
 
 	/* Resolver configuration. */
 	netresolve_set_family(channel, family);
@@ -71,17 +46,16 @@ main(int argc, char **argv)
 	/* Start name resolution. */
 	query1 = netresolve_query(channel, node1, service);
 	query2 = netresolve_query(channel, node2, service);
-
-	/* Set user data */
-	netresolve_query_set_user_data(query1, &data1);
-	netresolve_query_set_user_data(query2, &data2);
-
 	assert(query1 && query2);
 
+	/* Set callbacks. */
+	netresolve_query_set_callback(query1, on_success1, &priv);
+	netresolve_query_set_callback(query2, on_success2, &priv);
+
 	/* Run the main loop. */
-	while (finished < 2)
+	while (priv.finished < 2)
 		g_main_context_iteration(NULL, true);
-	assert(finished == 2);
+	assert(priv.finished == 2);
 
 	/* Clean up. */
 	netresolve_close(channel);

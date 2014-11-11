@@ -27,29 +27,9 @@
 #include "common.h"
 
 struct priv_async {
+	struct priv_common common;
 	struct netresolve_epoll epoll;
-	int finished;
 };
-
-static void
-on_success(netresolve_query_t query, void *user_data)
-{
-	struct priv_async *priv = user_data;
-	int which = *(int *) netresolve_query_get_user_data(query);
-
-	switch (which) {
-	case 1:
-		check_address(query, AF_INET6, "1:2:3:4:5:6:7:8", 999999);
-		break;
-	case 2:
-		check_address(query, AF_INET, "1.2.3.4", 999999);
-		break;
-	default:
-		abort();
-	}
-
-	priv->finished++;
-}
 
 int
 main(int argc, char **argv)
@@ -59,8 +39,6 @@ main(int argc, char **argv)
 	netresolve_query_t query1, query2;
 	const char *node1 = "1:2:3:4:5:6:7:8%999999";
 	const char *node2 = "1.2.3.4%999999";
-	int data1 = 1;
-	int data2 = 2;
 	const char *service = "80";
 	int family = AF_UNSPEC;
 	int socktype = 0;
@@ -80,9 +58,6 @@ main(int argc, char **argv)
 		abort();
 	}
 
-	/* Set callbacks. */
-	netresolve_set_success_callback(channel, on_success, &priv);
-
 	/* Resolver configuration. */
 	netresolve_set_family(channel, family);
 	netresolve_set_socktype(channel, socktype);
@@ -93,12 +68,12 @@ main(int argc, char **argv)
 	query2 = netresolve_query(channel, node2, service);
 	assert(query1 && query2);
 
-	/* Set user data */
-	netresolve_query_set_user_data(query1, &data1);
-	netresolve_query_set_user_data(query2, &data2);
+	/* Set callbacks. */
+	netresolve_query_set_callback(query1, on_success1, &priv);
+	netresolve_query_set_callback(query2, on_success2, &priv);
 
 	netresolve_epoll_wait(channel, &priv.epoll, true);
-	assert(priv.finished == 2);
+	assert(priv.common.finished == 2);
 
 	/* Clean up. */
 	netresolve_close(channel);

@@ -166,8 +166,8 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 	case NETRESOLVE_STATE_DONE:
 		if (query->channel->callbacks.on_connect)
 			netresolve_connect_cleanup(query);
-		if (query->channel->callbacks.on_success)
-			query->channel->callbacks.on_success(query, query->channel->callbacks.user_data);
+		if (query->callback)
+			query->callback(query, 0, query->user_data);
 		break;
 	case NETRESOLVE_STATE_ERROR:
 		break;
@@ -317,19 +317,10 @@ netresolve_query_done(netresolve_query_t query)
  * data that you will later retrieve with `netresolve_query_get_user_data()`.
  */
 void
-netresolve_query_set_user_data(netresolve_query_t query, void *user_data)
+netresolve_query_set_callback(netresolve_query_t query, netresolve_query_callback callback, void *user_data)
 {
+	query->callback = callback;
 	query->user_data = user_data;
-}
-
-/* netresolve_query_get_user_data:
- *
- * Retrieve a pointer previously attached using `netresolve_query_set_user_data()`.
- */
-void *
-netresolve_query_get_user_data(netresolve_query_t query)
-{
-	return query->user_data;
 }
 
 /* netresolve_query_get_count:

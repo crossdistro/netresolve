@@ -43,11 +43,8 @@ struct netresolve_fd_callbacks {
 	void *user_data;
 };
 
-typedef void (*netresolve_callback_t)(netresolve_query_t query, void *user_data);
 typedef void (*netresolve_socket_callback_t)(netresolve_query_t query, int idx, int sock, void *user_data);
 
-void netresolve_set_success_callback(netresolve_t channel,
-		netresolve_callback_t on_success, void *user_data);
 void netresolve_set_fd_callbacks(netresolve_t channel, const struct netresolve_fd_callbacks *callbacks);
 void netresolve_set_bind_callback(netresolve_t channel,
 		netresolve_socket_callback_t on_bind, void *user_data);
@@ -68,9 +65,10 @@ netresolve_query_t netresolve_query_reverse(netresolve_t channel, int family, co
 netresolve_query_t netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type);
 void netresolve_query_done(netresolve_query_t query);
 
-/* Query user data */
-void netresolve_query_set_user_data(netresolve_query_t query, void *user_data);
-void *netresolve_query_get_user_data(netresolve_query_t query);
+/* Query callback */
+typedef void (*netresolve_query_callback)(netresolve_query_t query, int status, void *user_data);
+
+void netresolve_query_set_callback(netresolve_query_t query, netresolve_query_callback callback, void *user_data);
 
 /* Query result getters (universal) */
 size_t netresolve_query_get_count(const netresolve_query_t query);
