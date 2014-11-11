@@ -156,6 +156,7 @@ struct netresolve_query {
 	struct netresolve_channel *channel;
 	void *user_data;
 	enum netresolve_state state;
+	int nfds;
 	int delayed_fd;
 	int first_connect_timeout;
 	struct netresolve_backend **backend;

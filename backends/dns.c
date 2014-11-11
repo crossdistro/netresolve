@@ -89,7 +89,7 @@ unwatch_file_descriptors(struct priv_dns *priv)
 
 	for (int fd = 0; fd < priv->nfds; fd++)
 		if (FD_ISSET(fd, &priv->rfds))
-			netresolve_backend_watch_fd(priv->query, fd, 0);
+			netresolve_backend_unwatch_fd(priv->query, fd);
 	FD_ZERO(&priv->rfds);
 	FD_ZERO(&priv->wfds);
 	priv->nfds = 0;
@@ -507,7 +507,7 @@ cleanup(netresolve_query_t query)
 
 #if defined(USE_UNBOUND)
 	if (priv->ctx) {
-		netresolve_backend_watch_fd(query, ub_fd(priv->ctx), 0);
+		netresolve_backend_unwatch_fd(query, ub_fd(priv->ctx));
 		ub_ctx_delete(priv->ctx);
 	}
 #elif defined(USE_ARES)

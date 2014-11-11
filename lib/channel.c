@@ -127,11 +127,9 @@ netresolve_epoll(netresolve_t channel, bool block)
 void
 netresolve_watch_fd(netresolve_t channel, int fd, int events)
 {
-	/* FIXME: Should be removed together with code relying on it. */
-	if (!events) {
-		netresolve_unwatch_fd(channel, fd);
-		return;
-	}
+	assert (fd >= 0);
+	assert (events);
+	assert (!(events & ~(EPOLLIN | EPOLLOUT)));
 
 	struct epoll_event event = { .events = events, .data = { .fd = fd} };
 
@@ -151,6 +149,8 @@ netresolve_watch_fd(netresolve_t channel, int fd, int events)
 void
 netresolve_unwatch_fd(netresolve_t channel, int fd)
 {
+	assert (fd >= 0);
+
 	assert(channel->epoll_count > 0);
 
 	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == -1) {
@@ -196,7 +196,7 @@ netresolve_add_timeout_ms(netresolve_t channel, time_t msec)
 void
 netresolve_remove_timeout(netresolve_t channel, int fd)
 {
-	netresolve_watch_fd(channel, fd, 0);
+	netresolve_unwatch_fd(channel, fd);
 	debug_channel(channel, "removed timeout: fd=%d", fd);
 	close(fd);
 }
