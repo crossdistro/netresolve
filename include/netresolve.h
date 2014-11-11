@@ -76,6 +76,7 @@ void *netresolve_query_get_user_data(netresolve_query_t query);
 size_t netresolve_query_get_count(const netresolve_query_t query);
 const char *netresolve_query_get_node_name(const netresolve_query_t query);
 const char *netresolve_query_get_service_name(const netresolve_query_t query);
+bool netresolve_query_get_secure(const netresolve_query_t query);
 
 /* Query result getters (forward queries) */
 void netresolve_query_get_node_info(const netresolve_query_t query, size_t idx,

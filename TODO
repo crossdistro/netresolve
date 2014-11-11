@@ -2,9 +2,6 @@
 
 ## Core library
 
- * Add DNSSEC validation information
-    - what about non-DNS protocols?
-    - what about any, localhost or numeric addresses
  * Improve path ordering
     - use rules from http://tools.ietf.org/html/rfc6724
     - use /etc/gai.conf

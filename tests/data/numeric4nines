@@ -1,4 +1,5 @@
 response netresolve 0.0.1
 name 1.2.3.4%999999
 ip 1.2.3.4%999999 any any 0 0 0 0
+secure
 

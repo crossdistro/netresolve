@@ -70,6 +70,7 @@ setup_forward(netresolve_query_t query, char **settings)
 	if (ipv6)
 		netresolve_backend_add_path(query, AF_INET6, &in6addr_loopback, 0, 0, 0, 0, 0, 0, 0);
 
+	netresolve_backend_set_secure(query);
 	netresolve_backend_finished(query);
 }
 
@@ -85,5 +86,6 @@ setup_reverse(netresolve_query_t query, char **settings)
 	}
 
 	netresolve_backend_add_name_info(query, "localhost", NULL);
+	netresolve_backend_set_secure(query);
 	netresolve_backend_finished(query);
 }

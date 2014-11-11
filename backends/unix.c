@@ -39,5 +39,6 @@ setup_forward(netresolve_query_t query, char **settings)
 	}
 
 	netresolve_backend_add_path(query, AF_UNIX, node, 0, socktype, 0, 0, 0, 0, 0);
+	netresolve_backend_set_secure(query);
 	netresolve_backend_finished(query);
 }

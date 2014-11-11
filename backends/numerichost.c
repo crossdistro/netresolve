@@ -36,7 +36,11 @@ setup_forward(netresolve_query_t query, char **settings)
 		return;
 	}
 
-	if (ifindex != -1)
+	if (ifindex >= 0) {
 		netresolve_backend_add_path(query, family, &address, ifindex, 0, 0, 0, 0, 0, 0);
-	netresolve_backend_finished(query);
+		netresolve_backend_set_canonical_name(query, node);
+		netresolve_backend_set_secure(query);
+		netresolve_backend_finished(query);
+	} else
+		netresolve_backend_failed(query);
 }

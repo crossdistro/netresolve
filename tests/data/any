@@ -2,4 +2,5 @@ response netresolve 0.0.1
 name localhost
 ip :: any any 0 0 0 0
 ip 0.0.0.0 any any 0 0 0 0
+secure
 

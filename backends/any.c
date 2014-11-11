@@ -56,8 +56,10 @@ setup_forward(netresolve_query_t query, char **settings)
 
 	netresolve_backend_add_path(query, AF_INET, &inaddr_any, 0, 0, 0, 0, 0, 0, 0);
 	netresolve_backend_add_path(query, AF_INET6, &in6addr_any, 0, 0, 0, 0, 0, 0, 0);
+	netresolve_backend_set_secure(query);
 	netresolve_backend_finished(query);
 }
+
 void
 setup_reverse(netresolve_query_t query, char **settings)
 {
@@ -76,5 +78,6 @@ setup_reverse(netresolve_query_t query, char **settings)
 	}
 
 	netresolve_backend_add_name_info(query, "", NULL);
+	netresolve_backend_set_secure(query);
 	netresolve_backend_finished(query);
 }

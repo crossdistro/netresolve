@@ -165,9 +165,10 @@ setup_forward(netresolve_query_t query, char **settings)
 		count++;
 	}
 
-	if (count)
+	if (count) {
+		netresolve_backend_set_secure(query);
 		netresolve_backend_finished(query);
-	else
+	} else
 		netresolve_backend_failed(query);
 
 	free(list.items);
@@ -194,9 +195,10 @@ setup_reverse(netresolve_query_t query, char **settings)
 		netresolve_backend_add_name_info(query, item->name, NULL);
 	}
 
-	if (count)
+	if (count) {
+		netresolve_backend_set_secure(query);
 		netresolve_backend_finished(query);
-	else
+	} else
 		netresolve_backend_failed(query);
 
 	free(list.items);

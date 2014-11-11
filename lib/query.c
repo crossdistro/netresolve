@@ -437,3 +437,9 @@ netresolve_query_get_dns_answer(const netresolve_query_t query, size_t *size)
 
 	return &query->response.dns.answer;
 }
+
+bool
+netresolve_query_get_secure(const netresolve_query_t query)
+{
+	return query->response.security == NETRESOLVE_SECURITY_SECURE;
+}

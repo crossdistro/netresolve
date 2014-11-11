@@ -65,6 +65,11 @@ enum netresolve_request_type {
 	_NETRSOLVE_REQUEST_TYPES
 };
 
+enum netresolve_security {
+	NETRESOLVE_SECURITY_INSECURE,
+	NETRESOLVE_SECURITY_SECURE
+};
+
 struct netresolve_backend {
 	bool mandatory;
 	char **settings;
@@ -176,6 +181,7 @@ struct netresolve_query {
 			void *answer;
 			size_t length;
 		} dns;
+		enum netresolve_security security;
 	} response;
 
 	struct netresolve_service_list *services;

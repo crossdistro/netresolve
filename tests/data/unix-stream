@@ -1,4 +1,5 @@
 response netresolve 0.0.1
 name /path/to/socket
 unix /path/to/socket stream
+secure
 

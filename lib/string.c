@@ -197,6 +197,7 @@ netresolve_get_response_string(netresolve_query_t query)
 	size_t i;
 	size_t length;
 	const char *answer = netresolve_query_get_dns_answer(query, &length);
+	bool secure = netresolve_query_get_secure(query);
 
 	bprintf(&start, end, "response %s %s\n", PACKAGE_NAME, VERSION);
 	if (length) {
@@ -213,6 +214,8 @@ netresolve_get_response_string(netresolve_query_t query)
 		add_path(&start, end, query, i);
 		bprintf(&start, end, "\n");
 	}
+	if (secure)
+		bprintf(&start, end, "secure\n");
 	bprintf(&start, end, "\n");
 
 	return query->buffer;

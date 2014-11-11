@@ -2,4 +2,5 @@ response netresolve 0.0.1
 name localhost
 ip 127.0.0.1 stream tcp 80 0 0 0
 ip 127.0.0.1 dgram udp 80 0 0 0
+secure
 

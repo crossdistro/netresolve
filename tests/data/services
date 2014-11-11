@@ -4,4 +4,5 @@ ip :: stream tcp 80 0 0 0
 ip :: dgram udp 80 0 0 0
 ip 0.0.0.0 stream tcp 80 0 0 0
 ip 0.0.0.0 dgram udp 80 0 0 0
+secure
 

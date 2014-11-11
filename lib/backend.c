@@ -258,6 +258,11 @@ netresolve_backend_add_name_info(netresolve_query_t query, const char *nodename,
 				service_callback, query);
 	}
 }
+void
+netresolve_backend_set_secure(netresolve_query_t query)
+{
+	query->response.security = NETRESOLVE_SECURITY_SECURE;
+}
 
 void
 netresolve_backend_set_dns_answer(netresolve_query_t query, const void *answer, size_t length)

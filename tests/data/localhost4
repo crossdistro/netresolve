@@ -1,4 +1,5 @@
 response netresolve 0.0.1
 name localhost
 ip 127.0.0.1 any any 0 0 0 0
+secure
 
