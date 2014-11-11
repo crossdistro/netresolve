@@ -78,6 +78,10 @@ Query information using a DNS backend and trust the AD flag:
 
     netresolve --backends aresdns:trust --node www.dnssec.cz
 
+Query information using a validating DNS backend:
+
+    netresolve --backends ubdns:validate --node www.dnssec.cz
+
 ## Library API
 
 Program or library using netresolve has to allocate a netresolve channel (or context) which is then used to perform all the queries. You may want to create multiple channels to have different configurations prepared for use.
@@ -237,7 +241,7 @@ The backends listed in the above comments are those used by default. You need to
 
 ### General purpose backends
 
-Three backends, `any`, `loopback` and `numerichost`, are available that perform trivial translations. The `hosts` backends uses `/etc/hosts` database of nodes. Nonblocking API is most useful for remote services. We have two nonblocking DNS backends, the default `ubdns` based on libunbound, and an alternative `aresdns` using *c-ares*.
+Three backends, `any`, `loopback` and `numerichost`, are available that perform trivial translations. The `hosts` backends uses `/etc/hosts` database of nodes. Nonblocking API is most useful for remote services. We have two nonblocking DNS backends, the default `ubdns` based on libunbound, and an alternative `aresdns` using *c-ares*. We support special configuration of the two DNS backends, `aresdns:trust` reads the DNS AD flag and marks the query result secure and `ubdns:validate` instructs libunbound to perform the validation.
 
 ### POSIX and glibc compatibility backends
 

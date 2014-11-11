@@ -53,6 +53,7 @@ struct priv_dns {
 	bool secure;
 #if defined(USE_UNBOUND)
 	struct ub_ctx* ctx;
+	bool validate;
 #elif defined(USE_ARES)
 	ares_channel channel;
 	fd_set rfds, wfds;
@@ -77,7 +78,16 @@ callback(void *arg, int status, struct ub_result* result)
 		return;
 	}
 
-	apply_answer(priv, result->answer_packet, result->answer_len);
+	if (!result->secure)
+		priv->secure = false;
+
+	if (!result->bogus)
+		apply_answer(priv, result->answer_packet, result->answer_len);
+	else {
+		error("libunbound: received bogus result");
+		priv->secure = false;
+		priv->failed = true;
+	}
 
 	ub_resolve_free(result);
 }
@@ -291,6 +301,9 @@ apply_answer(struct priv_dns *priv, uint8_t *data, size_t length)
 	ldns_rr_type type = ldns_pkt_question(pkt)->_rrs[0]->_rr_type;
 	ldns_rr_list *answer = ldns_pkt_answer(pkt);
 
+#if defined(USE_UNBOUND)
+	if (!priv->validate)
+#endif
 	if (!ldns_pkt_ad(pkt))
 		priv->secure = false;
 
@@ -362,6 +375,10 @@ setup(netresolve_query_t query, char **settings)
 	for (; *settings; settings++) {
 		if (!strcmp(*settings, "trust"))
 			priv->secure = true;
+#if defined(USE_UNBOUND)
+		else if (!strcmp(*settings, "validate"))
+			priv->validate = priv->secure = true;
+#endif
 	}
 
 	const char *name = netresolve_backend_get_nodename(query);
@@ -378,6 +395,10 @@ setup(netresolve_query_t query, char **settings)
 	if ((status = ub_ctx_resolvconf(priv->ctx, NULL)) != 0) {
 		error("libunbound: %s", ub_strerror(status));
 		return NULL;;
+	}
+	if (priv->validate && (status = ub_ctx_add_ta_file(priv->ctx, "/etc/dnssec/root-anchors.txt"))) {
+		error("libunbound: %s", ub_strerror(status));
+		return NULL;
 	}
 	netresolve_backend_watch_fd(query, ub_fd(priv->ctx), POLLIN);
 #elif defined(USE_ARES)
