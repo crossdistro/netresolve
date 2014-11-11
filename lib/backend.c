@@ -239,7 +239,7 @@ service_callback(const char *name, int socktype, int protocol, int port, void *u
 	if (query->response.servname)
 		return;
 
-	query->response.servname = strdup(name);
+	query->response.servname = name ? strdup(name) : NULL;
 }
 
 void

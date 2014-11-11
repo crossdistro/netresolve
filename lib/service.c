@@ -249,6 +249,6 @@ netresolve_service_list_query(struct netresolve_service_list **services,
 		char buffer[128] = { 0 };
 
 		snprintf(buffer, sizeof buffer, "%d", (int) port);
-		found_port(buffer, socktype, protocol, port, callback, user_data);
+		found_port(port ? buffer : NULL, socktype, protocol, port, callback, user_data);
 	}
 }
