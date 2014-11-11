@@ -42,6 +42,22 @@ getenv_bool(const char *name, bool def)
 	return value ? (!strcasecmp(value, "yes") || !strcasecmp(value, "true") || !strcasecmp(value, "1")) : def;
 }
 
+static int
+getenv_int(const char *name, int def)
+{
+	const char *value = secure_getenv(name);
+
+	return value ? strtoll(value, NULL, 10) : def;
+}
+
+static int
+getenv_family(const char *name, int def)
+{
+	const char *value = secure_getenv(name);
+
+	return value ? netresolve_family_from_string(value) : def;
+}
+
 netresolve_t
 netresolve_open(void)
 {
@@ -58,9 +74,10 @@ netresolve_open(void)
 		return NULL;
 	}
 
-	channel->config.force_family = netresolve_family_from_string(secure_getenv("NETRESOLVE_FORCE_FAMILY"));
+	channel->config.force_family = getenv_family("NETRESOLVE_FORCE_FAMILY", AF_UNSPEC);
 
 	channel->request.default_loopback = getenv_bool("NETRESOLVE_FLAG_DEFAULT_LOOPBACK", false);
+	channel->request.clamp_ttl = getenv_int("NETRESOLVE_CLAMP_TTL", -1);
 
 	return channel;
 }

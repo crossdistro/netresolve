@@ -133,6 +133,7 @@ struct netresolve_channel {
 		/* Advanced configuration */
 		bool default_loopback;
 		bool dns_srv_lookup;
+		int clamp_ttl;
 		/* Reverse query */
 		union {
 			char address[1024];
