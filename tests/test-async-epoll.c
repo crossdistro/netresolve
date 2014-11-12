@@ -27,7 +27,10 @@
 netresolve_t
 channel_open(struct priv_common *priv)
 {
-	return netresolve_epoll_open();
+	netresolve_t channel = netresolve_open();
+	netresolve_epoll_fd(channel);
+
+	return channel;
 }
 
 void

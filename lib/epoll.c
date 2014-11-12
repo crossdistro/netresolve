@@ -101,25 +101,16 @@ netresolve_epoll_install(netresolve_t channel,
 netresolve_t
 netresolve_epoll_open(void)
 {
-	netresolve_t channel;
-	struct netresolve_epoll *loop;
+	netresolve_t channel = netresolve_open();
 
-	if (!(channel = netresolve_open()))
-		goto fail_channel;
-
-	if (!(loop = calloc(1, sizeof *loop)))
-		goto fail_loop;
-
-	if (!netresolve_epoll_install(channel, loop, free_user_data))
-		goto fail_install;
+	if (channel) {
+		if (netresolve_epoll_fd(channel) == -1) {
+			netresolve_close(channel);
+			channel = NULL;
+		}
+	}
 
 	return channel;
-fail_install:
-	free(loop);
-fail_loop:
-	netresolve_close(channel);
-fail_channel:
-	return NULL;
 }
 
 /* netresolve_epoll_fd:
@@ -127,11 +118,27 @@ fail_channel:
  * Retrieve the epoll file descriptor from the channel. Do not add any file
  * descriptors to the epoll instance. Just use the file descriptor in your
  * event loop and poll it for reading.
+ *
+ * As a bonus, You can call this function between `netresolve_open()` and the
+ * first query to convert a blocking channel to an epoll based non-blocking
+ * one. A sequence of `netresolve_open()` and `netresolve_epoll_fd()` is thus
+ * equivalent to `netresolve_epoll_open()` with an optional
+ * `netresolve_epoll_fd()` to retrieve the file descriptor.
  */
 int
 netresolve_epoll_fd(netresolve_t channel)
 {
 	struct netresolve_epoll *loop = netresolve_get_user_data(channel);
+
+	/* Automatically turn netresolve channel into an epoll based nonblocking one */
+	if (!loop) {
+		if (!(loop = calloc(1, sizeof *loop)))
+			return -1;
+		if (!netresolve_epoll_install(channel, loop, free_user_data)) {
+			free(loop);
+			return -1;
+		}
+	}
 
 	return loop->fd;
 }
