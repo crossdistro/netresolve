@@ -71,6 +71,11 @@ enum netresolve_security {
 	NETRESOLVE_SECURITY_SECURE
 };
 
+struct netresolve_epoll {
+	int fd;
+	int count;
+};
+
 struct netresolve_backend {
 	bool mandatory;
 	char **settings;
@@ -106,9 +111,13 @@ struct netresolve_path {
 };
 
 struct netresolve_channel {
-	int epoll_fd;
-	int epoll_count;
-	void *epoll_handle;
+	struct netresolve_source {
+		int fd;
+		void *handle;
+		struct netresolve_source *previous, *next;
+	} sources;
+	struct netresolve_epoll epoll;
+	int count;
 	struct netresolve_backend **backends;
 	struct {
 		netresolve_watch_fd_callback_t watch_fd;
@@ -197,7 +206,6 @@ struct netresolve_query {
 };
 
 /* Channel */
-bool netresolve_epoll(netresolve_t channel, bool block);
 void netresolve_watch_fd(netresolve_t channel, int fd, int events);
 void netresolve_unwatch_fd(netresolve_t channel, int fd);
 int netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec);
@@ -236,5 +244,12 @@ void netresolve_query_connect(netresolve_query_t query, size_t idx);
 void netresolve_connect_start(netresolve_query_t query);
 bool netresolve_connect_dispatch(netresolve_query_t query, int fd, int events);
 void netresolve_connect_cleanup(netresolve_query_t query);
+
+/* Event loop for blocking mode */
+
+bool netresolve_epoll_install(netresolve_t channel,
+		struct netresolve_epoll *loop,
+		netresolve_free_user_data_callback_t free_loop);
+void netresolve_epoll_wait(netresolve_t channel);
 
 #endif /* NETRESOLVE_PRIVATE_H */

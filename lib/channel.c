@@ -21,6 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve-private.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -28,11 +29,7 @@
 #include <poll.h>
 #include <errno.h>
 #include <dlfcn.h>
-#include <sys/epoll.h>
 #include <sys/timerfd.h>
-#include <sys/eventfd.h>
-
-#include "netresolve-private.h"
 
 static bool
 getenv_bool(const char *name, bool def)
@@ -69,11 +66,7 @@ netresolve_open(void)
 	if (!(channel = calloc(1, sizeof *channel)))
 		return NULL;
 
-	channel->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-	if (channel->epoll_fd == -1) {
-		free(channel);
-		return NULL;
-	}
+	channel->sources.previous = channel->sources.next = &channel->sources;
 
 	channel->config.force_family = getenv_family("NETRESOLVE_FORCE_FAMILY", AF_UNSPEC);
 
@@ -96,7 +89,7 @@ netresolve_close(netresolve_t channel)
 	free(channel->queries);
 
 	netresolve_set_backend_string(channel, "");
-	if (channel->epoll_fd != -1 && close(channel->epoll_fd) == -1)
+	if (channel->epoll.fd != -1 && close(channel->epoll.fd) == -1)
 		abort();
 	if (channel->callbacks.free_user_data)
 		channel->callbacks.free_user_data(channel->callbacks.user_data);
@@ -104,87 +97,53 @@ netresolve_close(netresolve_t channel)
 	free(channel);
 }
 
-static bool
-dispatch_fd(netresolve_t channel, int fd, int events)
-{
-	assert(fd >= 0);
-	assert(events);
-
-	debug_channel(channel, "dispatching: fd=%d events=%d", fd, events);
-
-	for (int i = 0; i < channel->nqueries; i++) {
-		netresolve_query_t query = channel->queries[i];
-
-		if (netresolve_query_dispatch(query, fd, events))
-			return true;
-	}
-
-	return false;
-}
-
-bool
-netresolve_epoll(netresolve_t channel, bool block)
-{
-	static const int maxevents = 10;
-	struct epoll_event events[maxevents];
-	int nevents;
-	int i;
-
-	if (channel->epoll_count > 0) {
-		debug_channel(channel, "running epoll...");
-
-		nevents = epoll_wait(channel->epoll_fd, events, maxevents, block ? -1 : 0);
-		if (nevents == -1) {
-			error("epoll_wait: %s", strerror(errno));
-			return false;
-		}
-		for (i = 0; i < nevents; i++)
-			dispatch_fd(channel, events[i].data.fd, events[i].events);
-	}
-
-	return true;
-}
-
 void
 netresolve_watch_fd(netresolve_t channel, int fd, int events)
 {
-	assert (fd >= 0);
-	assert (events);
-	assert (!(events & ~(EPOLLIN | EPOLLOUT)));
+	struct netresolve_source *source;
 
-	struct epoll_event event = { .events = events, .data = { .fd = fd} };
+	assert(fd >= 0);
+	assert(events && !(events & ~(POLLIN | POLLOUT)));
 
-	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_ADD, fd, &event) == -1) {
-		error("epoll_ctl: %s (fd=%d)", strerror(errno), fd);
+	if (!(source = calloc(1, sizeof(*source))))
 		abort();
-	}
 
-	channel->epoll_count++;
+	source->fd = fd;
+	source->handle = channel->callbacks.watch_fd(channel, fd, events, source);
 
-	if (channel->epoll_count == 1 && channel->callbacks.watch_fd)
-		channel->epoll_handle = channel->callbacks.watch_fd(channel, channel->epoll_fd, POLLIN, channel);
+	source->previous = channel->sources.previous;
+	source->next = &channel->sources;
+	source->previous->next = source;
+	source->next->previous = source;
 
-	debug_channel(channel, "added file descriptor: fd=%d events=%d (total %d)", fd, events, channel->epoll_count);
+	channel->count++;
+
+	debug_channel(channel, "added file descriptor: fd=%d events=%d (total %d)", fd, events, channel->count);
 }
 
 void
 netresolve_unwatch_fd(netresolve_t channel, int fd)
 {
-	assert (fd >= 0);
+	struct netresolve_source *source;
 
-	assert(channel->epoll_count > 0);
+	assert(fd >= 0);
 
-	if (epoll_ctl(channel->epoll_fd, EPOLL_CTL_DEL, fd, NULL) == -1) {
-		error("epoll_ctl: %s (fd=%d}", strerror(errno), fd);
-		abort();
-	}
+	for (source = channel->sources.next; source != &channel->sources; source = source->next)
+		if (source->fd == fd)
+			break;
 
-	channel->epoll_count--;
+	assert(channel->count > 0);
+	assert(source != &channel->sources);
 
-	if (channel->epoll_count == 0 && channel->callbacks.watch_fd)
-		channel->callbacks.unwatch_fd(channel, channel->epoll_fd, channel->epoll_handle);
+	channel->callbacks.unwatch_fd(channel, fd, source->handle);
 
-	debug_channel(channel, "removed file descriptor: fd=%d (total %d)", fd, channel->epoll_count);
+	source->previous->next = source->next;
+	source->next->previous = source->previous;
+	free(source);
+
+	channel->count--;
+
+	debug_channel(channel, "removed file descriptor: fd=%d (total %d)", fd, channel->count);
 }
 
 int
@@ -226,13 +185,15 @@ netresolve_remove_timeout(netresolve_t channel, int fd)
 static netresolve_query_t
 start_query(netresolve_t channel, netresolve_query_t query)
 {
+	/* Install default callbacks for first query in blocking mode. */
+	if (!channel->callbacks.watch_fd)
+		netresolve_epoll_install(channel, &channel->epoll, NULL);
+
 	netresolve_query_setup(query);
 
 	/* Wait for the channel in blocking mode. */
-	if (!channel->callbacks.watch_fd)
-		while (channel->epoll_count > 0)
-			if (!netresolve_epoll(channel, true))
-				abort();
+	if (channel->callbacks.user_data == &channel->epoll)
+		netresolve_epoll_wait(channel);
 
 	return query;
 }
@@ -287,16 +248,22 @@ netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type)
 bool
 netresolve_dispatch(netresolve_t channel, void *data, int events)
 {
-	if (data != channel) {
-		errno = EINVAL;
-		return false;
-	}
-	if (events != EPOLLIN) {
-		errno = EINVAL;
-		return false;
+	struct netresolve_source *source = data;
+
+	assert(source);
+	assert(events & (POLLIN | POLLOUT));
+	assert(!(events & ~(POLLIN | POLLOUT)));
+
+	debug_channel(channel, "dispatching: fd=%d events=%d", source->fd, events);
+
+	for (int i = 0; i < channel->nqueries; i++) {
+		netresolve_query_t query = channel->queries[i];
+
+		if (netresolve_query_dispatch(query, source->fd, events))
+			return true;
 	}
 
-	return netresolve_epoll(channel, false);
+	return false;
 }
 
 static void

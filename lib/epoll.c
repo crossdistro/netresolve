@@ -26,11 +26,6 @@
 #include <unistd.h>
 #include <assert.h>
 
-struct netresolve_epoll {
-	int fd;
-	int count;
-};
-
 static void *
 watch_fd(netresolve_t channel, int fd, int events, void *data)
 {
