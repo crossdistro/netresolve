@@ -22,7 +22,6 @@ struct netresolve_asyncns_query {
 
 struct netresolve_asyncns {
 	netresolve_t channel;
-	struct netresolve_epoll epoll;
 	asyncns_query_t queries;
 };
 
@@ -44,14 +43,10 @@ dequeue(asyncns_query_t *q)
 }
 
 static void
-on_success(netresolve_query_t query, int status, void *user_data)
+callback(netresolve_query_t query, void *user_data)
 {
 	asyncns_query_t *q = user_data;
 
-	if (status)
-		debug("asyncns query failed");
-	else
-		debug("asyncns query successful");
 	q->done = true;
 }
 
@@ -63,18 +58,13 @@ asyncns_new (unsigned n_proc)
 	if (!(asyncns = calloc(1, sizeof *asyncns)))
 		goto fail_asyncns;
 
-	if ((asyncns->epoll.fd = epoll_create1(0)) == -1)
-		goto fail_epoll;
-
-    if (!(asyncns->channel = netresolve_epoll_open(&asyncns->epoll)))
+    if (!(asyncns->channel = netresolve_epoll_open()))
 		goto fail_channel;
 
 	asyncns->queries.previous = asyncns->queries.next = &asyncns->queries;
 
 	return asyncns;
 fail_channel:
-	close(asyncns->epoll.fd);
-fail_epoll:
 	free(asyncns);
 fail_asyncns:
 	return NULL;
@@ -83,13 +73,16 @@ fail_asyncns:
 int
 asyncns_fd(asyncns_t *asyncns)
 {
-	return asyncns->epoll.fd;
+	return netresolve_epoll_fd(asyncns->channel);
 }
 
 int
 asyncns_wait(asyncns_t *asyncns, int block)
 {
-	netresolve_epoll_wait(asyncns->channel, &asyncns->epoll, block);
+	if (block)
+		netresolve_epoll_wait(asyncns->channel);
+	else
+		netresolve_epoll_dispatch(asyncns->channel);
 
 	/* undocumented return value */
 	return 0;
@@ -106,7 +99,7 @@ add_query(asyncns_t *asyncns, netresolve_query_t query)
 	if (!(q = calloc(1, sizeof *q)))
 		goto fail_alloc;
 
-	netresolve_query_set_callback(query, on_success, q);
+	netresolve_query_set_callback(query, callback, q);
 
 	q->asyncns = asyncns;
 	q->query = query;
@@ -232,10 +225,10 @@ asyncns_free (asyncns_t *asyncns)
 {
 	asyncns_query_t *list = &asyncns->queries;
 
-	close(asyncns->epoll.fd);
-
 	while (list->next != list)
 		asyncns_cancel(asyncns, list->next);
+
+	netresolve_close(asyncns->channel);
 
 	free(asyncns);
 }

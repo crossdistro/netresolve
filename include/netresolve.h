@@ -34,22 +34,7 @@ typedef struct netresolve_query *netresolve_query_t;
 
 netresolve_t netresolve_open(void);
 void netresolve_close(netresolve_t channel);
-bool netresolve_dispatch_fd(netresolve_t channel, void *data, int events);
-
-/* Channel callback settings */
-struct netresolve_fd_callbacks {
-	void *(*watch_fd)(netresolve_t channel, int fd, int events, void *data, void *user_data);
-	void (*unwatch_fd)(netresolve_t channel, int fd, void *handle, void *user_data);
-	void *user_data;
-};
-
-typedef void (*netresolve_socket_callback_t)(netresolve_query_t query, int idx, int sock, void *user_data);
-
-void netresolve_set_fd_callbacks(netresolve_t channel, const struct netresolve_fd_callbacks *callbacks);
-void netresolve_set_bind_callback(netresolve_t channel,
-		netresolve_socket_callback_t on_bind, void *user_data);
-void netresolve_set_connect_callback(netresolve_t channel,
-		netresolve_socket_callback_t on_connect, void *user_data);
+bool netresolve_dispatch(netresolve_t channel, void *data, int events);
 
 /* Channel configuration */
 void netresolve_set_backend_string(netresolve_t channel, const char *string);
@@ -65,27 +50,30 @@ netresolve_query_t netresolve_query_reverse(netresolve_t channel, int family, co
 netresolve_query_t netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type);
 void netresolve_query_done(netresolve_query_t query);
 
-/* Query callback */
-typedef void (*netresolve_query_callback)(netresolve_query_t query, int status, void *user_data);
+/* Query callback (nonblocking mode only) */
+typedef void (*netresolve_query_callback)(netresolve_query_t query, void *user_data);
 
 void netresolve_query_set_callback(netresolve_query_t query, netresolve_query_callback callback, void *user_data);
 
-/* Query result getters (universal) */
-size_t netresolve_query_get_count(const netresolve_query_t query);
-const char *netresolve_query_get_node_name(const netresolve_query_t query);
-const char *netresolve_query_get_service_name(const netresolve_query_t query);
-bool netresolve_query_get_secure(const netresolve_query_t query);
-
 /* Query result getters (forward queries) */
+size_t netresolve_query_get_count(const netresolve_query_t query);
 void netresolve_query_get_node_info(const netresolve_query_t query, size_t idx,
 		int *family, const void **address,  int *ifindex);
 void netresolve_query_get_service_info(const netresolve_query_t query, size_t idx,
 		int *socktype, int *protocol, int *port);
 void netresolve_query_get_aux_info(const netresolve_query_t query, size_t idx,
 		int *priority, int *weight, int *ttl);
+#define netresolve_query_get_canonical_name(query) netresolve_query_get_node_name(query)
+
+/* Query result getters (reverse queries) */
+const char *netresolve_query_get_node_name(const netresolve_query_t query);
+const char *netresolve_query_get_service_name(const netresolve_query_t query);
 
 /* Query result getters (DNS queries) */
 const void *netresolve_query_get_dns_answer(const netresolve_query_t query, size_t *size);
+
+/* Query result getters (universal) */
+bool netresolve_query_get_secure(const netresolve_query_t query);
 
 /* Logging */
 enum netresolve_log_level {

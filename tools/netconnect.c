@@ -28,7 +28,7 @@
 #include <fcntl.h>
 #include <poll.h>
 
-#include <netresolve.h>
+#include <netresolve-callback.h>
 #include <netresolve-cli.h>
 
 static void

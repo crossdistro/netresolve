@@ -46,7 +46,9 @@ libnetresolve_la_SOURCES = \
 	lib/service.c \
 	lib/socket.c \
 	lib/string.c \
-	lib/utils.c
+	lib/utils.c \
+	lib/epoll.c \
+	lib/select.c
 libnetresolve_la_LDFLAGS = \
 	$(AM_LDFLAGS) \
 	-export-symbols-regex '^netresolve_'
@@ -128,13 +130,15 @@ res_query_LDFLAGS = $(AM_LDFLAGS) -lresolv
 TESTS = \
 	tests/test-netresolve.sh \
 	test-sync \
-	test-async \
+	test-epoll \
+	test-select \
 	test-libevent \
 	test-glib \
 	test-bind-connect \
 	tests/test-compat.sh
 EXTRA_DIST = \
 	tools/compat.h \
+	tests/common.h \
 	tests/test-netresolve.sh \
 	tests/data/any \
 	tests/data/localhost \
@@ -158,7 +162,8 @@ EXTRA_DIST = \
 	tests/data/empty
 noinst_PROGRAMS = \
 	test-sync \
-	test-async \
+	test-epoll \
+	test-select \
 	test-libevent \
 	test-glib \
 	test-bind-connect \
@@ -173,14 +178,17 @@ noinst_PROGRAMS = \
 test_sync_SOURCES = tests/test-sync.c tests/common.c tests/common.h
 test_sync_LDADD = libnetresolve.la
 
-test_async_SOURCES = tests/test-async.c tests/common.c tests/common.h
-test_async_LDADD = libnetresolve.la
+test_epoll_SOURCES = tests/test-async.c tests/test-async-epoll.c tests/common.c
+test_epoll_LDADD = libnetresolve.la
 
-test_libevent_SOURCES = tests/test-libevent.c tests/common.c tests/common.h
+test_select_SOURCES = tests/test-async.c tests/test-async-select.c tests/common.c
+test_select_LDADD = libnetresolve.la
+
+test_libevent_SOURCES = tests/test-libevent.c tests/common.c
 test_libevent_LDADD = libnetresolve.la
 test_libevent_LDFLAGS = $(AM_LDFLAGS) $(EVENT_LIBS)
 
-test_glib_SOURCES = tests/test-glib.c tests/common.c tests/common.h
+test_glib_SOURCES = tests/test-glib.c tests/common.c
 test_glib_LDADD = libnetresolve.la
 test_glib_CFLAGS = $(AM_CFLAGS) $(GLIB_CFLAGS)
 test_glib_LDFLAGS = $(AM_LDFLAGS) $(GLIB_LIBS)

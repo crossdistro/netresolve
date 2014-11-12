@@ -21,48 +21,17 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef NETRESOLVE_SELECT_H
+#define NETRESOLVE_SELECT_H
+
 #include <netresolve.h>
-#include "common.h"
+#include <sys/select.h>
 
-int
-main(int argc, char **argv)
-{
-	struct priv_common priv = { 0 };
-	netresolve_t channel;
-	netresolve_query_t query1, query2;
-	const char *node1 = "1:2:3:4:5:6:7:8%999999";
-	const char *node2 = "1.2.3.4%999999";
-	const char *service = "80";
-	int family = AF_UNSPEC;
-	int socktype = 0;
-	int protocol = IPPROTO_TCP;
+netresolve_t netresolve_select_open();
+int netresolve_select_apply_fds(netresolve_t channel, fd_set *rfds, fd_set *wfds);
+void netresolve_select_dispatch_read(netresolve_t channel, int fd);
+void netresolve_select_dispatch_write(netresolve_t channel, int fd);
+int netresolve_select_wait(netresolve_t channel, struct timeval *timeout);
+void netresolve_select_close(netresolve_t channel);
 
-	/* Create a channel. */
-	channel = channel_open(&priv);
-	if (!channel) {
-		perror("netresolve_open");
-		abort();
-	}
-
-	/* Resolver configuration. */
-	netresolve_set_family(channel, family);
-	netresolve_set_socktype(channel, socktype);
-	netresolve_set_protocol(channel, protocol);
-
-	/* Start name resolution. */
-	query1 = netresolve_query(channel, node1, service);
-	query2 = netresolve_query(channel, node2, service);
-	assert(query1 && query2);
-
-	/* Set callbacks. */
-	netresolve_query_set_callback(query1, callback1, &priv);
-	netresolve_query_set_callback(query2, callback2, &priv);
-
-	channel_wait(channel);
-	assert(priv.finished == 2);
-
-	/* Clean up. */
-	netresolve_close(channel);
-
-	exit(EXIT_SUCCESS);
-}
+#endif /* NETRESOLVE_SELECT_H */

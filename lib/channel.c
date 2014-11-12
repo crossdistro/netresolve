@@ -88,17 +88,18 @@ netresolve_open(void)
 void
 netresolve_close(netresolve_t channel)
 {
-	int i;
-
 	if (!channel)
 		return;
 
-	for (i = 0; i < channel->nqueries; i++)
+	for (int i = 0; i < channel->nqueries; i++)
 		netresolve_query_done(channel->queries[i]);
 	free(channel->queries);
 
 	netresolve_set_backend_string(channel, "");
-	close(channel->epoll_fd);
+	if (channel->epoll_fd != -1 && close(channel->epoll_fd) == -1)
+		abort();
+	if (channel->callbacks.free_user_data)
+		channel->callbacks.free_user_data(channel->callbacks.user_data);
 	memset(channel, 0, sizeof *channel);
 	free(channel);
 }
@@ -160,8 +161,8 @@ netresolve_watch_fd(netresolve_t channel, int fd, int events)
 
 	channel->epoll_count++;
 
-	if (channel->epoll_count == 1 && channel->fd_callbacks.watch_fd)
-		channel->epoll_handle = channel->fd_callbacks.watch_fd(channel, channel->epoll_fd, POLLIN, channel, channel->fd_callbacks.user_data);
+	if (channel->epoll_count == 1 && channel->callbacks.watch_fd)
+		channel->epoll_handle = channel->callbacks.watch_fd(channel, channel->epoll_fd, POLLIN, channel);
 
 	debug_channel(channel, "added file descriptor: fd=%d events=%d (total %d)", fd, events, channel->epoll_count);
 }
@@ -180,8 +181,8 @@ netresolve_unwatch_fd(netresolve_t channel, int fd)
 
 	channel->epoll_count--;
 
-	if (channel->epoll_count == 0 && channel->fd_callbacks.watch_fd)
-		channel->fd_callbacks.unwatch_fd(channel, channel->epoll_fd, channel->epoll_handle, channel->fd_callbacks.user_data);
+	if (channel->epoll_count == 0 && channel->callbacks.watch_fd)
+		channel->callbacks.unwatch_fd(channel, channel->epoll_fd, channel->epoll_handle);
 
 	debug_channel(channel, "removed file descriptor: fd=%d (total %d)", fd, channel->epoll_count);
 }
@@ -217,8 +218,9 @@ void
 netresolve_remove_timeout(netresolve_t channel, int fd)
 {
 	netresolve_unwatch_fd(channel, fd);
-	debug_channel(channel, "removed timeout: fd=%d", fd);
 	close(fd);
+
+	debug_channel(channel, "removed timeout: fd=%d", fd);
 }
 
 static netresolve_query_t
@@ -227,7 +229,7 @@ start_query(netresolve_t channel, netresolve_query_t query)
 	netresolve_query_setup(query);
 
 	/* Wait for the channel in blocking mode. */
-	if (!channel->fd_callbacks.watch_fd)
+	if (!channel->callbacks.watch_fd)
 		while (channel->epoll_count > 0)
 			if (!netresolve_epoll(channel, true))
 				abort();
@@ -283,7 +285,7 @@ netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type)
 }
 
 bool
-netresolve_dispatch_fd(netresolve_t channel, void *data, int events)
+netresolve_dispatch(netresolve_t channel, void *data, int events)
 {
 	if (data != channel) {
 		errno = EINVAL;
@@ -435,9 +437,30 @@ netresolve_set_protocol(netresolve_t channel, int protocol)
 }
 
 void
-netresolve_set_fd_callbacks(netresolve_t channel, const struct netresolve_fd_callbacks *callbacks)
+netresolve_set_fd_callbacks(netresolve_t channel, netresolve_watch_fd_callback_t watch_fd, netresolve_unwatch_fd_callback_t unwatch_fd)
 {
-	memcpy(&channel->fd_callbacks, callbacks, sizeof *callbacks);
+	assert(watch_fd && unwatch_fd);
+	assert(!channel->callbacks.watch_fd && !channel->callbacks.unwatch_fd);
+
+	channel->callbacks.watch_fd = watch_fd;
+	channel->callbacks.unwatch_fd = unwatch_fd;
+}
+
+void
+netresolve_set_user_data(netresolve_t channel,
+		void *user_data,
+		netresolve_free_user_data_callback_t free_user_data)
+{
+	assert(!channel->callbacks.user_data);
+
+	channel->callbacks.user_data = user_data;
+	channel->callbacks.free_user_data = free_user_data;
+}
+
+void *
+netresolve_get_user_data(netresolve_t channel)
+{
+	return channel->callbacks.user_data;
 }
 
 void

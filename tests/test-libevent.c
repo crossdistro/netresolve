@@ -64,8 +64,8 @@ main(int argc, char **argv)
 	assert(query1 && query2);
 
 	/* Set callbacks. */
-	netresolve_query_set_callback(query1, on_success1, &priv);
-	netresolve_query_set_callback(query2, on_success2, &priv);
+	netresolve_query_set_callback(query1, callback1, &priv);
+	netresolve_query_set_callback(query2, callback2, &priv);
 
 	/* Run the main loop. */
 	event_base_dispatch(base);

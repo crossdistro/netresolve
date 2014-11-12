@@ -24,90 +24,13 @@
 #ifndef NETRESOLVE_EPOLL_H
 #define NETRESOLVE_EPOLL_H
 
-#include <netresolve-private.h>
-#include <assert.h>
+#include <netresolve.h>
 #include <sys/epoll.h>
 
-/* FIXME: This header file should be turned in a library to avoid symbol name clashes. */
+netresolve_t netresolve_epoll_open(void);
+int netresolve_epoll_fd(netresolve_t channel);
+void netresolve_epoll_dispatch(netresolve_t channel);
 
-struct netresolve_epoll {
-	int fd;
-	int count;
-};
-
-static void *
-watch_fd(netresolve_t channel, int fd, int events, void *data, void *user_data)
-{
-	struct netresolve_epoll *loop = user_data;
-	struct epoll_event event = { .events = events, .data = { .ptr = data } };
-
-	assert(fd > 0);
-	assert(events == EPOLLIN);
-	assert(loop->count == 0);
-
-	if (epoll_ctl(loop->fd, EPOLL_CTL_ADD, fd, &event) == -1) {
-		error("epoll_ctl: %s", strerror(errno));
-		abort();
-	}
-
-	loop->count++;
-
-	return user_data;
-}
-
-static void
-unwatch_fd(netresolve_t channel, int fd, void *handle, void *user_data)
-{
-	struct netresolve_epoll *loop = user_data;
-
-	assert(fd > 0);
-	assert(handle == user_data);
-	assert(loop->count == 1);
-
-	if (epoll_ctl(loop->fd, EPOLL_CTL_DEL, fd, NULL) == -1) {
-		error("epoll_ctl: %s", strerror(errno));
-		abort();
-	}
-
-	loop->count--;
-}
-
-__attribute__((unused))
-static netresolve_t
-netresolve_epoll_open(struct netresolve_epoll *loop)
-{
-	netresolve_t channel = netresolve_open();
-	struct netresolve_fd_callbacks callbacks = { watch_fd, unwatch_fd, loop };
-
-	if (channel)
-		netresolve_set_fd_callbacks(channel, &callbacks);
-
-	return channel;
-}
-
-__attribute__((unused))
-static void
-netresolve_epoll_wait(netresolve_t channel, struct netresolve_epoll *loop, bool  block)
-{
-	while (loop->count > 0) {
-		static const int maxevents = 10;
-		struct epoll_event events[maxevents];
-		int nevents;
-		int i;
-
-		nevents = epoll_wait(loop->fd, events, maxevents, block ? -1 : 0);
-		switch (nevents) {
-		case -1:
-			perror("epoll_wait");
-			abort();
-		case 0:
-			return;
-		default:
-			for (i = 0; i < nevents; i++)
-				netresolve_dispatch_fd(channel, events[i].data.ptr, events[i].events);
-		}
-	}
-
-}
+void netresolve_epoll_wait(netresolve_t channel);
 
 #endif /* NETRESOLVE_EPOLL_H */

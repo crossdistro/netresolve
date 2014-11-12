@@ -21,48 +21,28 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef NETRESOLVE_CALLBACK_H
+#define NETRESOLVE_CALLBACK_H
+
 #include <netresolve.h>
-#include "common.h"
 
-int
-main(int argc, char **argv)
-{
-	struct priv_common priv = { 0 };
-	netresolve_t channel;
-	netresolve_query_t query1, query2;
-	const char *node1 = "1:2:3:4:5:6:7:8%999999";
-	const char *node2 = "1.2.3.4%999999";
-	const char *service = "80";
-	int family = AF_UNSPEC;
-	int socktype = 0;
-	int protocol = IPPROTO_TCP;
+/* Event loop integration */
+typedef void *(*netresolve_watch_fd_callback_t)(netresolve_t channel, int fd, int events, void *data);
+typedef void (*netresolve_unwatch_fd_callback_t)(netresolve_t channel, int fd, void *handle);
+typedef void (*netresolve_free_user_data_callback_t)(void *user_data);
 
-	/* Create a channel. */
-	channel = channel_open(&priv);
-	if (!channel) {
-		perror("netresolve_open");
-		abort();
-	}
+void netresolve_set_fd_callbacks(netresolve_t channel,
+		netresolve_watch_fd_callback_t watch_fd,
+		netresolve_unwatch_fd_callback_t unwatch_fd);
+void netresolve_set_user_data(netresolve_t channel, void *user_data, netresolve_free_user_data_callback_t free_user_data);
+void *netresolve_get_user_data(netresolve_t channel);
 
-	/* Resolver configuration. */
-	netresolve_set_family(channel, family);
-	netresolve_set_socktype(channel, socktype);
-	netresolve_set_protocol(channel, protocol);
+/* Socket API callbacks */
+typedef void (*netresolve_socket_callback_t)(netresolve_query_t query, int idx, int sock, void *user_data);
 
-	/* Start name resolution. */
-	query1 = netresolve_query(channel, node1, service);
-	query2 = netresolve_query(channel, node2, service);
-	assert(query1 && query2);
+void netresolve_set_bind_callback(netresolve_t channel,
+		netresolve_socket_callback_t on_bind, void *user_data);
+void netresolve_set_connect_callback(netresolve_t channel,
+		netresolve_socket_callback_t on_connect, void *user_data);
 
-	/* Set callbacks. */
-	netresolve_query_set_callback(query1, callback1, &priv);
-	netresolve_query_set_callback(query2, callback2, &priv);
-
-	channel_wait(channel);
-	assert(priv.finished == 2);
-
-	/* Clean up. */
-	netresolve_close(channel);
-
-	exit(EXIT_SUCCESS);
-}
+#endif /* NETRESOLVE_CALLBACK_H */

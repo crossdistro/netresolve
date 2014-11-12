@@ -24,12 +24,19 @@
 #ifndef NETRESOLVE_GLIB_H
 #define NETRESOLVE_GLIB_H
 
-#include <netresolve.h>
+#include <netresolve-callback.h>
 #include <glib.h>
 #include <poll.h>
+#include <stdlib.h>
 #include <assert.h>
 
 /* FIXME: This header file should be turned in a library to avoid symbol name clashes. */
+
+struct netresolve_source {
+	netresolve_t channel;
+	GIOChannel *stream;
+	void *data;
+};
 
 static int
 condition_to_events(int condition)
@@ -60,29 +67,37 @@ events_to_condition(int events)
 static gboolean
 handler(GIOChannel *stream, GIOCondition condition, gpointer data)
 {
-	bool dispatched = netresolve_dispatch_fd(data, data, condition_to_events(condition));
+	struct netresolve_source *source = data;
 
-	assert(dispatched);
+	if (!netresolve_dispatch(source->channel, source->data, condition_to_events(condition)))
+		abort();
 
 	return TRUE;
 }
 
 static void*
-watch_fd(netresolve_t channel, int fd, int events, void *data, void *user_data)
+watch_fd(netresolve_t channel, int fd, int events, void *data)
 {
-	GIOChannel *stream = g_io_channel_unix_new(fd);
+	struct netresolve_source *source = calloc(1, sizeof *source);
 
-	g_io_add_watch(stream, events_to_condition(events), handler, data);
+	assert(source);
 
-	return stream;
+	source->channel = channel;
+	source->stream = g_io_channel_unix_new(fd);
+	source->data = data;
+
+	g_io_add_watch(source->stream, events_to_condition(events), handler, source);
+
+	return source;
 }
 
 static void
-unwatch_fd(netresolve_t channel, int fd, void *handle, void *user_data)
+unwatch_fd(netresolve_t channel, int fd, void *handle)
 {
-	GIOChannel *stream = handle;
+	struct netresolve_source *source = handle;
 
-	g_io_channel_unref(stream);
+	g_io_channel_unref(source->stream);
+	free(source);
 }
 
 __attribute__((unused))
@@ -90,10 +105,10 @@ static netresolve_t
 netresolve_glib_open(void)
 {
 	netresolve_t channel = netresolve_open();
-	struct netresolve_fd_callbacks callbacks = { watch_fd, unwatch_fd, NULL };
 
 	assert(channel);
-	netresolve_set_fd_callbacks(channel, &callbacks);
+
+	netresolve_set_fd_callbacks(channel, watch_fd, unwatch_fd);
 
 	return channel;
 }

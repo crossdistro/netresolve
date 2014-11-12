@@ -167,7 +167,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		if (query->channel->callbacks.on_connect)
 			netresolve_connect_cleanup(query);
 		if (query->callback)
-			query->callback(query, 0, query->user_data);
+			query->callback(query, query->user_data);
 		break;
 	case NETRESOLVE_STATE_ERROR:
 		break;
@@ -178,8 +178,13 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		cleanup_query(query);
 
 		/* Restart with the next backend. */
-		if (*++query->backend)
+		if (*++query->backend) {
 			netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
+			break;
+		}
+
+		if (query->callback)
+			query->callback(query, query->user_data);
 		break;
 	}
 }

@@ -25,6 +25,7 @@
 #define NETRESOLVE_PRIVATE_H
 
 #include <netresolve.h>
+#include <netresolve-callback.h>
 #include <netresolve-backend.h>
 #include <netresolve-compat.h>
 #include <netresolve-cli.h>
@@ -110,11 +111,14 @@ struct netresolve_channel {
 	void *epoll_handle;
 	struct netresolve_backend **backends;
 	struct {
+		netresolve_watch_fd_callback_t watch_fd;
+		netresolve_unwatch_fd_callback_t unwatch_fd;
+		void *user_data;
+		netresolve_free_user_data_callback_t free_user_data;
 		netresolve_socket_callback_t on_bind;
 		netresolve_socket_callback_t on_connect;
 		void *user_data_sock;
 	} callbacks;
-	struct netresolve_fd_callbacks fd_callbacks;
 	struct netresolve_request {
 		enum netresolve_request_type type;
 		/* Perform L3 address resolution using 'nodename' if not NULL. Use
