@@ -304,8 +304,10 @@ netresolve_query_done(netresolve_query_t query)
 	for (i = 0; i < channel->nqueries; i++)
 		if (channel->queries[i] == query)
 			break;
-	if (i < channel->nqueries)
-		memmove(&channel->queries[i], &channel->queries[i+1], --channel->nqueries - i);
+
+	if (i < --channel->nqueries)
+		memmove(&channel->queries[i], &channel->queries[i+1], channel->nqueries - i);
+
 	channel->queries = realloc(channel->queries, channel->nqueries * sizeof *channel->queries);
 
 	free(query);
