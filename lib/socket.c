@@ -73,7 +73,7 @@ netresolve_query_connect(netresolve_query_t query, size_t idx)
 	if (connect(path->socket.fd, sa, salen) == -1 && errno != EINPROGRESS)
 		goto fail_connect;
 
-	netresolve_watch_fd(query->channel, path->socket.fd, POLLOUT);
+	netresolve_watch_fd(query, path->socket.fd, POLLOUT);
 	path->socket.state = NETRESOLVE_STATE_WAITING;
 	return;
 
@@ -110,7 +110,7 @@ connect_finished(netresolve_query_t query, struct netresolve_path *path)
 	path->socket.state = NETRESOLVE_STATE_DONE;
 
 	if (query->first_connect_timeout == -1)
-		query->first_connect_timeout = netresolve_add_timeout(query->channel, FIRST_CONNECT_TIMEOUT, 0);
+		query->first_connect_timeout = netresolve_add_timeout(query, FIRST_CONNECT_TIMEOUT, 0);
 
 	connect_check(query);
 }
@@ -164,7 +164,7 @@ netresolve_connect_dispatch(netresolve_query_t query, int fd, int events)
 		struct netresolve_path *path = &query->response.paths[i];
 
 		if (fd == path->socket.fd) {
-			netresolve_unwatch_fd(query->channel, path->socket.fd);
+			netresolve_unwatch_fd(query, path->socket.fd);
 
 			assert(events & POLLOUT);
 
@@ -224,7 +224,7 @@ netresolve_connect_cleanup(netresolve_query_t query)
 	}
 
 	if (query->first_connect_timeout != -1) {
-		netresolve_remove_timeout(query->channel, query->first_connect_timeout);
+		netresolve_remove_timeout(query, query->first_connect_timeout);
 		query->first_connect_timeout = -1;
 	}
 }

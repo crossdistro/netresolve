@@ -66,7 +66,7 @@ clear_timeout(netresolve_query_t query, int *tfd)
 	if (*tfd == -1)
 		return;
 
-	netresolve_remove_timeout(query->channel, *tfd);
+	netresolve_remove_timeout(query, *tfd);
 	*tfd = -1;
 }
 
@@ -130,13 +130,13 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		break;
 	case NETRESOLVE_STATE_WAITING:
 		if (query->request.timeout > 0)
-			query->timeout_fd = netresolve_add_timeout_ms(query->channel, query->request.timeout);
+			query->timeout_fd = netresolve_add_timeout_ms(query, query->request.timeout);
 		break;
 	case NETRESOLVE_STATE_WAITING_MORE:
 		if (query->request.partial_timeout == 0)
 			netresolve_query_set_state(query, NETRESOLVE_STATE_CONNECTING);
 		if (query->request.partial_timeout > 0)
-			query->partial_timeout_fd = netresolve_add_timeout_ms(query->channel, query->request.partial_timeout);
+			query->partial_timeout_fd = netresolve_add_timeout_ms(query, query->request.partial_timeout);
 		break;
 	case NETRESOLVE_STATE_RESOLVED:
 		if (old_state == NETRESOLVE_STATE_SETUP) {
@@ -144,7 +144,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 				error("can't create eventfd");
 				abort();
 			}
-			netresolve_watch_fd(query->channel, query->delayed_fd, POLLIN);
+			netresolve_watch_fd(query, query->delayed_fd, POLLIN);
 		}
 		break;
 	case NETRESOLVE_STATE_CONNECTING:
@@ -203,6 +203,8 @@ netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
 	}
 
 	query->channel = channel;
+	query->sources.previous = query->sources.next = &query->sources;
+
 	channel->queries = queries;
 	channel->queries[channel->nqueries - 1] = query;
 

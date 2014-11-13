@@ -111,13 +111,8 @@ struct netresolve_path {
 };
 
 struct netresolve_channel {
-	struct netresolve_source {
-		int fd;
-		void *handle;
-		struct netresolve_source *previous, *next;
-	} sources;
 	struct netresolve_epoll epoll;
-	int count;
+	int nfds;
 	struct netresolve_backend **backends;
 	struct {
 		netresolve_watch_fd_callback_t watch_fd;
@@ -173,6 +168,12 @@ struct netresolve_channel {
 
 struct netresolve_query {
 	struct netresolve_channel *channel;
+	struct netresolve_source {
+		netresolve_query_t query;
+		int fd;
+		void *handle;
+		struct netresolve_source *previous, *next;
+	} sources;
 	netresolve_query_callback callback;
 	void *user_data;
 	enum netresolve_state state;
@@ -205,18 +206,18 @@ struct netresolve_query {
 	char buffer[1024];
 };
 
-/* Channel */
-void netresolve_watch_fd(netresolve_t channel, int fd, int events);
-void netresolve_unwatch_fd(netresolve_t channel, int fd);
-int netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec);
-int netresolve_add_timeout_ms(netresolve_t channel, time_t msec);
-void netresolve_remove_timeout(netresolve_t channel, int fd);
-
 /* Query */
 void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
 netresolve_query_t netresolve_query_new(netresolve_t channel, enum netresolve_request_type type);
 void netresolve_query_setup(netresolve_query_t query);
 bool netresolve_query_dispatch(netresolve_query_t query, int fd, int events);
+
+/* Event handling */
+void netresolve_watch_fd(netresolve_query_t query, int fd, int events);
+void netresolve_unwatch_fd(netresolve_query_t query, int fd);
+int netresolve_add_timeout(netresolve_query_t query, time_t sec, long nsec);
+int netresolve_add_timeout_ms(netresolve_query_t query, time_t msec);
+void netresolve_remove_timeout(netresolve_query_t query, int fd);
 
 /* Services */
 struct netresolve_service_list;

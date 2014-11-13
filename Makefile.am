@@ -43,6 +43,7 @@ libnetresolve_la_SOURCES = \
 	lib/compat.c \
 	lib/logging.c \
 	lib/query.c \
+	lib/event.c \
 	lib/service.c \
 	lib/socket.c \
 	lib/string.c \

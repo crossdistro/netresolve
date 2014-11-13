@@ -66,8 +66,6 @@ netresolve_open(void)
 	if (!(channel = calloc(1, sizeof *channel)))
 		return NULL;
 
-	channel->sources.previous = channel->sources.next = &channel->sources;
-
 	channel->config.force_family = getenv_family("NETRESOLVE_FORCE_FAMILY", AF_UNSPEC);
 
 	channel->request.default_loopback = getenv_bool("NETRESOLVE_FLAG_DEFAULT_LOOPBACK", false);
@@ -95,91 +93,6 @@ netresolve_close(netresolve_t channel)
 		channel->callbacks.free_user_data(channel->callbacks.user_data);
 	memset(channel, 0, sizeof *channel);
 	free(channel);
-}
-
-void
-netresolve_watch_fd(netresolve_t channel, int fd, int events)
-{
-	struct netresolve_source *source;
-
-	assert(fd >= 0);
-	assert(events && !(events & ~(POLLIN | POLLOUT)));
-
-	if (!(source = calloc(1, sizeof(*source))))
-		abort();
-
-	source->fd = fd;
-	source->handle = channel->callbacks.watch_fd(channel, fd, events, source);
-
-	source->previous = channel->sources.previous;
-	source->next = &channel->sources;
-	source->previous->next = source;
-	source->next->previous = source;
-
-	channel->count++;
-
-	debug_channel(channel, "added file descriptor: fd=%d events=%d (total %d)", fd, events, channel->count);
-}
-
-void
-netresolve_unwatch_fd(netresolve_t channel, int fd)
-{
-	struct netresolve_source *source;
-
-	assert(fd >= 0);
-
-	for (source = channel->sources.next; source != &channel->sources; source = source->next)
-		if (source->fd == fd)
-			break;
-
-	assert(channel->count > 0);
-	assert(source != &channel->sources);
-
-	channel->callbacks.unwatch_fd(channel, fd, source->handle);
-
-	source->previous->next = source->next;
-	source->next->previous = source->previous;
-	free(source);
-
-	channel->count--;
-
-	debug_channel(channel, "removed file descriptor: fd=%d (total %d)", fd, channel->count);
-}
-
-int
-netresolve_add_timeout(netresolve_t channel, time_t sec, long nsec)
-{
-	int fd;
-	struct itimerspec timerspec = {{0, 0}, {sec, nsec}};
-
-	if ((fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK)) == -1)
-		return -1;
-
-	if (timerfd_settime(fd, 0, &timerspec, NULL) == -1) {
-		close(fd);
-		return -1;
-	}
-
-	debug_channel(channel, "adding timeout: fd=%d sec=%d nsec=%ld", fd, (int) sec, nsec);
-
-	netresolve_watch_fd(channel, fd, POLLIN);
-
-	return fd;
-}
-
-int
-netresolve_add_timeout_ms(netresolve_t channel, time_t msec)
-{
-	return netresolve_add_timeout(channel, msec / 1000, (msec % 1000) * 1000000L);
-}
-
-void
-netresolve_remove_timeout(netresolve_t channel, int fd)
-{
-	netresolve_unwatch_fd(channel, fd);
-	close(fd);
-
-	debug_channel(channel, "removed timeout: fd=%d", fd);
 }
 
 static netresolve_query_t
@@ -243,27 +156,6 @@ netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type)
 	query->request.dns_type = type;
 
 	return start_query(channel, query);
-}
-
-bool
-netresolve_dispatch(netresolve_t channel, void *data, int events)
-{
-	struct netresolve_source *source = data;
-
-	assert(source);
-	assert(events & (POLLIN | POLLOUT));
-	assert(!(events & ~(POLLIN | POLLOUT)));
-
-	debug_channel(channel, "dispatching: fd=%d events=%d", source->fd, events);
-
-	for (int i = 0; i < channel->nqueries; i++) {
-		netresolve_query_t query = channel->queries[i];
-
-		if (netresolve_query_dispatch(query, source->fd, events))
-			return true;
-	}
-
-	return false;
 }
 
 static void
@@ -401,16 +293,6 @@ void
 netresolve_set_protocol(netresolve_t channel, int protocol)
 {
 	channel->request.protocol = protocol;
-}
-
-void
-netresolve_set_fd_callbacks(netresolve_t channel, netresolve_watch_fd_callback_t watch_fd, netresolve_unwatch_fd_callback_t unwatch_fd)
-{
-	assert(watch_fd && unwatch_fd);
-	assert(!channel->callbacks.watch_fd && !channel->callbacks.unwatch_fd);
-
-	channel->callbacks.watch_fd = watch_fd;
-	channel->callbacks.unwatch_fd = unwatch_fd;
 }
 
 void
