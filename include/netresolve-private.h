@@ -203,9 +203,8 @@ void netresolve_remove_timeout(netresolve_t channel, int fd);
 /* Query */
 void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
 netresolve_query_t netresolve_query_new(netresolve_t channel, enum netresolve_request_type type);
-void netresolve_query_start(netresolve_query_t query);
+void netresolve_query_setup(netresolve_query_t query);
 bool netresolve_query_dispatch(netresolve_query_t query, int fd, int events);
-void netresolve_query_cleanup(netresolve_query_t query);
 
 /* Services */
 struct netresolve_service_list;

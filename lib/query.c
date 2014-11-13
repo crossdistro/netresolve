@@ -223,7 +223,7 @@ netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
 }
 
 void
-netresolve_query_start(netresolve_query_t query)
+netresolve_query_setup(netresolve_query_t query)
 {
 	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
 }

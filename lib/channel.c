@@ -61,11 +61,12 @@ getenv_family(const char *name, int def)
 netresolve_t
 netresolve_open(void)
 {
+	netresolve_t channel;
+
 	/* FIXME: this should probably be only called once */
 	netresolve_set_log_level(getenv_bool("NETRESOLVE_VERBOSE", false) ? NETRESOLVE_LOG_LEVEL_DEBUG : NETRESOLVE_LOG_LEVEL_QUIET);
 
-	netresolve_t channel = calloc(1, sizeof *channel);
-	if (!channel)
+	if (!(channel = calloc(1, sizeof *channel)))
 		return NULL;
 
 	channel->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
@@ -223,7 +224,7 @@ netresolve_remove_timeout(netresolve_t channel, int fd)
 static netresolve_query_t
 start_query(netresolve_t channel, netresolve_query_t query)
 {
-	netresolve_query_start(query);
+	netresolve_query_setup(query);
 
 	/* Wait for the channel in blocking mode. */
 	if (!channel->fd_callbacks.watch_fd)
