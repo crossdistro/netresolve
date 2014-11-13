@@ -192,21 +192,18 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 netresolve_query_t
 netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
 {
+	struct netresolve_query *queries = &channel->queries;
 	netresolve_query_t query;
-	netresolve_query_t *queries;
 
 	if (!(query = calloc(1, sizeof *query)))
 		return NULL;
-	if (!(queries = realloc(channel->queries, ++channel->nqueries * sizeof *queries))) {
-		free(query);
-		return NULL;
-	}
+
+	query->previous = queries->previous;
+	query->next = queries;
+	query->previous->next = query->next->previous = query;
 
 	query->channel = channel;
 	query->sources.previous = query->sources.next = &query->sources;
-
-	channel->queries = queries;
-	channel->queries[channel->nqueries - 1] = query;
 
 	if (!channel->backends)
 		netresolve_set_backend_string(channel, secure_getenv("NETRESOLVE_BACKENDS"));
@@ -301,21 +298,12 @@ netresolve_query_dispatch(netresolve_query_t query, int fd, int events)
 void
 netresolve_query_done(netresolve_query_t query)
 {
-	netresolve_t channel = query->channel;
-	int i;
-
 	cleanup_query(query);
 
 	netresolve_query_set_state(query, NETRESOLVE_STATE_NONE);
 
-	for (i = 0; i < channel->nqueries; i++)
-		if (channel->queries[i] == query)
-			break;
-
-	if (i < --channel->nqueries)
-		memmove(&channel->queries[i], &channel->queries[i+1], channel->nqueries - i);
-
-	channel->queries = realloc(channel->queries, channel->nqueries * sizeof *channel->queries);
+	query->previous->next = query->next;
+	query->next->previous = query->previous;
 
 	free(query);
 }

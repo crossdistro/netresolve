@@ -110,19 +110,23 @@ struct netresolve_path {
 	} socket;
 };
 
-struct netresolve_channel {
-	struct netresolve_epoll epoll;
+struct netresolve_query {
+	struct netresolve_channel *channel;
+	struct netresolve_source {
+		netresolve_query_t query;
+		int fd;
+		void *handle;
+		struct netresolve_source *previous, *next;
+	} sources;
+	netresolve_query_callback callback;
+	void *user_data;
+	enum netresolve_state state;
 	int nfds;
-	struct netresolve_backend **backends;
-	struct {
-		netresolve_watch_fd_callback_t watch_fd;
-		netresolve_unwatch_fd_callback_t unwatch_fd;
-		void *user_data;
-		netresolve_free_user_data_callback_t free_user_data;
-		netresolve_socket_callback_t on_bind;
-		netresolve_socket_callback_t on_connect;
-		void *user_data_sock;
-	} callbacks;
+	int delayed_fd;
+	int timeout_fd;
+	int partial_timeout_fd;
+	int first_connect_timeout;
+	struct netresolve_backend **backend;
 	struct netresolve_request {
 		enum netresolve_request_type type;
 		/* Perform L3 address resolution using 'nodename' if not NULL. Use
@@ -158,32 +162,6 @@ struct netresolve_channel {
 		int timeout;
 		int partial_timeout;
 	} request;
-	struct netresolve_config {
-		int force_family;
-	} config;
-	/* A list of queries */
-	netresolve_query_t *queries;
-	size_t nqueries;
-};
-
-struct netresolve_query {
-	struct netresolve_channel *channel;
-	struct netresolve_source {
-		netresolve_query_t query;
-		int fd;
-		void *handle;
-		struct netresolve_source *previous, *next;
-	} sources;
-	netresolve_query_callback callback;
-	void *user_data;
-	enum netresolve_state state;
-	int nfds;
-	int delayed_fd;
-	int timeout_fd;
-	int partial_timeout_fd;
-	int first_connect_timeout;
-	struct netresolve_backend **backend;
-	struct netresolve_request request;
 	struct netresolve_response {
 		struct netresolve_path *paths;
 		size_t pathcount;
@@ -204,6 +182,27 @@ struct netresolve_query {
 		struct sockaddr_in6 sin6;
 	} sa_buffer;
 	char buffer[1024];
+	struct netresolve_query *previous, *next;
+};
+
+struct netresolve_channel {
+	struct netresolve_query queries;
+	struct netresolve_request request;
+	struct netresolve_epoll epoll;
+	int nfds;
+	struct netresolve_backend **backends;
+	struct {
+		netresolve_watch_fd_callback_t watch_fd;
+		netresolve_unwatch_fd_callback_t unwatch_fd;
+		void *user_data;
+		netresolve_free_user_data_callback_t free_user_data;
+		netresolve_socket_callback_t on_bind;
+		netresolve_socket_callback_t on_connect;
+		void *user_data_sock;
+	} callbacks;
+	struct netresolve_config {
+		int force_family;
+	} config;
 };
 
 /* Query */

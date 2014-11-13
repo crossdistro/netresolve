@@ -66,6 +66,8 @@ netresolve_open(void)
 	if (!(channel = calloc(1, sizeof *channel)))
 		return NULL;
 
+	channel->queries.previous = channel->queries.next = &channel->queries;
+
 	channel->config.force_family = getenv_family("NETRESOLVE_FORCE_FAMILY", AF_UNSPEC);
 
 	channel->request.default_loopback = getenv_bool("NETRESOLVE_FLAG_DEFAULT_LOOPBACK", false);
@@ -79,12 +81,10 @@ netresolve_open(void)
 void
 netresolve_close(netresolve_t channel)
 {
-	if (!channel)
-		return;
+	struct netresolve_query *queries = &channel->queries;
 
-	for (int i = 0; i < channel->nqueries; i++)
-		netresolve_query_done(channel->queries[i]);
-	free(channel->queries);
+	while (queries->next != queries)
+		netresolve_query_done(queries->next);
 
 	netresolve_set_backend_string(channel, "");
 	if (channel->epoll.fd != -1 && close(channel->epoll.fd) == -1)
