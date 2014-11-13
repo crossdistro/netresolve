@@ -21,15 +21,18 @@ stamp-h1
 /netconnect
 /netresolve
 /res_query
-/test-async
 /test-asyncns
+/test-asyncns-cancel
 /test-bind-connect
+/test-epoll
 /test-getaddrinfo
 /test-gethostbyname
 /test-gethostbyname2
 /test-gethostbyname2_r
 /test-gethostbyname_r
+/test-glib
 /test-libevent
+/test-select
 /test-sync
 /tools/wrapresolve
 
