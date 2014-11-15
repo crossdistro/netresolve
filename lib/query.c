@@ -423,7 +423,7 @@ netresolve_query_get_dns_answer(const netresolve_query_t query, size_t *size)
 	if (size)
 		*size = query->response.dns.length;
 
-	return &query->response.dns.answer;
+	return query->response.dns.answer;
 }
 
 bool
