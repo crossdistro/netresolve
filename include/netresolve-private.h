@@ -147,6 +147,7 @@ struct netresolve_query {
 		/* Advanced configuration */
 		bool default_loopback;
 		bool dns_srv_lookup;
+		bool dns_search;
 		int clamp_ttl;
 		/* Reverse query */
 		union {

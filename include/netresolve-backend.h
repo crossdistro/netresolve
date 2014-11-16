@@ -56,10 +56,11 @@ int netresolve_backend_get_protocol(netresolve_query_t query);
 int netresolve_backend_get_socktype(netresolve_query_t query);
 bool netresolve_backend_get_default_loopback(netresolve_query_t query);
 bool netresolve_backend_get_dns_srv_lookup(netresolve_query_t query);
+bool netresolve_backend_get_dns_search(netresolve_query_t query);
 
 /* Input: Reverse lookup */
-bool netresolve_backend_get_reverse_lookup(netresolve_query_t query);
 void *netresolve_backend_get_address(netresolve_query_t query);
+uint16_t netresolve_backend_get_port(netresolve_query_t query);
 
 /* Input: DNS record lookup */
 const char *netresolve_backend_get_dns_query(netresolve_query_t query, int *cls, int *type);

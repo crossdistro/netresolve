@@ -77,10 +77,22 @@ netresolve_backend_get_dns_srv_lookup(netresolve_query_t query)
 	return query->request.dns_srv_lookup;
 }
 
+bool
+netresolve_backend_get_dns_search(netresolve_query_t query)
+{
+	return query->request.dns_search;
+}
+
 void *
 netresolve_backend_get_address(netresolve_query_t query)
 {
 	return query->request.address;
+}
+
+uint16_t
+netresolve_backend_get_port(netresolve_query_t query)
+{
+	return query->request.port;
 }
 
 const char *
