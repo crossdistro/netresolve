@@ -21,12 +21,37 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <netresolve.h>
+#include <netresolve-cli.h>
+#include <ldns/ldns.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 
-#include <netresolve.h>
-#include <netresolve-cli.h>
+
+static char *
+get_dns_string(netresolve_query_t query)
+{
+	const uint8_t *answer;
+	size_t length;
+
+	if (!(answer = netresolve_query_get_dns_answer(query, &length)))
+		return NULL;
+
+	ldns_pkt *pkt;
+
+	int status = ldns_wire2pkt(&pkt, answer, length);
+
+	if (status) {
+		fprintf(stderr, "ldns: %s", ldns_get_errorstr_by_id(status));
+		return NULL;
+	}
+	
+	char *result = ldns_pkt2str(pkt);
+
+	ldns_pkt_free(pkt);
+	return result;
+}
 
 int
 main(int argc, char **argv)
@@ -46,7 +71,15 @@ main(int argc, char **argv)
 		return EXIT_FAILURE;
 	}
 
-	printf("%s", netresolve_get_response_string(query));
+	const char *response_string = netresolve_get_response_string(query);
+	char *dns_string = get_dns_string(query);
+
+	if (response_string)
+		printf("%s", response_string);
+	if (dns_string) {
+		printf("%s", dns_string);
+		free(dns_string);
+	}
 
 	netresolve_close(channel);
 	return EXIT_SUCCESS;
