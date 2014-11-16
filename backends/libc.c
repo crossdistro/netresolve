@@ -22,6 +22,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <netresolve-backend.h>
+#include <resolv.h>
+
+#define SIZE 16 * 1024
 
 void
 setup_forward(netresolve_query_t query, char **settings)
@@ -38,4 +41,66 @@ setup_forward(netresolve_query_t query, char **settings)
 	}
 
 	netresolve_backend_apply_addrinfo(query, status, result, 0);
+}
+
+void
+setup_reverse(netresolve_query_t query, char **settings)
+{
+	int flags = 0;
+	union {
+		struct sockaddr sa;
+		struct sockaddr_in sa4;
+		struct sockaddr_in6 sa6;
+	} sa = { { 0 } };
+	int status;
+	char nodename[SIZE], servname[SIZE];
+
+	sa.sa.sa_family = netresolve_backend_get_family(query);
+
+	switch (sa.sa.sa_family) {
+	case AF_INET:
+		memcpy(&sa.sa4.sin_addr, netresolve_backend_get_address(query), sizeof sa.sa4.sin_addr);
+		sa.sa4.sin_port = netresolve_backend_get_port(query);
+		status = getnameinfo(&sa.sa, sizeof sa.sa4, nodename, sizeof nodename, servname, sizeof servname, flags);
+		break;
+	case AF_INET6:
+		memcpy(&sa.sa6.sin6_addr, netresolve_backend_get_address(query), sizeof sa.sa6.sin6_addr);
+		sa.sa6.sin6_port = netresolve_backend_get_port(query);
+		status = getnameinfo(&sa.sa, sizeof sa.sa4, nodename, sizeof nodename, servname, sizeof servname, flags);
+		break;
+	default:
+		status = EAI_FAMILY;
+		break;
+	}
+
+	if (status) {
+		netresolve_backend_failed(query);
+		return;
+	}
+
+	netresolve_backend_add_name_info(query, nodename, servname);
+	netresolve_backend_finished(query);
+}
+
+void
+setup_dns(netresolve_query_t query, char **settings)
+{
+	const char *dname = netresolve_backend_get_nodename(query);
+	bool search = netresolve_backend_get_dns_search(query);
+	int cls;
+	int type;
+	uint8_t answer[SIZE];
+	size_t length;
+
+	netresolve_backend_get_dns_query(query, &cls, &type);
+
+	length = (search ? res_search : res_query)(dname, cls, type, answer, sizeof answer);
+
+	if (length == -1) {
+		netresolve_backend_failed(query);
+		return;
+	}
+
+	netresolve_backend_set_dns_answer(query, answer, length);
+	netresolve_backend_finished(query);
 }
