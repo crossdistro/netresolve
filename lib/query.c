@@ -207,10 +207,8 @@ netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
 
 	if (!channel->backends)
 		netresolve_set_backend_string(channel, secure_getenv("NETRESOLVE_BACKENDS"));
-	if (!channel->backends || !*channel->backends) {
-		netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
-		return query;
-	}
+	if (!channel->backends || !*channel->backends)
+		abort();
 
 	query->first_connect_timeout = -1;
 	query->delayed_fd = -1;
