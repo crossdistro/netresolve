@@ -105,10 +105,11 @@ int getnameinfo(const struct sockaddr *sa, socklen_t salen,
 			if (myhost)
 				memcpy(host, myhost, myhostlen);
 		}
-		if (serv)
+		if (serv) {
 			memset(serv, 0, servlen);
 			if (myserv)
 				memcpy(serv, myserv, myservlen);
+		}
 	}
 
 out:
