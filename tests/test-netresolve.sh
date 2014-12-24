@@ -12,7 +12,7 @@ $DIFF <($NR --backends loopback) $DATA/localhost
 $DIFF <($NR --backends hosts) $DATA/failed
 $DIFF <($NR --backends ubdns) $DATA/failed
 $DIFF <($NR --backends aresdns) $DATA/failed
-$DIFF <($NR --backends getaddrinfo) $DATA/failed
+$DIFF <($NR --backends libc) $DATA/failed
 $DIFF <($NR --backends nss:files) $DATA/failed
 $DIFF <($NR --backends nss:bogusbogus) $DATA/failed
 $DIFF <($NR --backends nss:./.libs/libnss_netresolve.so) <(grep -v '^secure$' $DATA/any)
@@ -27,7 +27,7 @@ $DIFF <(NETRESOLVE_FLAG_DEFAULT_LOOPBACK=yes $NR) $DATA/localhost
 
 # empty/http
 $DIFF <($NR --service http) $DATA/services
-$DIFF <($NR --backend getaddrinfo --service http) <(grep -v '^secure$' $DATA/services)
+$DIFF <($NR --backend libc --service http) <(grep -v '^secure$' $DATA/services)
 
 # numeric
 $DIFF <($NR --node 1.2.3.4) $DATA/numeric4
@@ -56,7 +56,7 @@ $DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:gethostbyname --node loc
 
 # localhost/http
 $DIFF <($NR --node localhost) $DATA/localhost
-$DIFF <($NR --backends getaddrinfo --node localhost --service http) <(grep -v '^secure$' $DATA/localhost-http)
+$DIFF <($NR --backends libc --node localhost --service http) <(grep -v '^secure$' $DATA/localhost-http)
 $DIFF <($NR --backends nss:files --node localhost --service http) <(grep -v '^secure$' $DATA/localhost-http)
 $DIFF <($NR --backends nss:files:gethostbyname4 --node localhost --service http) <(grep -v '^secure$' $DATA/localhost-http)
 $DIFF <($NR --backends nss:files:gethostbyname3 --node localhost --service http) <(grep -v '^secure$' $DATA/localhost-http)
