@@ -67,6 +67,7 @@ netresolve_open(void)
 		return NULL;
 
 	channel->queries.previous = channel->queries.next = &channel->queries;
+	channel->epoll.fd = -1;
 
 	channel->config.force_family = getenv_family("NETRESOLVE_FORCE_FAMILY", AF_UNSPEC);
 
