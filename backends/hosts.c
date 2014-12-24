@@ -59,6 +59,7 @@ add_node(struct hosts_list *list, const char *name, int family, void *address, i
 {
 	struct hosts_item item = {
 		.family = family,
+		.ifindex = ifindex,
 		.name = name ? strdup(name) : NULL
 	};
 
