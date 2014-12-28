@@ -10,6 +10,10 @@ while [ $# -gt 0 ]; do
         (-v|--verbose)
             export NETRESOLVE_VERBOSE=yes
             ;;
+        (-b|--backends)
+            shift
+            export NETRESOLVE_BACKENDS="$1"
+            ;;
         (-4)
             export NETRESOLVE_FORCE_FAMILY=ip4
             ;;
