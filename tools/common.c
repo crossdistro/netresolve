@@ -68,6 +68,8 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 	int cls = ns_c_in, type = 0;
 	netresolve_query_t query;
 
+	netresolve_set_log_level(NETRESOLVE_LOG_LEVEL_ERROR);
+
 	while ((opt = getopt_long(count_argv(argv), argv, opts, longopts, &idx)) != -1) {
 		switch (opt) {
 		case 'h':
