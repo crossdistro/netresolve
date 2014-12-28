@@ -51,7 +51,7 @@ libnetresolve_la_SOURCES = \
 	lib/epoll.c \
 	lib/select.c
 libnetresolve_la_LDFLAGS = \
-	$(AM_LDFLAGS) \
+	$(AM_LDFLAGS) -lldns \
 	-export-symbols-regex '^netresolve_'
 
 libnetresolve_libc_la_SOURCES = \
@@ -127,7 +127,7 @@ gethostbyname_SOURCES = tools/gethostbyname.c tools/compat.c
 gethostbyaddr_SOURCES = tools/gethostbyaddr.c tools/compat.c
 
 res_query_SOURCES = tools/res_query.c tools/compat.c
-res_query_LDFLAGS = $(AM_LDFLAGS) -lresolv
+res_query_LDFLAGS = $(AM_LDFLAGS) -lresolv -lldns
 
 TESTS = \
 	tests/test-netresolve.sh \

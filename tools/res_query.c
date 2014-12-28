@@ -28,6 +28,7 @@
 #include <netdb.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
+#include <ldns/ldns.h>
 
 #include "compat.h"
 
@@ -53,6 +54,7 @@ main(int argc, char **argv)
 	int type = ns_t_a;
 	uint8_t answer[SIZE];
 	int length = 0;
+	ldns_pkt *pkt;
 
 	while ((opt = getopt_long(argc, argv, opts, longopts, &idx)) != -1) {
 		switch (opt) {
@@ -101,12 +103,12 @@ main(int argc, char **argv)
 
 	printf("result:\n");
 	printf("  length = %d\n", length);
-	if (length <= 0)
-		exit(EXIT_FAILURE);
-	printf("  answer = 0x");
-	for (int i = 0; i < length; i++)
-		printf("%02x", answer[i]);
-	printf("\n");
+
+	if (length > 0 && !ldns_wire2pkt(&pkt, answer, length)) {
+		printf("  answer:\n%s\n", ldns_pkt2str(pkt));
+
+		ldns_pkt_free(pkt);
+	}
 
 	exit(EXIT_SUCCESS);
 }

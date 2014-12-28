@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+#include <ldns/ldns.h>
 
 static const char *
 socktype_to_string(int socktype)
@@ -196,16 +197,10 @@ netresolve_get_response_string(netresolve_query_t query)
 	size_t npaths = netresolve_query_get_count(query);
 	size_t i;
 	size_t length;
-	const char *answer = netresolve_query_get_dns_answer(query, &length);
+	const uint8_t *answer = netresolve_query_get_dns_answer(query, &length);
 	bool secure = netresolve_query_get_secure(query);
 
 	bprintf(&start, end, "response %s %s\n", PACKAGE_NAME, VERSION);
-	if (length) {
-		bprintf(&start, end, "dns %d 0x", length);
-		for (i = 0; i < length; i++)
-			bprintf(&start, end, "%02hhx", answer[i]);
-		bprintf(&start, end, "\n", length);
-	}
 	if (nodename)
 		bprintf(&start, end, "name %s\n", nodename);
 	if (servname)
@@ -213,6 +208,22 @@ netresolve_get_response_string(netresolve_query_t query)
 	for (i = 0; i < npaths; i++) {
 		add_path(&start, end, query, i);
 		bprintf(&start, end, "\n");
+	}
+	if (length) {
+		bprintf(&start, end, "dns %d 0x", length);
+		for (i = 0; i < length; i++)
+			bprintf(&start, end, "%02hhx", answer[i]);
+		bprintf(&start, end, "\n", length);
+
+		ldns_pkt *pkt;
+		int status = ldns_wire2pkt(&pkt, answer, length);
+		if (status) {
+			error("ldns: %s", ldns_get_errorstr_by_id(status));
+			return NULL;
+		} else {
+			bprintf(&start, end, "%s\n", ldns_pkt2str(pkt));
+			ldns_pkt_free(pkt);
+		}
 	}
 	if (secure)
 		bprintf(&start, end, "secure\n");
