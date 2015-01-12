@@ -36,9 +36,9 @@
 #include <sys/socket.h>
 #include <assert.h>
 
-#define debug_channel(channel, format, ...) debug( \
-		"[channel %p] " format, \
-		channel, \
+#define debug_context(context, format, ...) debug( \
+		"[context %p] " format, \
+		context, \
 		##__VA_ARGS__)
 
 #define debug_query(query, format, ...) debug( \
@@ -111,7 +111,7 @@ struct netresolve_path {
 };
 
 struct netresolve_query {
-	struct netresolve_channel *channel;
+	struct netresolve_context *context;
 	struct netresolve_source {
 		netresolve_query_t query;
 		int fd;
@@ -186,7 +186,7 @@ struct netresolve_query {
 	struct netresolve_query *previous, *next;
 };
 
-struct netresolve_channel {
+struct netresolve_context {
 	struct netresolve_query queries;
 	struct netresolve_request request;
 	struct netresolve_epoll epoll;
@@ -208,7 +208,7 @@ struct netresolve_channel {
 
 /* Query */
 void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
-netresolve_query_t netresolve_query_new(netresolve_t channel, enum netresolve_request_type type);
+netresolve_query_t netresolve_query_new(netresolve_t context, enum netresolve_request_type type);
 void netresolve_query_setup(netresolve_query_t query);
 bool netresolve_query_dispatch(netresolve_query_t query, int fd, int events);
 
@@ -248,9 +248,9 @@ void netresolve_connect_cleanup(netresolve_query_t query);
 
 /* Event loop for blocking mode */
 
-bool netresolve_epoll_install(netresolve_t channel,
+bool netresolve_epoll_install(netresolve_t context,
 		struct netresolve_epoll *loop,
 		netresolve_free_user_data_callback_t free_loop);
-void netresolve_epoll_wait(netresolve_t channel);
+void netresolve_epoll_wait(netresolve_t context);
 
 #endif /* NETRESOLVE_PRIVATE_H */

@@ -158,13 +158,13 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 			}
 		}
 
-		if (query->channel->callbacks.on_connect) {
+		if (query->context->callbacks.on_connect) {
 			netresolve_connect_start(query);
 		} else
 			netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 		break;
 	case NETRESOLVE_STATE_DONE:
-		if (query->channel->callbacks.on_connect)
+		if (query->context->callbacks.on_connect)
 			netresolve_connect_cleanup(query);
 		if (query->callback)
 			query->callback(query, query->user_data);
@@ -190,9 +190,9 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 }
 
 netresolve_query_t
-netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
+netresolve_query_new(netresolve_t context, enum netresolve_request_type type)
 {
-	struct netresolve_query *queries = &channel->queries;
+	struct netresolve_query *queries = &context->queries;
 	netresolve_query_t query;
 
 	if (!(query = calloc(1, sizeof *query)))
@@ -202,20 +202,20 @@ netresolve_query_new(netresolve_t channel, enum netresolve_request_type type)
 	query->next = queries;
 	query->previous->next = query->next->previous = query;
 
-	query->channel = channel;
+	query->context = context;
 	query->sources.previous = query->sources.next = &query->sources;
 
-	if (!channel->backends)
-		netresolve_set_backend_string(channel, secure_getenv("NETRESOLVE_BACKENDS"));
-	if (!channel->backends || !*channel->backends)
+	if (!context->backends)
+		netresolve_set_backend_string(context, secure_getenv("NETRESOLVE_BACKENDS"));
+	if (!context->backends || !*context->backends)
 		abort();
 
 	query->first_connect_timeout = -1;
 	query->delayed_fd = -1;
 	query->timeout_fd = -1;
 	query->partial_timeout_fd = -1;
-	query->backend = channel->backends;
-	memcpy(&query->request, &channel->request, sizeof channel->request);
+	query->backend = context->backends;
+	memcpy(&query->request, &context->request, sizeof context->request);
 
 	query->request.type = type;
 
@@ -244,9 +244,9 @@ dispatch_timeout(netresolve_query_t query, int *tfd, enum netresolve_state state
 
 /* netresolve_query_dispatch:
  *
- * This internal function is called by the netresolve channel object to hand
+ * This internal function is called by the netresolve context object to hand
  * over file descriptor events to a query. The query must return `false` if
- * it didn't handle the query so that the channel can pass it to the next
+ * it didn't handle the query so that the context can pass it to the next
  * query.
  */
 bool

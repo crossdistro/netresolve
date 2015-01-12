@@ -28,9 +28,9 @@
 #include <stdio.h>
 #include <string.h>
 
-typedef struct netresolve_channel *netresolve_t;
+typedef struct netresolve_context *netresolve_t;
 
-netresolve_query_t netresolve_query_argv(netresolve_t channel, char **argv);
+netresolve_query_t netresolve_query_argv(netresolve_t context, char **argv);
 
 const char * netresolve_get_request_string(netresolve_query_t query);
 const char * netresolve_get_response_string(netresolve_query_t query);

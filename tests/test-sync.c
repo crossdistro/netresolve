@@ -26,39 +26,39 @@
 int
 main(int argc, char **argv)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	netresolve_query_t query;
 	const char *service = "80";
 	int family = AF_UNSPEC;
 	int socktype = 0;
 	int protocol = IPPROTO_TCP;
 
-	/* Create a channel. */
-	channel = netresolve_open();
-	if (!channel) {
+	/* Create a context. */
+	context = netresolve_open();
+	if (!context) {
 		perror("netresolve_open");
 		abort();
 	}
 
 	/* Resolver configuration. */
-	netresolve_set_family(channel, family);
-	netresolve_set_socktype(channel, socktype);
-	netresolve_set_protocol(channel, protocol);
+	netresolve_set_family(context, family);
+	netresolve_set_socktype(context, socktype);
+	netresolve_set_protocol(context, protocol);
 
 	/* First query */
-	query = netresolve_query(channel, "1:2:3:4:5:6:7:8%999999", service);
+	query = netresolve_query(context, "1:2:3:4:5:6:7:8%999999", service);
 	check_address(query, AF_INET6, "1:2:3:4:5:6:7:8", 999999);
 	netresolve_query_done(query);
 
 	/* Second query */
-	query = netresolve_query(channel, "1.2.3.4%999999", service);
+	query = netresolve_query(context, "1.2.3.4%999999", service);
 	check_address(query, AF_INET, "1.2.3.4", 999999);
 	netresolve_query_done(query);
 
 	/* Check results */
 
 	/* Clean up. */
-	netresolve_close(channel);
+	netresolve_close(context);
 
 	exit(EXIT_SUCCESS);
 }

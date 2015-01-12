@@ -160,7 +160,7 @@ add_path(netresolve_query_t query, const struct netresolve_path *path)
 
 	debug_query(query, "added path: %s", netresolve_get_path_string(query, response->pathcount - 1));
 
-	if (query->channel->callbacks.on_bind)
+	if (query->context->callbacks.on_bind)
 		netresolve_query_bind(query, response->pathcount - 1);
 
 	if (query->state == NETRESOLVE_STATE_WAITING)

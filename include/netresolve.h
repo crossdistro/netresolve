@@ -29,25 +29,25 @@
 #include <netinet/in.h>
 
 /* Channel manipulation */
-typedef struct netresolve_channel *netresolve_t;
+typedef struct netresolve_context *netresolve_t;
 typedef struct netresolve_query *netresolve_query_t;
 
 netresolve_t netresolve_open(void);
-void netresolve_close(netresolve_t channel);
-bool netresolve_dispatch(netresolve_t channel, void *data, int events);
+void netresolve_close(netresolve_t context);
+bool netresolve_dispatch(netresolve_t context, void *data, int events);
 
 /* Channel configuration */
-void netresolve_set_backend_string(netresolve_t channel, const char *string);
-void netresolve_set_family(netresolve_t channel, int family);
-void netresolve_set_socktype(netresolve_t channel, int socktype);
-void netresolve_set_protocol(netresolve_t channel, int protocol);
-void netresolve_set_default_loopback(netresolve_t channel, bool value);
-void netresolve_set_dns_srv_lookup(netresolve_t channel, bool value);
+void netresolve_set_backend_string(netresolve_t context, const char *string);
+void netresolve_set_family(netresolve_t context, int family);
+void netresolve_set_socktype(netresolve_t context, int socktype);
+void netresolve_set_protocol(netresolve_t context, int protocol);
+void netresolve_set_default_loopback(netresolve_t context, bool value);
+void netresolve_set_dns_srv_lookup(netresolve_t context, bool value);
 
 /* Query constructors and destructors */
-netresolve_query_t netresolve_query(netresolve_t channel, const char *node, const char *service);
-netresolve_query_t netresolve_query_reverse(netresolve_t channel, int family, const void *address, int ifindex, int port);
-netresolve_query_t netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type);
+netresolve_query_t netresolve_query(netresolve_t context, const char *node, const char *service);
+netresolve_query_t netresolve_query_reverse(netresolve_t context, int family, const void *address, int ifindex, int port);
+netresolve_query_t netresolve_query_dns(netresolve_t context, const char *dname, int cls, int type);
 void netresolve_query_done(netresolve_query_t query);
 
 /* Query callback (nonblocking mode only) */

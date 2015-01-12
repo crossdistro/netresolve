@@ -34,9 +34,9 @@ struct netresolve_select {
 };
 
 static void *
-watch_fd(netresolve_t channel, int fd, int events, void *data)
+watch_fd(netresolve_t context, int fd, int events, void *data)
 {
-	struct netresolve_select *loop = netresolve_get_user_data(channel);
+	struct netresolve_select *loop = netresolve_get_user_data(context);
 
 	assert(fd >= 0);
 	assert(!FD_ISSET(fd, &loop->rfds) && !FD_ISSET(fd, &loop->wfds));
@@ -59,9 +59,9 @@ watch_fd(netresolve_t channel, int fd, int events, void *data)
 }
 
 static void
-unwatch_fd(netresolve_t channel, int fd, void *handle)
+unwatch_fd(netresolve_t context, int fd, void *handle)
 {
-	struct netresolve_select *loop = netresolve_get_user_data(channel);
+	struct netresolve_select *loop = netresolve_get_user_data(context);
 
 	assert(fd >= 0);
 	assert(FD_ISSET(fd, &loop->rfds) || FD_ISSET(fd, &loop->wfds));
@@ -90,28 +90,28 @@ free_user_data(void *user_data)
 netresolve_t
 netresolve_select_open()
 {
-	netresolve_t channel;
+	netresolve_t context;
 	struct netresolve_select *loop;
 
 	if (!(loop = calloc(1, sizeof *loop)))
 		goto fail;
-	if (!(channel = netresolve_open()))
-		goto fail_channel;
+	if (!(context = netresolve_open()))
+		goto fail_context;
 
-	netresolve_set_fd_callbacks(channel, watch_fd, unwatch_fd);
-	netresolve_set_user_data(channel, loop, free_user_data);
+	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd);
+	netresolve_set_user_data(context, loop, free_user_data);
 
-	return channel;
-fail_channel:
+	return context;
+fail_context:
 	free(loop);
 fail:
 	return NULL;
 }
 
 int
-netresolve_select_apply_fds(netresolve_t channel, fd_set *rfds, fd_set *wfds)
+netresolve_select_apply_fds(netresolve_t context, fd_set *rfds, fd_set *wfds)
 {
-	struct netresolve_select *loop = netresolve_get_user_data(channel);
+	struct netresolve_select *loop = netresolve_get_user_data(context);
 
 	for (int fd = 0; fd < loop->nfds; fd++) {
 		if (FD_ISSET(fd, &loop->rfds))
@@ -124,45 +124,45 @@ netresolve_select_apply_fds(netresolve_t channel, fd_set *rfds, fd_set *wfds)
 }
 
 void
-netresolve_select_dispatch_read(netresolve_t channel, int fd)
+netresolve_select_dispatch_read(netresolve_t context, int fd)
 {
-	struct netresolve_select *loop = netresolve_get_user_data(channel);
+	struct netresolve_select *loop = netresolve_get_user_data(context);
 	assert(fd >= 0);
 	assert(fd < loop->nfds);
 	assert(FD_ISSET(fd, &loop->rfds));
 
-	netresolve_dispatch(channel, loop->data[fd], POLLIN);
+	netresolve_dispatch(context, loop->data[fd], POLLIN);
 }
 
 void
-netresolve_select_dispatch_write(netresolve_t channel, int fd)
+netresolve_select_dispatch_write(netresolve_t context, int fd)
 {
-	struct netresolve_select *loop = netresolve_get_user_data(channel);
+	struct netresolve_select *loop = netresolve_get_user_data(context);
 
 	assert(fd >= 0);
 	assert(fd < loop->nfds);
 	assert(FD_ISSET(fd, &loop->wfds));
 
-	netresolve_dispatch(channel, loop->data[fd], POLLOUT);
+	netresolve_dispatch(context, loop->data[fd], POLLOUT);
 }
 
 int
-netresolve_select_wait(netresolve_t channel, struct timeval *timeout)
+netresolve_select_wait(netresolve_t context, struct timeval *timeout)
 {
 	fd_set rfds, wfds;
 	int nfds, status;
 	
 	FD_ZERO(&rfds);
 	FD_ZERO(&wfds);
-	nfds = netresolve_select_apply_fds(channel, &rfds, &wfds);
+	nfds = netresolve_select_apply_fds(context, &rfds, &wfds);
 
 	status = select(nfds, &rfds, &wfds, NULL, timeout);
 
 	for (int fd = 0; fd < nfds; fd++) {
 		if (FD_ISSET(fd, &rfds))
-			netresolve_select_dispatch_read(channel, fd);
+			netresolve_select_dispatch_read(context, fd);
 		if (FD_ISSET(fd, &wfds))
-			netresolve_select_dispatch_write(channel, fd);
+			netresolve_select_dispatch_write(context, fd);
 	}
 
 	return status;

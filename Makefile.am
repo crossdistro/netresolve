@@ -39,7 +39,7 @@ libnetresolve_la_SOURCES = \
 	include/netresolve-backend.h \
 	include/netresolve-cli.h \
 	lib/backend.c \
-	lib/channel.c \
+	lib/context.c \
 	lib/compat.c \
 	lib/logging.c \
 	lib/query.c \

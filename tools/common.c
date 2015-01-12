@@ -42,7 +42,7 @@ count_argv(char **argv)
 }
 
 netresolve_query_t
-netresolve_query_argv(netresolve_t channel, char **argv)
+netresolve_query_argv(netresolve_t context, char **argv)
 {
 	static const struct option longopts[] = {
 		{ "help", 0, 0, 'h' },
@@ -95,22 +95,22 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 			service = optarg;
 			break;
 		case 'f':
-			netresolve_set_family(channel, netresolve_family_from_string(optarg));
+			netresolve_set_family(context, netresolve_family_from_string(optarg));
 			break;
 		case 't':
-			netresolve_set_socktype(channel, netresolve_socktype_from_string(optarg));
+			netresolve_set_socktype(context, netresolve_socktype_from_string(optarg));
 			break;
 		case 'p':
-			netresolve_set_protocol(channel, netresolve_protocol_from_string(optarg));
+			netresolve_set_protocol(context, netresolve_protocol_from_string(optarg));
 			break;
 		case 'v':
 			netresolve_set_log_level(NETRESOLVE_LOG_LEVEL_DEBUG);
 			break;
 		case 'b':
-			netresolve_set_backend_string(channel, optarg);
+			netresolve_set_backend_string(context, optarg);
 			break;
 		case 'S':
-			netresolve_set_dns_srv_lookup(channel, true);
+			netresolve_set_dns_srv_lookup(context, true);
 			break;
 		case 'a':
 			address_str = optarg;
@@ -133,7 +133,7 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 		abort();
 
 	if (type)
-		query = netresolve_query_dns(channel, node, cls, type);
+		query = netresolve_query_dns(context, node, cls, type);
 	else if (address_str || port_str) {
 		Address address;
 		int family, ifindex;
@@ -142,9 +142,9 @@ netresolve_query_argv(netresolve_t channel, char **argv)
 			errno = EINVAL;
 			return NULL;
 		}
-		query = netresolve_query_reverse(channel, family, &address, ifindex, port_str ? strtol(port_str, NULL, 10) : 0);
+		query = netresolve_query_reverse(context, family, &address, ifindex, port_str ? strtol(port_str, NULL, 10) : 0);
 	} else
-		query = netresolve_query(channel, node, service);
+		query = netresolve_query(context, node, service);
 
 	debug("%s", netresolve_get_request_string(query));
 

@@ -73,10 +73,10 @@ netresolve_query_get_sockaddr(netresolve_query_t query, size_t idx,
 
 /* netresolve_query_getaddrinfo:
  *
- * Configures the channel and calls `netresolve_query()` according to the
+ * Configures the context and calls `netresolve_query()` according to the
  * input parameters which are the same as for POSIX `getaddrinfo()`. As this
- * function both depends on and changes the channel configuration, it's
- * recommended that a dedicated channel is created and used only for
+ * function both depends on and changes the context configuration, it's
+ * recommended that a dedicated context is created and used only for
  * `netresolve_query_getaddrinfo()` queries.
  *
  * When the query is finished, you can pick up the result using
@@ -84,19 +84,19 @@ netresolve_query_get_sockaddr(netresolve_query_t query, size_t idx,
  * `netresolve_query_getaddrinfo_free()`.
  */
 netresolve_query_t
-netresolve_query_getaddrinfo(netresolve_t channel, const char *node, const char *service, const struct addrinfo *hints)
+netresolve_query_getaddrinfo(netresolve_t context, const char *node, const char *service, const struct addrinfo *hints)
 {
 	struct addrinfo default_hints = { 0 };
 
 	if (!hints)
 		hints = &default_hints;
 
-	netresolve_set_default_loopback(channel, !(hints->ai_flags & AI_PASSIVE));
-	netresolve_set_family(channel, hints->ai_family);
-	netresolve_set_socktype(channel, hints->ai_socktype);
-	netresolve_set_protocol(channel, hints->ai_protocol);
+	netresolve_set_default_loopback(context, !(hints->ai_flags & AI_PASSIVE));
+	netresolve_set_family(context, hints->ai_family);
+	netresolve_set_socktype(context, hints->ai_socktype);
+	netresolve_set_protocol(context, hints->ai_protocol);
 
-	return netresolve_query(channel, node, service);
+	return netresolve_query(context, node, service);
 }
 
 int
@@ -145,22 +145,22 @@ netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **re
 }
 
 netresolve_query_t
-netresolve_query_getnameinfo(netresolve_t channel, const struct sockaddr *sa, socklen_t salen, int flags)
+netresolve_query_getnameinfo(netresolve_t context, const struct sockaddr *sa, socklen_t salen, int flags)
 {
 	struct sockaddr_in *sa4 = (void *) sa;
 	struct sockaddr_in6 *sa6 = (void *) sa;
 
-	netresolve_set_protocol(channel, flags & NI_DGRAM ? IPPROTO_UDP : IPPROTO_TCP);
+	netresolve_set_protocol(context, flags & NI_DGRAM ? IPPROTO_UDP : IPPROTO_TCP);
 
 	switch (sa->sa_family) {
 	case AF_INET:
 		if (salen != sizeof *sa4)
 			return NULL;
-		return netresolve_query_reverse(channel, sa4->sin_family, &sa4->sin_addr, 0, ntohs(sa4->sin_port));
+		return netresolve_query_reverse(context, sa4->sin_family, &sa4->sin_addr, 0, ntohs(sa4->sin_port));
 	case AF_INET6:
 		if (salen != sizeof *sa6)
 			return NULL;
-		return netresolve_query_reverse(channel, sa6->sin6_family, &sa6->sin6_addr, sa6->sin6_scope_id, ntohs(sa6->sin6_port));
+		return netresolve_query_reverse(context, sa6->sin6_family, &sa6->sin6_addr, sa6->sin6_scope_id, ntohs(sa6->sin6_port));
 	default:
 		return NULL;
 	}
@@ -185,7 +185,7 @@ netresolve_query_getnameinfo_done(netresolve_query_t query, char **node, char **
 /* netresolve_query_gethostbyname:
  *
  * Calls `netresolve_query()` to just resolve a node name. As its operation
- * depends on channel configuration, it's recommended that a dedicated channel
+ * depends on context configuration, it's recommended that a dedicated context
  * is created and used only for `netresolve_query_gethostbyname()` queries.
  *
  * When the query is finished, you can pick up the result using
@@ -193,11 +193,11 @@ netresolve_query_getnameinfo_done(netresolve_query_t query, char **node, char **
  * `netresolve_query_gethostbyname_free()`.
  */
 netresolve_query_t
-netresolve_query_gethostbyname(netresolve_t channel, const char *name, int family)
+netresolve_query_gethostbyname(netresolve_t context, const char *name, int family)
 {
-	netresolve_set_family(channel, family);
+	netresolve_set_family(context, family);
 
-	return netresolve_query(channel, name, NULL);
+	return netresolve_query(context, name, NULL);
 }
 
 static struct hostent *
@@ -272,7 +272,7 @@ netresolve_query_gethostbyname_done(netresolve_query_t query, int *h_errnop, int
 }
 
 netresolve_query_t
-netresolve_query_gethostbyaddr(netresolve_t channel, const void *address, int length, int family)
+netresolve_query_gethostbyaddr(netresolve_t context, const void *address, int length, int family)
 {
 	switch (family) {
 	case AF_INET:
@@ -286,7 +286,7 @@ netresolve_query_gethostbyaddr(netresolve_t channel, const void *address, int le
 		return NULL;
 	}
 
-	netresolve_query_t query = netresolve_query_reverse(channel, family, address, 0, 0);
+	netresolve_query_t query = netresolve_query_reverse(context, family, address, 0, 0);
 
 	if (query)
 		netresolve_backend_add_path(query, family, address, 0, 0, 0, 0, 0, 0, 0);

@@ -33,7 +33,7 @@
 /* FIXME: This header file should be turned in a library to avoid symbol name clashes. */
 
 struct netresolve_source {
-	netresolve_t channel;
+	netresolve_t context;
 	struct event *event;
 	void *data;
 };
@@ -69,19 +69,19 @@ handler(int fd, short condition, void *data)
 {
 	struct netresolve_source *source = data;
 
-	if (!netresolve_dispatch(source->channel, source->data, condition_to_events(condition)))
+	if (!netresolve_dispatch(source->context, source->data, condition_to_events(condition)))
 		abort();
 }
 
 static void*
-watch_fd(netresolve_t channel, int fd, int events, void *data)
+watch_fd(netresolve_t context, int fd, int events, void *data)
 {
-	struct event_base *base = netresolve_get_user_data(channel);
+	struct event_base *base = netresolve_get_user_data(context);
 	struct netresolve_source *source = calloc(1, sizeof *source);
 
 	assert(source);
 
-	source->channel = channel;
+	source->context = context;
 	source->event = event_new(base, fd, events_to_condition(events), handler, source);
 	source->data = data;
 
@@ -93,7 +93,7 @@ watch_fd(netresolve_t channel, int fd, int events, void *data)
 }
 
 static void
-unwatch_fd(netresolve_t channel, int fd, void *handle)
+unwatch_fd(netresolve_t context, int fd, void *handle)
 {
 	struct netresolve_source *source = handle;
 
@@ -105,14 +105,14 @@ __attribute__((unused))
 static netresolve_t
 netresolve_event_open(struct event_base *base)
 {
-	netresolve_t channel = netresolve_open();
+	netresolve_t context = netresolve_open();
 
-	if (channel) {
-		netresolve_set_fd_callbacks(channel, watch_fd, unwatch_fd);
-		netresolve_set_user_data(channel, base, NULL);
+	if (context) {
+		netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd);
+		netresolve_set_user_data(context, base, NULL);
 	}
 
-	return channel;
+	return context;
 }
 
 #endif /* NETRESOLVE_EVENT_H */

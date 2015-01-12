@@ -48,21 +48,21 @@ set_flags(int sock, int flags)
 int
 netresolve_utils_bind(const char *node, const char *service, int family, int socktype, int protocol)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	int sock = -1;
 	int flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC);
 
-	if (!(channel = netresolve_open()))
+	if (!(context = netresolve_open()))
 		return -1;
 
-	netresolve_set_bind_callback(channel, on_socket, &sock);
-	netresolve_set_family(channel, family);
-	netresolve_set_socktype(channel, socktype & ~flags);
-	netresolve_set_protocol(channel, protocol);
+	netresolve_set_bind_callback(context, on_socket, &sock);
+	netresolve_set_family(context, family);
+	netresolve_set_socktype(context, socktype & ~flags);
+	netresolve_set_protocol(context, protocol);
 
-	netresolve_query(channel, node, service);
+	netresolve_query(context, node, service);
 
-	netresolve_close(channel);
+	netresolve_close(context);
 
 	return sock;
 }
@@ -70,21 +70,21 @@ netresolve_utils_bind(const char *node, const char *service, int family, int soc
 int
 netresolve_utils_connect(const char *node, const char *service, int family, int socktype, int protocol)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	int sock = -1;
 	int flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC);
 
-	if (!(channel = netresolve_open()))
+	if (!(context = netresolve_open()))
 		return -1;
 
-	netresolve_set_connect_callback(channel, on_socket, &sock);
-	netresolve_set_family(channel, family);
-	netresolve_set_socktype(channel, socktype & ~flags);
-	netresolve_set_protocol(channel, protocol);
+	netresolve_set_connect_callback(context, on_socket, &sock);
+	netresolve_set_family(context, family);
+	netresolve_set_socktype(context, socktype & ~flags);
+	netresolve_set_protocol(context, protocol);
 
-	netresolve_query(channel, node, service);
+	netresolve_query(context, node, service);
 
-	netresolve_close(channel);
+	netresolve_close(context);
 
 	if (sock != -1)
 		set_flags(sock, flags);

@@ -27,9 +27,9 @@
 #include <assert.h>
 
 static void *
-watch_fd(netresolve_t channel, int fd, int events, void *data)
+watch_fd(netresolve_t context, int fd, int events, void *data)
 {
-	struct netresolve_epoll *loop = netresolve_get_user_data(channel);
+	struct netresolve_epoll *loop = netresolve_get_user_data(context);
 	struct epoll_event event = { .events = events, .data = { .ptr = data } };
 
 	if (epoll_ctl(loop->fd, EPOLL_CTL_ADD, fd, &event) == -1) {
@@ -43,9 +43,9 @@ watch_fd(netresolve_t channel, int fd, int events, void *data)
 }
 
 static void
-unwatch_fd(netresolve_t channel, int fd, void *handle)
+unwatch_fd(netresolve_t context, int fd, void *handle)
 {
-	struct netresolve_epoll *loop = netresolve_get_user_data(channel);
+	struct netresolve_epoll *loop = netresolve_get_user_data(context);
 
 	assert(handle == NULL);
 
@@ -76,7 +76,7 @@ free_user_data(void *user_data)
  * `netresolve_epoll_open()` instead.
  */
 bool
-netresolve_epoll_install(netresolve_t channel,
+netresolve_epoll_install(netresolve_t context,
 		struct netresolve_epoll *loop,
 		netresolve_free_user_data_callback_t free_loop)
 {
@@ -86,8 +86,8 @@ netresolve_epoll_install(netresolve_t channel,
 		return false;
 	}
 
-	netresolve_set_fd_callbacks(channel, watch_fd, unwatch_fd);
-	netresolve_set_user_data(channel, loop, free_loop);
+	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd);
+	netresolve_set_user_data(context, loop, free_loop);
 
 	return true;
 }
@@ -96,45 +96,45 @@ netresolve_epoll_install(netresolve_t channel,
  *
  * Use this constructor instead of `netresolve_open()` to use the library in
  * a file descriptor based nonblocking mode. Always use
- * `netresolve_epoll_close()` to dispose of the channel.
+ * `netresolve_epoll_close()` to dispose of the context.
  */
 netresolve_t
 netresolve_epoll_open(void)
 {
-	netresolve_t channel = netresolve_open();
+	netresolve_t context = netresolve_open();
 
-	if (channel) {
-		if (netresolve_epoll_fd(channel) == -1) {
-			netresolve_close(channel);
-			channel = NULL;
+	if (context) {
+		if (netresolve_epoll_fd(context) == -1) {
+			netresolve_close(context);
+			context = NULL;
 		}
 	}
 
-	return channel;
+	return context;
 }
 
 /* netresolve_epoll_fd:
  *
- * Retrieve the epoll file descriptor from the channel. Do not add any file
+ * Retrieve the epoll file descriptor from the context. Do not add any file
  * descriptors to the epoll instance. Just use the file descriptor in your
  * event loop and poll it for reading.
  *
  * As a bonus, You can call this function between `netresolve_open()` and the
- * first query to convert a blocking channel to an epoll based non-blocking
+ * first query to convert a blocking context to an epoll based non-blocking
  * one. A sequence of `netresolve_open()` and `netresolve_epoll_fd()` is thus
  * equivalent to `netresolve_epoll_open()` with an optional
  * `netresolve_epoll_fd()` to retrieve the file descriptor.
  */
 int
-netresolve_epoll_fd(netresolve_t channel)
+netresolve_epoll_fd(netresolve_t context)
 {
-	struct netresolve_epoll *loop = netresolve_get_user_data(channel);
+	struct netresolve_epoll *loop = netresolve_get_user_data(context);
 
-	/* Automatically turn netresolve channel into an epoll based nonblocking one */
+	/* Automatically turn netresolve context into an epoll based nonblocking one */
 	if (!loop) {
 		if (!(loop = calloc(1, sizeof *loop)))
 			return -1;
-		if (!netresolve_epoll_install(channel, loop, free_user_data)) {
+		if (!netresolve_epoll_install(context, loop, free_user_data)) {
 			free(loop);
 			return -1;
 		}
@@ -144,9 +144,9 @@ netresolve_epoll_fd(netresolve_t channel)
 }
 
 static void
-dispatch_events(netresolve_t channel, int timeout)
+dispatch_events(netresolve_t context, int timeout)
 {
-	struct netresolve_epoll *loop = netresolve_get_user_data(channel);
+	struct netresolve_epoll *loop = netresolve_get_user_data(context);
 	static const int maxevents = 10;
 	struct epoll_event events[maxevents];
 	int nevents;
@@ -161,7 +161,7 @@ dispatch_events(netresolve_t channel, int timeout)
 		return;
 	default:
 		for (i = 0; i < nevents; i++)
-			if (!netresolve_dispatch(channel, events[i].data.ptr, events[i].events))
+			if (!netresolve_dispatch(context, events[i].data.ptr, events[i].events))
 				abort();
 	}
 }
@@ -171,24 +171,24 @@ dispatch_events(netresolve_t channel, int timeout)
  * Call this function when the file descriptor is ready for reading.
  */
 void
-netresolve_epoll_dispatch(netresolve_t channel)
+netresolve_epoll_dispatch(netresolve_t context)
 {
-	dispatch_events(channel, 0);
+	dispatch_events(context, 0);
 }
 
 /* netresolve_epoll_wait:
  *
  * This function is used internally by netresolve to run an epoll based
- * main loop for the channel until all pending queries are fully
+ * main loop for the context until all pending queries are fully
  * processed. You wouldn't run it in your application but it is definitely
  * useful for simple testing, as it simulates a real application main
  * loop and allows for processing queries simultaneously.
  */
 void
-netresolve_epoll_wait(netresolve_t channel)
+netresolve_epoll_wait(netresolve_t context)
 {
-	struct netresolve_epoll *loop = netresolve_get_user_data(channel);
+	struct netresolve_epoll *loop = netresolve_get_user_data(context);
 
 	while (loop->count > 0)
-		dispatch_events(channel, -1);
+		dispatch_events(context, -1);
 }

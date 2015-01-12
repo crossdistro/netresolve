@@ -33,7 +33,7 @@
 /* FIXME: This header file should be turned in a library to avoid symbol name clashes. */
 
 struct netresolve_source {
-	netresolve_t channel;
+	netresolve_t context;
 	GIOChannel *stream;
 	void *data;
 };
@@ -69,20 +69,20 @@ handler(GIOChannel *stream, GIOCondition condition, gpointer data)
 {
 	struct netresolve_source *source = data;
 
-	if (!netresolve_dispatch(source->channel, source->data, condition_to_events(condition)))
+	if (!netresolve_dispatch(source->context, source->data, condition_to_events(condition)))
 		abort();
 
 	return TRUE;
 }
 
 static void*
-watch_fd(netresolve_t channel, int fd, int events, void *data)
+watch_fd(netresolve_t context, int fd, int events, void *data)
 {
 	struct netresolve_source *source = calloc(1, sizeof *source);
 
 	assert(source);
 
-	source->channel = channel;
+	source->context = context;
 	source->stream = g_io_channel_unix_new(fd);
 	source->data = data;
 
@@ -92,7 +92,7 @@ watch_fd(netresolve_t channel, int fd, int events, void *data)
 }
 
 static void
-unwatch_fd(netresolve_t channel, int fd, void *handle)
+unwatch_fd(netresolve_t context, int fd, void *handle)
 {
 	struct netresolve_source *source = handle;
 
@@ -104,13 +104,13 @@ __attribute__((unused))
 static netresolve_t 
 netresolve_glib_open(void)
 {
-	netresolve_t channel = netresolve_open();
+	netresolve_t context = netresolve_open();
 
-	assert(channel);
+	assert(context);
 
-	netresolve_set_fd_callbacks(channel, watch_fd, unwatch_fd);
+	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd);
 
-	return channel;
+	return context;
 }
 
 #endif /* NETRESOLVE_GLIB_H */

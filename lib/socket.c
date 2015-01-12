@@ -48,7 +48,7 @@ netresolve_query_bind(netresolve_query_t query, size_t idx)
 		return;
 	}
 
-	query->channel->callbacks.on_bind(query, idx, sock, query->channel->callbacks.user_data_sock);
+	query->context->callbacks.on_bind(query, idx, sock, query->context->callbacks.user_data_sock);
 }
 
 void
@@ -96,7 +96,7 @@ connect_check(netresolve_query_t query)
 			break;
 
 		if (path->socket.state == NETRESOLVE_STATE_DONE) {
-			query->channel->callbacks.on_connect(query, idx, path->socket.fd, query->channel->callbacks.user_data_sock);
+			query->context->callbacks.on_connect(query, idx, path->socket.fd, query->context->callbacks.user_data_sock);
 			path->socket.state = NETRESOLVE_STATE_NONE;
 			netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 			break;

@@ -25,13 +25,13 @@
 #include "common.h"
 
 netresolve_t
-channel_open(struct priv_common *priv)
+context_open(struct priv_common *priv)
 {
 	return netresolve_select_open();
 }
 
 void
-channel_wait(netresolve_t channel)
+context_wait(netresolve_t context)
 {
-	netresolve_select_wait(channel, NULL);
+	netresolve_select_wait(context, NULL);
 }

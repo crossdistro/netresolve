@@ -27,13 +27,13 @@
 #include <unistd.h>
 
 void
-netresolve_set_fd_callbacks(netresolve_t channel, netresolve_watch_fd_callback_t watch_fd, netresolve_unwatch_fd_callback_t unwatch_fd)
+netresolve_set_fd_callbacks(netresolve_t context, netresolve_watch_fd_callback_t watch_fd, netresolve_unwatch_fd_callback_t unwatch_fd)
 {
 	assert(watch_fd && unwatch_fd);
-	assert(!channel->callbacks.watch_fd && !channel->callbacks.unwatch_fd);
+	assert(!context->callbacks.watch_fd && !context->callbacks.unwatch_fd);
 
-	channel->callbacks.watch_fd = watch_fd;
-	channel->callbacks.unwatch_fd = unwatch_fd;
+	context->callbacks.watch_fd = watch_fd;
+	context->callbacks.unwatch_fd = unwatch_fd;
 }
 
 void
@@ -50,16 +50,16 @@ netresolve_watch_fd(netresolve_query_t query, int fd, int events)
 
 	source->query = query;
 	source->fd = fd;
-	source->handle = query->channel->callbacks.watch_fd(query->channel, fd, events, source);
+	source->handle = query->context->callbacks.watch_fd(query->context, fd, events, source);
 
 	source->previous = sources->previous;
 	source->next = sources;
 	source->previous->next = source->next->previous = source;
 
 	query->nfds++;
-	query->channel->nfds++;
+	query->context->nfds++;
 
-	debug_query(query, "added file descriptor: fd=%d events=%d (total %d/%d)", fd, events, query->nfds, query->channel->nfds);
+	debug_query(query, "added file descriptor: fd=%d events=%d (total %d/%d)", fd, events, query->nfds, query->context->nfds);
 }
 
 void
@@ -75,19 +75,19 @@ netresolve_unwatch_fd(netresolve_query_t query, int fd)
 			break;
 
 	assert(query->nfds > 0);
-	assert(query->channel->nfds > 0);
+	assert(query->context->nfds > 0);
 	assert(source != sources);
 
-	query->channel->callbacks.unwatch_fd(query->channel, fd, source->handle);
+	query->context->callbacks.unwatch_fd(query->context, fd, source->handle);
 
 	source->previous->next = source->next;
 	source->next->previous = source->previous;
 	free(source);
 
 	query->nfds--;
-	query->channel->nfds--;
+	query->context->nfds--;
 
-	debug_query(query, "removed file descriptor: fd=%d (total %d/%d)", fd, query->nfds, query->channel->nfds);
+	debug_query(query, "removed file descriptor: fd=%d (total %d/%d)", fd, query->nfds, query->context->nfds);
 }
 
 int
@@ -127,7 +127,7 @@ netresolve_remove_timeout(netresolve_query_t query, int fd)
 }
 
 bool
-netresolve_dispatch(netresolve_t channel, void *data, int events)
+netresolve_dispatch(netresolve_t context, void *data, int events)
 {
 	struct netresolve_source *source = data;
 

@@ -56,16 +56,16 @@ get_dns_string(netresolve_query_t query)
 int
 main(int argc, char **argv)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	netresolve_query_t query;
 
-	channel = netresolve_open();
-	if (!channel) {
+	context = netresolve_open();
+	if (!context) {
 		fprintf(stderr, "netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
 
-	query = netresolve_query_argv(channel, argv);
+	query = netresolve_query_argv(context, argv);
 	if (!query) {
 		fprintf(stderr, "netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;
@@ -81,6 +81,6 @@ main(int argc, char **argv)
 		free(dns_string);
 	}
 
-	netresolve_close(channel);
+	netresolve_close(context);
 	return EXIT_SUCCESS;
 }

@@ -21,7 +21,7 @@ struct netresolve_asyncns_query {
 };
 
 struct netresolve_asyncns {
-	netresolve_t channel;
+	netresolve_t context;
 	asyncns_query_t queries;
 };
 
@@ -58,13 +58,13 @@ asyncns_new (unsigned n_proc)
 	if (!(asyncns = calloc(1, sizeof *asyncns)))
 		goto fail_asyncns;
 
-    if (!(asyncns->channel = netresolve_epoll_open()))
-		goto fail_channel;
+    if (!(asyncns->context = netresolve_epoll_open()))
+		goto fail_context;
 
 	asyncns->queries.previous = asyncns->queries.next = &asyncns->queries;
 
 	return asyncns;
-fail_channel:
+fail_context:
 	free(asyncns);
 fail_asyncns:
 	return NULL;
@@ -73,16 +73,16 @@ fail_asyncns:
 int
 asyncns_fd(asyncns_t *asyncns)
 {
-	return netresolve_epoll_fd(asyncns->channel);
+	return netresolve_epoll_fd(asyncns->context);
 }
 
 int
 asyncns_wait(asyncns_t *asyncns, int block)
 {
 	if (block)
-		netresolve_epoll_wait(asyncns->channel);
+		netresolve_epoll_wait(asyncns->context);
 	else
-		netresolve_epoll_dispatch(asyncns->channel);
+		netresolve_epoll_dispatch(asyncns->context);
 
 	/* undocumented return value */
 	return 0;
@@ -127,7 +127,7 @@ remove_query(asyncns_query_t *q)
 asyncns_query_t *
 asyncns_getaddrinfo(asyncns_t *asyncns, const char *node, const char *service, const struct addrinfo *hints) 
 {
-	return add_query(asyncns, netresolve_query_getaddrinfo(asyncns->channel, node, service, hints));
+	return add_query(asyncns, netresolve_query_getaddrinfo(asyncns->context, node, service, hints));
 }
 
 int
@@ -139,7 +139,7 @@ asyncns_getaddrinfo_done (asyncns_t *asyncns, asyncns_query_t *q, struct addrinf
 asyncns_query_t *
 asyncns_getnameinfo (asyncns_t *asyncns, const struct sockaddr *sa, socklen_t salen, int flags, int gethost, int getserv)
 {
-	return add_query(asyncns, netresolve_query_getnameinfo(asyncns->channel, sa, salen, flags));
+	return add_query(asyncns, netresolve_query_getnameinfo(asyncns->context, sa, salen, flags));
 }
 
 int
@@ -171,7 +171,7 @@ asyncns_getnameinfo_done (asyncns_t *asyncns, asyncns_query_t *q, char *host, si
 asyncns_query_t *
 asyncns_res_query (asyncns_t *asyncns, const char *dname, int class, int type)
 {
-	return add_query(asyncns, netresolve_query_res_query(asyncns->channel, dname, class, type));
+	return add_query(asyncns, netresolve_query_res_query(asyncns->context, dname, class, type));
 }
 
 asyncns_query_t *
@@ -179,7 +179,7 @@ asyncns_res_search (asyncns_t *asyncns, const char *dname, int class, int type)
 {
 	/* FIXME: enable search */
 
-	return add_query(asyncns, netresolve_query_res_query(asyncns->channel, dname, class, type));
+	return add_query(asyncns, netresolve_query_res_query(asyncns->context, dname, class, type));
 }
 
 int
@@ -228,7 +228,7 @@ asyncns_free (asyncns_t *asyncns)
 	while (list->next != list)
 		asyncns_cancel(asyncns, list->next);
 
-	netresolve_close(asyncns->channel);
+	netresolve_close(asyncns->context);
 
 	free(asyncns);
 }

@@ -27,22 +27,22 @@
 #include <netresolve.h>
 
 /* Event loop integration */
-typedef void *(*netresolve_watch_fd_callback_t)(netresolve_t channel, int fd, int events, void *data);
-typedef void (*netresolve_unwatch_fd_callback_t)(netresolve_t channel, int fd, void *handle);
+typedef void *(*netresolve_watch_fd_callback_t)(netresolve_t context, int fd, int events, void *data);
+typedef void (*netresolve_unwatch_fd_callback_t)(netresolve_t context, int fd, void *handle);
 typedef void (*netresolve_free_user_data_callback_t)(void *user_data);
 
-void netresolve_set_fd_callbacks(netresolve_t channel,
+void netresolve_set_fd_callbacks(netresolve_t context,
 		netresolve_watch_fd_callback_t watch_fd,
 		netresolve_unwatch_fd_callback_t unwatch_fd);
-void netresolve_set_user_data(netresolve_t channel, void *user_data, netresolve_free_user_data_callback_t free_user_data);
-void *netresolve_get_user_data(netresolve_t channel);
+void netresolve_set_user_data(netresolve_t context, void *user_data, netresolve_free_user_data_callback_t free_user_data);
+void *netresolve_get_user_data(netresolve_t context);
 
 /* Socket API callbacks */
 typedef void (*netresolve_socket_callback_t)(netresolve_query_t query, int idx, int sock, void *user_data);
 
-void netresolve_set_bind_callback(netresolve_t channel,
+void netresolve_set_bind_callback(netresolve_t context,
 		netresolve_socket_callback_t on_bind, void *user_data);
-void netresolve_set_connect_callback(netresolve_t channel,
+void netresolve_set_connect_callback(netresolve_t context,
 		netresolve_socket_callback_t on_connect, void *user_data);
 
 #endif /* NETRESOLVE_CALLBACK_H */

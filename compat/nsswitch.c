@@ -34,17 +34,17 @@ _nss_netresolve_getaddrinfo(const char *nodename, const char *servname,
 		const struct addrinfo *hints,
 		struct addrinfo **result, int32_t *ttl)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	netresolve_query_t query;
 	int status = EAI_SYSTEM;
 
-	if (!(channel = netresolve_open()))
+	if (!(context = netresolve_open()))
 		return status;
 
-	if ((query = netresolve_query_getaddrinfo(channel, nodename, servname, hints)))
+	if ((query = netresolve_query_getaddrinfo(context, nodename, servname, hints)))
 		status = netresolve_query_getaddrinfo_done(query, result, ttl);
 
-	netresolve_close(channel);
+	netresolve_close(context);
 	return status;
 }
 

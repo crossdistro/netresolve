@@ -63,7 +63,7 @@ read_and_write(int rfd, int wfd)
 }
 
 static void
-on_connect(netresolve_query_t channel, int idx, int sock, void *user_data)
+on_connect(netresolve_query_t context, int idx, int sock, void *user_data)
 {
 	*(int *) user_data = sock;
 }
@@ -71,20 +71,20 @@ on_connect(netresolve_query_t channel, int idx, int sock, void *user_data)
 int
 main(int argc, char **argv)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	netresolve_query_t query;
 	int sock = -1;
 	struct pollfd fds[2];
 
-	channel = netresolve_open();
-	if (!channel) {
+	context = netresolve_open();
+	if (!context) {
 		fprintf(stderr, "netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
 
-	netresolve_set_connect_callback(channel, on_connect, &sock);
+	netresolve_set_connect_callback(context, on_connect, &sock);
 
-	query = netresolve_query_argv(channel, argv);
+	query = netresolve_query_argv(context, argv);
 	if (!query) {
 		fprintf(stderr, "netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;
@@ -114,6 +114,6 @@ main(int argc, char **argv)
 			read_and_write(sock, 1);
 	}
 
-	netresolve_close(channel);
+	netresolve_close(context);
 	return EXIT_SUCCESS;
 }

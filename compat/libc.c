@@ -42,17 +42,17 @@ int
 getaddrinfo(const char *nodename, const char *servname,
 		const struct addrinfo *hints, struct addrinfo **result)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	netresolve_query_t query;
 	int status = EAI_SYSTEM;
 
-	if (!(channel = netresolve_open()))
+	if (!(context = netresolve_open()))
 		return status;
 
-	if ((query = netresolve_query_getaddrinfo(channel, nodename, servname, hints)))
+	if ((query = netresolve_query_getaddrinfo(context, nodename, servname, hints)))
 		status = netresolve_query_getaddrinfo_done(query, result, NULL);
 
-	netresolve_close(channel);
+	netresolve_close(context);
 	return status;
 }
 
@@ -80,17 +80,17 @@ int getnameinfo(const struct sockaddr *sa, socklen_t salen,
 		char *serv, socklen_t servlen,
 		int flags)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	netresolve_query_t query;
 	int status = EAI_SYSTEM;
 	char *myhost = NULL;
 	char *myserv = NULL;
 	int myhostlen, myservlen;
 
-	if (!(channel = netresolve_open()))
+	if (!(context = netresolve_open()))
 		return status;
 
-	if ((query = netresolve_query_getnameinfo(channel, sa, salen, flags)))
+	if ((query = netresolve_query_getnameinfo(context, sa, salen, flags)))
 		status = netresolve_query_getnameinfo_done(query, &myhost, &myserv, NULL);
 
 	if (!status) {
@@ -113,7 +113,7 @@ int getnameinfo(const struct sockaddr *sa, socklen_t salen,
 	}
 
 out:
-	netresolve_close(channel);
+	netresolve_close(context);
 	return status;
 }
 
@@ -136,19 +136,19 @@ out:
 struct hostent *
 gethostbyname2(const char *node, int family)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	netresolve_query_t query;
 	static struct hostent *he = NULL;
 
-	if (!(channel = netresolve_open()))
+	if (!(context = netresolve_open()))
 		return NULL;
 
-	if ((query = netresolve_query_gethostbyname(channel, node, family))) {
+	if ((query = netresolve_query_gethostbyname(context, node, family))) {
 		netresolve_freehostent(he);
 		he = netresolve_query_gethostbyname_done(query, &h_errno, NULL);
 	}
 
-	netresolve_close(channel);
+	netresolve_close(context);
 	return he;
 }
 
@@ -184,18 +184,18 @@ gethostbyaddr(const void *addr, socklen_t len, int type)
 {
 	static struct hostent *he = NULL;
 
-	netresolve_t channel;
+	netresolve_t context;
 	netresolve_query_t query;
 
-	if (!(channel = netresolve_open()))
+	if (!(context = netresolve_open()))
 		return NULL;
 
-	if ((query = netresolve_query_gethostbyaddr(channel, addr, len, type))) {
+	if ((query = netresolve_query_gethostbyaddr(context, addr, len, type))) {
 		netresolve_freehostent(he);
 		he = netresolve_query_gethostbyaddr_done(query, &h_errno, NULL);
 	}
 
-	netresolve_close(channel);
+	netresolve_close(context);
 	return he;
 }
 
@@ -209,18 +209,18 @@ gethostbyname2_r(const char *name, int family,
 		struct hostent *he, char *buffer, size_t buflen,
 		struct hostent **result, int *h_errnop)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	netresolve_query_t query;
 	struct hostent *tmp;
 
-	if (!(channel = netresolve_open())) {
+	if (!(context = netresolve_open())) {
 		*result = NULL;
 		return errno;
 	}
 
-	if (!(query = netresolve_query_gethostbyname(channel, name, family))) {
+	if (!(query = netresolve_query_gethostbyname(context, name, family))) {
 		*result = NULL;
-		netresolve_close(channel);
+		netresolve_close(context);
 		return errno;
 	}
 
@@ -258,7 +258,7 @@ gethostbyname2_r(const char *name, int family,
 	}
 
 	netresolve_freehostent(tmp);
-	netresolve_close(channel);
+	netresolve_close(context);
 
 	*result = he;
 
@@ -280,15 +280,15 @@ gethostbyname_r(const char *name,
 static int
 _res_query(const char *dname, int class, int type, bool search, unsigned char *answer, int length)
 {
-	netresolve_t channel;
+	netresolve_t context;
 	netresolve_query_t query;
 	const char *myanswer;
 	size_t mylength = -1;
 
-	if (!(channel = netresolve_open()))
+	if (!(context = netresolve_open()))
 		return mylength;
 
-	if ((query = netresolve_query_dns(channel, dname, class, type))) {
+	if ((query = netresolve_query_dns(context, dname, class, type))) {
 		myanswer = netresolve_query_get_dns_answer(query, &mylength);
 
 		if (mylength > length)
@@ -299,7 +299,7 @@ _res_query(const char *dname, int class, int type, bool search, unsigned char *a
 
 out:
 	netresolve_query_done(query);
-	netresolve_close(channel);
+	netresolve_close(context);
 	return mylength;
 }
 

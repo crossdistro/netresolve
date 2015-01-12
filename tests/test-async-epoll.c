@@ -25,16 +25,16 @@
 #include "common.h"
 
 netresolve_t
-channel_open(struct priv_common *priv)
+context_open(struct priv_common *priv)
 {
-	netresolve_t channel = netresolve_open();
-	netresolve_epoll_fd(channel);
+	netresolve_t context = netresolve_open();
+	netresolve_epoll_fd(context);
 
-	return channel;
+	return context;
 }
 
 void
-channel_wait(netresolve_t channel)
+context_wait(netresolve_t context)
 {
-	netresolve_epoll_wait(channel);
+	netresolve_epoll_wait(context);
 }

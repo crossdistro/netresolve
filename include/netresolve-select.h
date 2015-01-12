@@ -28,10 +28,10 @@
 #include <sys/select.h>
 
 netresolve_t netresolve_select_open();
-int netresolve_select_apply_fds(netresolve_t channel, fd_set *rfds, fd_set *wfds);
-void netresolve_select_dispatch_read(netresolve_t channel, int fd);
-void netresolve_select_dispatch_write(netresolve_t channel, int fd);
-int netresolve_select_wait(netresolve_t channel, struct timeval *timeout);
-void netresolve_select_close(netresolve_t channel);
+int netresolve_select_apply_fds(netresolve_t context, fd_set *rfds, fd_set *wfds);
+void netresolve_select_dispatch_read(netresolve_t context, int fd);
+void netresolve_select_dispatch_write(netresolve_t context, int fd);
+int netresolve_select_wait(netresolve_t context, struct timeval *timeout);
+void netresolve_select_close(netresolve_t context);
 
 #endif /* NETRESOLVE_SELECT_H */

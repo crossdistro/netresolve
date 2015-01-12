@@ -58,80 +58,80 @@ getenv_family(const char *name, int def)
 netresolve_t
 netresolve_open(void)
 {
-	netresolve_t channel;
+	netresolve_t context;
 
 	/* FIXME: this should probably be only called once */
 	netresolve_set_log_level(getenv_bool("NETRESOLVE_VERBOSE", false) ? NETRESOLVE_LOG_LEVEL_DEBUG : NETRESOLVE_LOG_LEVEL_QUIET);
 
-	if (!(channel = calloc(1, sizeof *channel)))
+	if (!(context = calloc(1, sizeof *context)))
 		return NULL;
 
-	channel->queries.previous = channel->queries.next = &channel->queries;
-	channel->epoll.fd = -1;
+	context->queries.previous = context->queries.next = &context->queries;
+	context->epoll.fd = -1;
 
-	channel->config.force_family = getenv_family("NETRESOLVE_FORCE_FAMILY", AF_UNSPEC);
+	context->config.force_family = getenv_family("NETRESOLVE_FORCE_FAMILY", AF_UNSPEC);
 
-	channel->request.default_loopback = getenv_bool("NETRESOLVE_FLAG_DEFAULT_LOOPBACK", false);
-	channel->request.clamp_ttl = getenv_int("NETRESOLVE_CLAMP_TTL", -1);
-	channel->request.timeout = getenv_int("NETRESOLVE_TIMEOUT", 15000);
-	channel->request.partial_timeout = getenv_int("NETRESOLVE_PARTIAL_TIMEOUT", 5000);
+	context->request.default_loopback = getenv_bool("NETRESOLVE_FLAG_DEFAULT_LOOPBACK", false);
+	context->request.clamp_ttl = getenv_int("NETRESOLVE_CLAMP_TTL", -1);
+	context->request.timeout = getenv_int("NETRESOLVE_TIMEOUT", 15000);
+	context->request.partial_timeout = getenv_int("NETRESOLVE_PARTIAL_TIMEOUT", 5000);
 
-	return channel;
+	return context;
 }
 
 void
-netresolve_close(netresolve_t channel)
+netresolve_close(netresolve_t context)
 {
-	struct netresolve_query *queries = &channel->queries;
+	struct netresolve_query *queries = &context->queries;
 
 	while (queries->next != queries)
 		netresolve_query_done(queries->next);
 
-	netresolve_set_backend_string(channel, "");
-	if (channel->epoll.fd != -1 && close(channel->epoll.fd) == -1)
+	netresolve_set_backend_string(context, "");
+	if (context->epoll.fd != -1 && close(context->epoll.fd) == -1)
 		abort();
-	if (channel->callbacks.free_user_data)
-		channel->callbacks.free_user_data(channel->callbacks.user_data);
-	memset(channel, 0, sizeof *channel);
-	free(channel);
+	if (context->callbacks.free_user_data)
+		context->callbacks.free_user_data(context->callbacks.user_data);
+	memset(context, 0, sizeof *context);
+	free(context);
 }
 
 static netresolve_query_t
-start_query(netresolve_t channel, netresolve_query_t query)
+start_query(netresolve_t context, netresolve_query_t query)
 {
 	/* Install default callbacks for first query in blocking mode. */
-	if (!channel->callbacks.watch_fd)
-		netresolve_epoll_install(channel, &channel->epoll, NULL);
+	if (!context->callbacks.watch_fd)
+		netresolve_epoll_install(context, &context->epoll, NULL);
 
 	netresolve_query_setup(query);
 
-	/* Wait for the channel in blocking mode. */
-	if (channel->callbacks.user_data == &channel->epoll)
-		netresolve_epoll_wait(channel);
+	/* Wait for the context in blocking mode. */
+	if (context->callbacks.user_data == &context->epoll)
+		netresolve_epoll_wait(context);
 
 	return query;
 }
 
 netresolve_query_t
-netresolve_query(netresolve_t channel, const char *nodename, const char *servname)
+netresolve_query(netresolve_t context, const char *nodename, const char *servname)
 {
-	netresolve_query_t query = netresolve_query_new(channel, NETRESOLVE_REQUEST_FORWARD);
+	netresolve_query_t query = netresolve_query_new(context, NETRESOLVE_REQUEST_FORWARD);
 
 	if (!query)
 		return NULL;
 
-	if (channel->config.force_family)
-		query->request.family = channel->config.force_family;
+	if (context->config.force_family)
+		query->request.family = context->config.force_family;
 	query->request.nodename = nodename;
 	query->request.servname = servname;
 
-	return start_query(channel, query);
+	return start_query(context, query);
 }
 
 netresolve_query_t
-netresolve_query_reverse(netresolve_t channel, int family, const void *address, int ifindex, int port)
+netresolve_query_reverse(netresolve_t context, int family, const void *address, int ifindex, int port)
 {
-	netresolve_query_t query = netresolve_query_new(channel, NETRESOLVE_REQUEST_REVERSE);
+	netresolve_query_t query = netresolve_query_new(context, NETRESOLVE_REQUEST_REVERSE);
 	size_t size = family == AF_INET ? 4 : 16;
 
 	if (!query)
@@ -141,13 +141,13 @@ netresolve_query_reverse(netresolve_t channel, int family, const void *address, 
 	memcpy(query->request.address, address, size);
 	query->request.port = port;
 
-	return start_query(channel, query);
+	return start_query(context, query);
 }
 
 netresolve_query_t
-netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type)
+netresolve_query_dns(netresolve_t context, const char *dname, int cls, int type)
 {
-	netresolve_query_t query = netresolve_query_new(channel, NETRESOLVE_REQUEST_DNS);
+	netresolve_query_t query = netresolve_query_new(context, NETRESOLVE_REQUEST_DNS);
 
 	if (!query)
 		return NULL;
@@ -156,7 +156,7 @@ netresolve_query_dns(netresolve_t channel, const char *dname, int cls, int type)
 	query->request.dns_class = cls;
 	query->request.dns_type = type;
 
-	return start_query(channel, query);
+	return start_query(context, query);
 }
 
 static void
@@ -218,7 +218,7 @@ fail:
 }
 
 void
-netresolve_set_backend_string(netresolve_t channel, const char *string)
+netresolve_set_backend_string(netresolve_t context, const char *string)
 {
 	const char *setup, *end;
 	char **settings = NULL;
@@ -230,13 +230,13 @@ netresolve_set_backend_string(netresolve_t channel, const char *string)
 		string = "unix,any,loopback,numerichost,hosts,hostname,ubdns";
 
 	/* Clear old backends */
-	if (channel->backends) {
+	if (context->backends) {
 		struct netresolve_backend **backend;
 
-		for (backend = channel->backends; *backend; backend++)
+		for (backend = context->backends; *backend; backend++)
 			free_backend(*backend);
-		free(channel->backends);
-		channel->backends = NULL;
+		free(context->backends);
+		context->backends = NULL;
 	}
 
 	/* Install new set of backends */
@@ -249,11 +249,11 @@ netresolve_set_backend_string(netresolve_t channel, const char *string)
 		}
 		if (*end == ',' || *end == '\0') {
 			if (settings && *settings && **settings) {
-				channel->backends = realloc(channel->backends, (nbackends + 2) * sizeof *channel->backends);
-				channel->backends[nbackends] = load_backend(settings);
-				if (channel->backends[nbackends]) {
+				context->backends = realloc(context->backends, (nbackends + 2) * sizeof *context->backends);
+				context->backends[nbackends] = load_backend(settings);
+				if (context->backends[nbackends]) {
 					nbackends++;
-					channel->backends[nbackends] = NULL;
+					context->backends[nbackends] = NULL;
 				}
 			} else
 				free(settings);
@@ -267,73 +267,73 @@ netresolve_set_backend_string(netresolve_t channel, const char *string)
 }
 
 void
-netresolve_set_default_loopback(netresolve_t channel, bool value)
+netresolve_set_default_loopback(netresolve_t context, bool value)
 {
-	channel->request.default_loopback = value;
+	context->request.default_loopback = value;
 }
 
 void
-netresolve_set_dns_srv_lookup(netresolve_t channel, bool value)
+netresolve_set_dns_srv_lookup(netresolve_t context, bool value)
 {
-	channel->request.dns_srv_lookup = value;
+	context->request.dns_srv_lookup = value;
 }
 
 void
-netresolve_set_family(netresolve_t channel, int family)
+netresolve_set_family(netresolve_t context, int family)
 {
-	channel->request.family = family;
+	context->request.family = family;
 }
 
 void
-netresolve_set_socktype(netresolve_t channel, int socktype)
+netresolve_set_socktype(netresolve_t context, int socktype)
 {
-	channel->request.socktype = socktype;
+	context->request.socktype = socktype;
 }
 
 void
-netresolve_set_protocol(netresolve_t channel, int protocol)
+netresolve_set_protocol(netresolve_t context, int protocol)
 {
-	channel->request.protocol = protocol;
+	context->request.protocol = protocol;
 }
 
 void
-netresolve_set_user_data(netresolve_t channel,
+netresolve_set_user_data(netresolve_t context,
 		void *user_data,
 		netresolve_free_user_data_callback_t free_user_data)
 {
-	assert(!channel->callbacks.user_data);
+	assert(!context->callbacks.user_data);
 
-	channel->callbacks.user_data = user_data;
-	channel->callbacks.free_user_data = free_user_data;
+	context->callbacks.user_data = user_data;
+	context->callbacks.free_user_data = free_user_data;
 }
 
 void *
-netresolve_get_user_data(netresolve_t channel)
+netresolve_get_user_data(netresolve_t context)
 {
-	return channel->callbacks.user_data;
+	return context->callbacks.user_data;
 }
 
 void
-netresolve_set_bind_callback(netresolve_t channel,
+netresolve_set_bind_callback(netresolve_t context,
 		netresolve_socket_callback_t on_bind,
 		void *user_data)
 {
-	channel->callbacks.on_bind = on_bind;
-	channel->callbacks.on_connect = NULL;
-	channel->callbacks.user_data_sock = user_data;
+	context->callbacks.on_bind = on_bind;
+	context->callbacks.on_connect = NULL;
+	context->callbacks.user_data_sock = user_data;
 
-	netresolve_set_default_loopback(channel, false);
+	netresolve_set_default_loopback(context, false);
 }
 
 void
-netresolve_set_connect_callback(netresolve_t channel,
+netresolve_set_connect_callback(netresolve_t context,
 		netresolve_socket_callback_t on_connect,
 		void *user_data)
 {
-	channel->callbacks.on_bind = NULL;
-	channel->callbacks.on_connect = on_connect;
-	channel->callbacks.user_data_sock = user_data;
+	context->callbacks.on_bind = NULL;
+	context->callbacks.on_connect = on_connect;
+	context->callbacks.user_data_sock = user_data;
 
-	netresolve_set_default_loopback(channel, true);
+	netresolve_set_default_loopback(context, true);
 }
 
