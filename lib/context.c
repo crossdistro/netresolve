@@ -297,23 +297,6 @@ netresolve_set_protocol(netresolve_t context, int protocol)
 }
 
 void
-netresolve_set_user_data(netresolve_t context,
-		void *user_data,
-		netresolve_free_user_data_callback_t free_user_data)
-{
-	assert(!context->callbacks.user_data);
-
-	context->callbacks.user_data = user_data;
-	context->callbacks.free_user_data = free_user_data;
-}
-
-void *
-netresolve_get_user_data(netresolve_t context)
-{
-	return context->callbacks.user_data;
-}
-
-void
 netresolve_set_bind_callback(netresolve_t context,
 		netresolve_socket_callback_t on_bind,
 		void *user_data)

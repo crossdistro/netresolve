@@ -34,7 +34,6 @@ typedef struct netresolve_query *netresolve_query_t;
 
 netresolve_t netresolve_open(void);
 void netresolve_close(netresolve_t context);
-bool netresolve_dispatch(netresolve_t context, void *data, int events);
 
 /* Channel configuration */
 void netresolve_set_backend_string(netresolve_t context, const char *string);

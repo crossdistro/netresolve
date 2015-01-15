@@ -25,7 +25,7 @@
 #include <errno.h>
 #include <fcntl.h>
 
-#include <netresolve-callback.h>
+#include <netresolve-socket.h>
 #include <netresolve-utils.h>
 
 static void

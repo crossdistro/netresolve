@@ -21,23 +21,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef NETRESOLVE_CALLBACK_H
-#define NETRESOLVE_CALLBACK_H
+#ifndef NETRESOLVE_SOCKET_H
+#define NETRESOLVE_SOCKET_H
 
 #include <netresolve.h>
 
-/* Event loop integration */
-typedef void *(*netresolve_watch_fd_callback_t)(netresolve_t context, int fd, int events, void *data);
-typedef void (*netresolve_unwatch_fd_callback_t)(netresolve_t context, int fd, void *handle);
-typedef void (*netresolve_free_user_data_callback_t)(void *user_data);
-
-void netresolve_set_fd_callbacks(netresolve_t context,
-		netresolve_watch_fd_callback_t watch_fd,
-		netresolve_unwatch_fd_callback_t unwatch_fd);
-void netresolve_set_user_data(netresolve_t context, void *user_data, netresolve_free_user_data_callback_t free_user_data);
-void *netresolve_get_user_data(netresolve_t context);
-
-/* Socket API callbacks */
 typedef void (*netresolve_socket_callback_t)(netresolve_query_t query, int idx, int sock, void *user_data);
 
 void netresolve_set_bind_callback(netresolve_t context,
@@ -45,4 +33,7 @@ void netresolve_set_bind_callback(netresolve_t context,
 void netresolve_set_connect_callback(netresolve_t context,
 		netresolve_socket_callback_t on_connect, void *user_data);
 
-#endif /* NETRESOLVE_CALLBACK_H */
+int netresolve_utils_bind(const char *node, const char *service, int family, int socktype, int protocol);
+int netresolve_utils_connect(const char *node, const char *service, int family, int socktype, int protocol);
+
+#endif /* NETRESOLVE_SOCKET_H */

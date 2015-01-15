@@ -25,7 +25,8 @@
 #define NETRESOLVE_PRIVATE_H
 
 #include <netresolve.h>
-#include <netresolve-callback.h>
+#include <netresolve-nonblock.h>
+#include <netresolve-socket.h>
 #include <netresolve-backend.h>
 #include <netresolve-compat.h>
 #include <netresolve-cli.h>
@@ -247,7 +248,6 @@ bool netresolve_connect_dispatch(netresolve_query_t query, int fd, int events);
 void netresolve_connect_cleanup(netresolve_query_t query);
 
 /* Event loop for blocking mode */
-
 bool netresolve_epoll_install(netresolve_t context,
 		struct netresolve_epoll *loop,
 		netresolve_free_user_data_callback_t free_loop);

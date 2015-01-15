@@ -21,12 +21,23 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef NETRESOLVE_UTILS_H
-#define NETRESOLVE_UTILS_H
+#ifndef NETRESOLVE_NONBLOCK_H
+#define NETRESOLVE_NONBLOCK_H
 
-#include <netinet/in.h>
+#include <netresolve.h>
 
-int netresolve_utils_bind(const char *node, const char *service, int family, int socktype, int protocol);
-int netresolve_utils_connect(const char *node, const char *service, int family, int socktype, int protocol);
+typedef struct netresolve_source *netresolve_source_t;
 
-#endif /* NETRESOLVE_UTILS_H */
+typedef void *(*netresolve_watch_fd_callback_t)(netresolve_t context, int fd, int events, netresolve_source_t source);
+typedef void (*netresolve_unwatch_fd_callback_t)(netresolve_t context, int fd, void *handle);
+typedef void (*netresolve_free_user_data_callback_t)(void *user_data);
+
+void netresolve_set_fd_callbacks(netresolve_t context,
+		netresolve_watch_fd_callback_t watch_fd,
+		netresolve_unwatch_fd_callback_t unwatch_fd,
+		void *user_data,
+		netresolve_free_user_data_callback_t free_user_data);
+void *netresolve_get_user_data(netresolve_t context);
+bool netresolve_dispatch(netresolve_t context, netresolve_source_t source, int events);
+
+#endif /* NETRESOLVE_NONBLOCK_H */

@@ -27,13 +27,26 @@
 #include <unistd.h>
 
 void
-netresolve_set_fd_callbacks(netresolve_t context, netresolve_watch_fd_callback_t watch_fd, netresolve_unwatch_fd_callback_t unwatch_fd)
+netresolve_set_fd_callbacks(netresolve_t context,
+		netresolve_watch_fd_callback_t watch_fd,
+		netresolve_unwatch_fd_callback_t unwatch_fd,
+		void *user_data,
+		netresolve_free_user_data_callback_t free_user_data)
 {
 	assert(watch_fd && unwatch_fd);
 	assert(!context->callbacks.watch_fd && !context->callbacks.unwatch_fd);
 
 	context->callbacks.watch_fd = watch_fd;
 	context->callbacks.unwatch_fd = unwatch_fd;
+
+	context->callbacks.user_data = user_data;
+	context->callbacks.free_user_data = free_user_data;
+}
+
+void *
+netresolve_get_user_data(netresolve_t context)
+{
+    return context->callbacks.user_data;
 }
 
 void
@@ -127,10 +140,8 @@ netresolve_remove_timeout(netresolve_query_t query, int fd)
 }
 
 bool
-netresolve_dispatch(netresolve_t context, void *data, int events)
+netresolve_dispatch(netresolve_t context, netresolve_source_t source, int events)
 {
-	struct netresolve_source *source = data;
-
 	assert(source);
 	assert(events & (POLLIN | POLLOUT));
 	assert(!(events & ~(POLLIN | POLLOUT)));

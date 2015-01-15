@@ -30,11 +30,11 @@
 struct netresolve_select {
 	fd_set rfds, wfds;
 	int nfds;
-	void **data;
+	netresolve_source_t *sources;
 };
 
 static void *
-watch_fd(netresolve_t context, int fd, int events, void *data)
+watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
 {
 	struct netresolve_select *loop = netresolve_get_user_data(context);
 
@@ -50,10 +50,10 @@ watch_fd(netresolve_t context, int fd, int events, void *data)
 	if (fd >= loop->nfds)
 		loop->nfds = fd + 1;
 
-	loop->data = realloc(loop->data, loop->nfds * sizeof *loop->data);
-	assert(loop->data);
+	loop->sources = realloc(loop->sources, loop->nfds * sizeof *loop->sources);
+	assert(loop->sources);
 
-	loop->data[fd] = data;
+	loop->sources[fd] = source;
 
 	return NULL;
 }
@@ -74,7 +74,7 @@ unwatch_fd(netresolve_t context, int fd, void *handle)
 	while (loop->nfds > 0 && !FD_ISSET(loop->nfds - 1, &loop->rfds) && !FD_ISSET(loop->nfds - 1, &loop->wfds))
 		loop->nfds--;
 
-	loop->data = realloc(loop->data, loop->nfds * sizeof *loop->data);
+	loop->sources = realloc(loop->sources, loop->nfds * sizeof *loop->sources);
 }
 
 static void
@@ -98,8 +98,7 @@ netresolve_select_open()
 	if (!(context = netresolve_open()))
 		goto fail_context;
 
-	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd);
-	netresolve_set_user_data(context, loop, free_user_data);
+	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, loop, free_user_data);
 
 	return context;
 fail_context:
@@ -131,7 +130,7 @@ netresolve_select_dispatch_read(netresolve_t context, int fd)
 	assert(fd < loop->nfds);
 	assert(FD_ISSET(fd, &loop->rfds));
 
-	netresolve_dispatch(context, loop->data[fd], POLLIN);
+	netresolve_dispatch(context, loop->sources[fd], POLLIN);
 }
 
 void
@@ -143,7 +142,7 @@ netresolve_select_dispatch_write(netresolve_t context, int fd)
 	assert(fd < loop->nfds);
 	assert(FD_ISSET(fd, &loop->wfds));
 
-	netresolve_dispatch(context, loop->data[fd], POLLOUT);
+	netresolve_dispatch(context, loop->sources[fd], POLLOUT);
 }
 
 int

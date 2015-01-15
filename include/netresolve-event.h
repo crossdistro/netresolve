@@ -24,7 +24,7 @@
 #ifndef NETRESOLVE_EVENT_H
 #define NETRESOLVE_EVENT_H
 
-#include <netresolve-callback.h>
+#include <netresolve-nonblock.h>
 #include <event2/event.h>
 #include <poll.h>
 #include <stdlib.h>
@@ -32,10 +32,10 @@
 
 /* FIXME: This header file should be turned in a library to avoid symbol name clashes. */
 
-struct netresolve_source {
+struct netresolve_event_source {
 	netresolve_t context;
 	struct event *event;
-	void *data;
+	netresolve_source_t source;
 };
 
 static int
@@ -67,38 +67,38 @@ events_to_condition(int events)
 static void
 handler(int fd, short condition, void *data)
 {
-	struct netresolve_source *source = data;
+	struct netresolve_event_source *event_source = data;
 
-	if (!netresolve_dispatch(source->context, source->data, condition_to_events(condition)))
+	if (!netresolve_dispatch(event_source->context, event_source->source, condition_to_events(condition)))
 		abort();
 }
 
 static void*
-watch_fd(netresolve_t context, int fd, int events, void *data)
+watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
 {
 	struct event_base *base = netresolve_get_user_data(context);
-	struct netresolve_source *source = calloc(1, sizeof *source);
+	struct netresolve_event_source *event_source = calloc(1, sizeof *event_source);
 
-	assert(source);
+	assert(event_source);
 
-	source->context = context;
-	source->event = event_new(base, fd, events_to_condition(events), handler, source);
-	source->data = data;
+	event_source->context = context;
+	event_source->event = event_new(base, fd, events_to_condition(events), handler, event_source);
+	event_source->source = source;
 
-	assert(source->event);
+	assert(event_source->event);
 
-	event_add(source->event, NULL);
+	event_add(event_source->event, NULL);
 
-	return source;
+	return event_source;
 }
 
 static void
 unwatch_fd(netresolve_t context, int fd, void *handle)
 {
-	struct netresolve_source *source = handle;
+	struct netresolve_event_source *event_source = handle;
 
-	event_free(source->event);
-	free(source);
+	event_free(event_source->event);
+	free(event_source);
 }
 
 __attribute__((unused))
@@ -107,10 +107,8 @@ netresolve_event_open(struct event_base *base)
 {
 	netresolve_t context = netresolve_open();
 
-	if (context) {
-		netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd);
-		netresolve_set_user_data(context, base, NULL);
-	}
+	if (context)
+		netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, base, NULL);
 
 	return context;
 }

@@ -26,7 +26,11 @@ SED_PROCESS = \
 
 include_HEADERS = \
 	include/netresolve.h \
-	include/netresolve-utils.h
+	include/netresolve-nonblock.h \
+	include/netresolve-event.h \
+	include/netresolve-glib.h \
+	include/netresolve-epoll.h \
+	include/netresolve-select.h
 
 lib_LTLIBRARIES = \
 	libnetresolve.la \

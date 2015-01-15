@@ -1,10 +1,10 @@
 /* Copyright (c) 2013-2014 Pavel Šimerda, Red Hat, Inc. (psimerda at redhat.com) and others
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
+ * Redistribution and use in glib_source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
  *
- * 1. Redistributions of source code must retain the above copyright notice, this
+ * 1. Redistributions of glib_source code must retain the above copyright notice, this
  *    list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright notice,
  *    this list of conditions and the following disclaimer in the documentation
@@ -24,7 +24,7 @@
 #ifndef NETRESOLVE_GLIB_H
 #define NETRESOLVE_GLIB_H
 
-#include <netresolve-callback.h>
+#include <netresolve-nonblock.h>
 #include <glib.h>
 #include <poll.h>
 #include <stdlib.h>
@@ -32,10 +32,10 @@
 
 /* FIXME: This header file should be turned in a library to avoid symbol name clashes. */
 
-struct netresolve_source {
+struct netresolve_glib_source {
 	netresolve_t context;
 	GIOChannel *stream;
-	void *data;
+	netresolve_source_t source;
 };
 
 static int
@@ -67,37 +67,37 @@ events_to_condition(int events)
 static gboolean
 handler(GIOChannel *stream, GIOCondition condition, gpointer data)
 {
-	struct netresolve_source *source = data;
+	struct netresolve_glib_source *glib_source = data;
 
-	if (!netresolve_dispatch(source->context, source->data, condition_to_events(condition)))
+	if (!netresolve_dispatch(glib_source->context, glib_source->source, condition_to_events(condition)))
 		abort();
 
 	return TRUE;
 }
 
 static void*
-watch_fd(netresolve_t context, int fd, int events, void *data)
+watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
 {
-	struct netresolve_source *source = calloc(1, sizeof *source);
+	struct netresolve_glib_source *glib_source = calloc(1, sizeof *glib_source);
 
-	assert(source);
+	assert(glib_source);
 
-	source->context = context;
-	source->stream = g_io_channel_unix_new(fd);
-	source->data = data;
+	glib_source->context = context;
+	glib_source->stream = g_io_channel_unix_new(fd);
+	glib_source->source = source;
 
-	g_io_add_watch(source->stream, events_to_condition(events), handler, source);
+	g_io_add_watch(glib_source->stream, events_to_condition(events), handler, glib_source);
 
-	return source;
+	return glib_source;
 }
 
 static void
 unwatch_fd(netresolve_t context, int fd, void *handle)
 {
-	struct netresolve_source *source = handle;
+	struct netresolve_glib_source *glib_source = handle;
 
-	g_io_channel_unref(source->stream);
-	free(source);
+	g_io_channel_unref(glib_source->stream);
+	free(glib_source);
 }
 
 __attribute__((unused))
@@ -108,7 +108,7 @@ netresolve_glib_open(void)
 
 	assert(context);
 
-	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd);
+	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, NULL, NULL);
 
 	return context;
 }

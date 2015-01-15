@@ -22,15 +22,16 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <netresolve-epoll.h>
+#include <netresolve-nonblock.h>
 #include <netresolve-private.h>
 #include <unistd.h>
 #include <assert.h>
 
 static void *
-watch_fd(netresolve_t context, int fd, int events, void *data)
+watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
 {
 	struct netresolve_epoll *loop = netresolve_get_user_data(context);
-	struct epoll_event event = { .events = events, .data = { .ptr = data } };
+	struct epoll_event event = { .events = events, .data = { .ptr = source } };
 
 	if (epoll_ctl(loop->fd, EPOLL_CTL_ADD, fd, &event) == -1) {
 		error("epoll_ctl: %s", strerror(errno));
@@ -86,8 +87,7 @@ netresolve_epoll_install(netresolve_t context,
 		return false;
 	}
 
-	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd);
-	netresolve_set_user_data(context, loop, free_loop);
+	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, loop, free_loop);
 
 	return true;
 }
