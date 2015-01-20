@@ -27,7 +27,7 @@
 #include <netresolve.h>
 #include <sys/epoll.h>
 
-netresolve_t netresolve_epoll_open(void);
+netresolve_t netresolve_epoll_new(void);
 int netresolve_epoll_fd(netresolve_t context);
 void netresolve_epoll_dispatch(netresolve_t context);
 

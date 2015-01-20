@@ -28,12 +28,13 @@
 
 typedef void (*netresolve_socket_callback_t)(netresolve_query_t query, int idx, int sock, void *user_data);
 
-void netresolve_set_bind_callback(netresolve_t context,
-		netresolve_socket_callback_t on_bind, void *user_data);
-void netresolve_set_connect_callback(netresolve_t context,
-		netresolve_socket_callback_t on_connect, void *user_data);
-
-int netresolve_utils_bind(const char *node, const char *service, int family, int socktype, int protocol);
-int netresolve_utils_connect(const char *node, const char *service, int family, int socktype, int protocol);
+netresolve_query_t netresolve_connect(netresolve_t context,
+		const char *nodename, const char *servname,
+		int family, int socktype, int protocol,
+		netresolve_socket_callback_t callback, void *user_data);
+netresolve_query_t netresolve_bind(netresolve_t context,
+		const char *nodename, const char *servname,
+		int family, int socktype, int protocol,
+		netresolve_socket_callback_t callback, void *user_data);
 
 #endif /* NETRESOLVE_SOCKET_H */

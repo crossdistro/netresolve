@@ -103,9 +103,9 @@ unwatch_fd(netresolve_t context, int fd, void *handle)
 
 __attribute__((unused))
 static netresolve_t
-netresolve_event_open(struct event_base *base)
+netresolve_event_new(struct event_base *base)
 {
-	netresolve_t context = netresolve_open();
+	netresolve_t context = netresolve_context_new();
 
 	if (context)
 		netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, base, NULL);

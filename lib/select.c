@@ -24,7 +24,6 @@
 #include <netresolve-select.h>
 #include <netresolve-private.h>
 #include <sys/poll.h>
-#include <stdlib.h>
 #include <assert.h>
 
 struct netresolve_select {
@@ -88,14 +87,14 @@ free_user_data(void *user_data)
 }
 
 netresolve_t
-netresolve_select_open()
+netresolve_select_new()
 {
 	netresolve_t context;
 	struct netresolve_select *loop;
 
 	if (!(loop = calloc(1, sizeof *loop)))
 		goto fail;
-	if (!(context = netresolve_open()))
+	if (!(context = netresolve_context_new()))
 		goto fail_context;
 
 	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, loop, free_user_data);

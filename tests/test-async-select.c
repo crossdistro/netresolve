@@ -25,9 +25,9 @@
 #include "common.h"
 
 netresolve_t
-context_open(struct priv_common *priv)
+context_new(struct priv_common *priv)
 {
-	return netresolve_select_open();
+	return netresolve_select_new();
 }
 
 void

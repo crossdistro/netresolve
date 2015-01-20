@@ -38,13 +38,13 @@ _nss_netresolve_getaddrinfo(const char *nodename, const char *servname,
 	netresolve_query_t query;
 	int status = EAI_SYSTEM;
 
-	if (!(context = netresolve_open()))
+	if (!(context = netresolve_context_new()))
 		return status;
 
-	if ((query = netresolve_query_getaddrinfo(context, nodename, servname, hints)))
+	if ((query = netresolve_query_getaddrinfo(context, nodename, servname, hints, NULL, NULL)))
 		status = netresolve_query_getaddrinfo_done(query, result, ttl);
 
-	netresolve_close(context);
+	netresolve_context_free(context);
 	return status;
 }
 

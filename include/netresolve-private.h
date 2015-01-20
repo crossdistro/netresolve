@@ -29,7 +29,10 @@
 #include <netresolve-socket.h>
 #include <netresolve-backend.h>
 #include <netresolve-compat.h>
-#include <netresolve-cli.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <nss.h>
 #include <netdb.h>
 #include <net/if.h>
@@ -43,9 +46,10 @@
 		##__VA_ARGS__)
 
 #define debug_query(query, format, ...) debug( \
-		"[query %p %s] " format, \
+		"[query %p %s %s] " format, \
 		query, \
 		query->backend  && *query->backend ? (*query->backend)->settings[0] : "-", \
+		netresolve_query_state_to_string(query->state), \
 		##__VA_ARGS__)
 
 enum netresolve_state {
@@ -54,7 +58,6 @@ enum netresolve_state {
 	NETRESOLVE_STATE_WAITING,
 	NETRESOLVE_STATE_WAITING_MORE,
 	NETRESOLVE_STATE_RESOLVED,
-	NETRESOLVE_STATE_CONNECTING,
 	NETRESOLVE_STATE_DONE,
 	NETRESOLVE_STATE_ERROR,
 	NETRESOLVE_STATE_FAILED
@@ -126,7 +129,6 @@ struct netresolve_query {
 	int delayed_fd;
 	int timeout_fd;
 	int partial_timeout_fd;
-	int first_connect_timeout;
 	struct netresolve_backend **backend;
 	struct netresolve_request {
 		enum netresolve_request_type type;
@@ -135,13 +137,13 @@ struct netresolve_query {
 		 * resolution and additional flags to further tweak nodename name
 		 * resolution.
 		 */
-		const char *nodename;
+		char *nodename;
 		int family;
 		/* Perform L4 port resolution using 'servname' if not NULL. Use
 		 * 'socktype' and 'protocol' to limit the possible options and
 		 * additional flags to further tweak servname name resolution.
 		 */
-		const char *servname;
+		char *servname;
 		int socktype;
 		int protocol;
 		int port;
@@ -156,6 +158,7 @@ struct netresolve_query {
 			struct in_addr address4;
 			struct in6_addr address6;
 		};
+		int ifindex;
 		/* DNS data query */
 		char *dns_name;
 		int dns_class;
@@ -198,9 +201,6 @@ struct netresolve_context {
 		netresolve_unwatch_fd_callback_t unwatch_fd;
 		void *user_data;
 		netresolve_free_user_data_callback_t free_user_data;
-		netresolve_socket_callback_t on_bind;
-		netresolve_socket_callback_t on_connect;
-		void *user_data_sock;
 	} callbacks;
 	struct netresolve_config {
 		int force_family;
@@ -208,10 +208,15 @@ struct netresolve_context {
 };
 
 /* Query */
+netresolve_query_t netresolve_query(netresolve_t context, netresolve_query_callback callback, void *user_data,
+		enum netresolve_option type, ...);
+const char *netresolve_query_state_to_string(enum netresolve_state state);
 void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
-netresolve_query_t netresolve_query_new(netresolve_t context, enum netresolve_request_type type);
-void netresolve_query_setup(netresolve_query_t query);
 bool netresolve_query_dispatch(netresolve_query_t query, int fd, int events);
+
+/* Request */
+bool netresolve_request_set_options_from_va(struct netresolve_request *request, va_list ap);
+bool netresolve_request_get_options_from_va(struct netresolve_request *request, va_list ap);
 
 /* Event handling */
 void netresolve_watch_fd(netresolve_query_t query, int fd, int events);
@@ -235,17 +240,12 @@ int netresolve_socktype_from_string(const char *str);
 int netresolve_protocol_from_string(const char *str);
 
 /* String output */
-const char * netresolve_get_request_string(netresolve_query_t query);
-const char * netresolve_get_path_string(netresolve_query_t query, int i);
-const char * netresolve_get_response_string(netresolve_query_t query);
+const char *netresolve_get_request_string(netresolve_query_t query);
+const char *netresolve_get_path_string(netresolve_query_t query, int i);
+const char *netresolve_get_response_string(netresolve_query_t query);
 
 /* Socket */
-void netresolve_query_bind(netresolve_query_t query, size_t idx);
-void netresolve_query_connect(netresolve_query_t query, size_t idx);
-
-void netresolve_connect_start(netresolve_query_t query);
 bool netresolve_connect_dispatch(netresolve_query_t query, int fd, int events);
-void netresolve_connect_cleanup(netresolve_query_t query);
 
 /* Event loop for blocking mode */
 bool netresolve_epoll_install(netresolve_t context,

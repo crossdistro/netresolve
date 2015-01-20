@@ -72,7 +72,7 @@ netresolve_watch_fd(netresolve_query_t query, int fd, int events)
 	query->nfds++;
 	query->context->nfds++;
 
-	debug_query(query, "added file descriptor: fd=%d events=%d (total %d/%d)", fd, events, query->nfds, query->context->nfds);
+	debug_query(query, "added file descriptor: fd=%d events=%d source=%p (total %d/%d)", fd, events, source, query->nfds, query->context->nfds);
 }
 
 void
@@ -91,16 +91,18 @@ netresolve_unwatch_fd(netresolve_query_t query, int fd)
 	assert(query->context->nfds > 0);
 	assert(source != sources);
 
-	query->context->callbacks.unwatch_fd(query->context, fd, source->handle);
-
 	source->previous->next = source->next;
 	source->next->previous = source->previous;
-	free(source);
 
 	query->nfds--;
 	query->context->nfds--;
 
-	debug_query(query, "removed file descriptor: fd=%d (total %d/%d)", fd, query->nfds, query->context->nfds);
+	query->context->callbacks.unwatch_fd(query->context, fd, source->handle);
+
+	debug_query(query, "removed file descriptor: fd=%d source=%p (total %d/%d)", fd, source, query->nfds, query->context->nfds);
+
+	memset(source, 0, sizeof *source);
+	free(source);
 }
 
 int
@@ -143,13 +145,14 @@ bool
 netresolve_dispatch(netresolve_t context, netresolve_source_t source, int events)
 {
 	assert(source);
+	assert(source->query);
 
 	if (!(events & (POLLIN | POLLOUT)) || (events & ~(POLLIN | POLLOUT))) {
 		error("Bad poll events %d for source %p.", events, source);
 		return false;
 	}
 
-	debug_query(source->query, "dispatching: fd=%d events=%d", source->fd, events);
+	debug_query(source->query, "dispatching: fd=%d events=%d source=%p", source->fd, events, source);
 
 	return netresolve_query_dispatch(source->query, source->fd, events);
 }

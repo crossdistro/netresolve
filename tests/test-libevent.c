@@ -47,32 +47,30 @@ main(int argc, char **argv)
 	}
 
 	/* Create a context. */
-	context = netresolve_event_open(base);
+	context = netresolve_event_new(base);
 	if (!context) {
-		perror("netresolve_open");
+		perror("netresolve_context_new");
 		abort();
 	}
 
 	/* Resolver configuration. */
-	netresolve_set_family(context, family);
-	netresolve_set_socktype(context, socktype);
-	netresolve_set_protocol(context, protocol);
+	netresolve_context_set_options(context,
+			NETRESOLVE_OPTION_FAMILY, family,
+			NETRESOLVE_OPTION_SOCKTYPE, socktype,
+			NETRESOLVE_OPTION_PROTOCOL, protocol,
+			NETRESOLVE_OPTION_DONE);
 
 	/* Start name resolution. */
-	query1 = netresolve_query(context, node1, service);
-	query2 = netresolve_query(context, node2, service);
+	query1 = netresolve_query_forward(context, node1, service, callback1, &priv);
+	query2 = netresolve_query_forward(context, node2, service, callback2, &priv);
 	assert(query1 && query2);
-
-	/* Set callbacks. */
-	netresolve_query_set_callback(query1, callback1, &priv);
-	netresolve_query_set_callback(query2, callback2, &priv);
 
 	/* Run the main loop. */
 	event_base_dispatch(base);
 	assert(priv.finished == 2);
 
 	/* Clean up. */
-	netresolve_close(context);
+	netresolve_context_free(context);
 	event_base_free(base);
 
 	exit(EXIT_SUCCESS);

@@ -21,12 +21,43 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <netresolve-utils.h>
+#include <netresolve-socket.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <assert.h>
 
+
+static void
+on_socket(netresolve_query_t query, int idx, int sock, void *user_data)
+{
+	int *psock = user_data;
+
+	if (*psock == -1)
+		*psock = sock;
+	else
+		close(sock);
+}
+
+int
+do_bind(const char *node, const char *service, int family, int socktype, int protocol)
+{
+	int sock = -1;
+
+	netresolve_bind(NULL, node, service, family, socktype, protocol, on_socket, &sock);
+
+	return sock;
+}
+
+int
+do_connect(const char *node, const char *service, int family, int socktype, int protocol)
+{
+	int sock = -1;
+
+	netresolve_connect(NULL, node, service, family, socktype, protocol, on_socket, &sock);
+
+	return sock;
+}
 int
 main(int argc, char **argv)
 {
@@ -40,12 +71,12 @@ main(int argc, char **argv)
 	char outbuf[6] = "asdf\n";
 	char inbuf[6] = {0};
 
-	sock_server = netresolve_utils_bind(node, service, family, socktype, protocol);
+	sock_server = do_bind(node, service, family, socktype, protocol);
 	assert(sock_server > 0);
 	status = listen(sock_server, 10);
 	assert(status == 0);
 
-	sock_client = netresolve_utils_connect(node, service, family, socktype, protocol);
+	sock_client = do_connect(node, service, family, socktype, protocol);
 	assert(sock_client > 0);
 
 	sock_accept = accept(sock_server, NULL, 0);

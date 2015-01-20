@@ -34,31 +34,33 @@ main(int argc, char **argv)
 	int protocol = IPPROTO_TCP;
 
 	/* Create a context. */
-	context = netresolve_open();
+	context = netresolve_context_new();
 	if (!context) {
-		perror("netresolve_open");
+		perror("netresolve_context_new");
 		abort();
 	}
 
 	/* Resolver configuration. */
-	netresolve_set_family(context, family);
-	netresolve_set_socktype(context, socktype);
-	netresolve_set_protocol(context, protocol);
+	netresolve_context_set_options(context,
+			NETRESOLVE_OPTION_FAMILY, family,
+			NETRESOLVE_OPTION_SOCKTYPE, socktype,
+			NETRESOLVE_OPTION_PROTOCOL, protocol,
+			NULL);
 
 	/* First query */
-	query = netresolve_query(context, "1:2:3:4:5:6:7:8%999999", service);
+	query = netresolve_query_forward(context, "1:2:3:4:5:6:7:8%999999", service, NULL, NULL);
 	check_address(query, AF_INET6, "1:2:3:4:5:6:7:8", 999999);
-	netresolve_query_done(query);
+	netresolve_query_free(query);
 
 	/* Second query */
-	query = netresolve_query(context, "1.2.3.4%999999", service);
+	query = netresolve_query_forward(context, "1.2.3.4%999999", service, NULL, NULL);
 	check_address(query, AF_INET, "1.2.3.4", 999999);
-	netresolve_query_done(query);
+	netresolve_query_free(query);
 
 	/* Check results */
 
 	/* Clean up. */
-	netresolve_close(context);
+	netresolve_context_free(context);
 
 	exit(EXIT_SUCCESS);
 }

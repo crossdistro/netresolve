@@ -38,5 +38,5 @@ void check_address(netresolve_query_t query, int exp_family, const char *exp_add
 void callback1(netresolve_query_t query, void *user_data);
 void callback2(netresolve_query_t query, void *user_data);
 
-netresolve_t context_open();
+netresolve_t context_new();
 void context_wait();

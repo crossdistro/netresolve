@@ -72,6 +72,10 @@ DNS style query:
 
     netresolve --class ch --type txt --node version.bind
 
+Connection support similar to netcat or socat:
+
+    netresolve --connect --node localhost --service 22
+
 ## Experimental DNSSEC support via command line
 
 Query information using a DNS backend and trust the AD flag:
@@ -82,22 +86,22 @@ Query information using a validating DNS backend:
 
     netresolve --backends ubdns:validate --node www.dnssec.cz
 
-## Library API – blocking mode
+## Library API – simple blocking queries
 
 Program or library using netresolve has to allocate a netresolve context (or context) which is then used to perform all the queries. You may want to create multiple contexts to have different configurations prepared for use. By default the netresolve context is in blocking mode. Consult the next section about event loop integration on how to create a netresolve context in nonblocking mode.
 
     #include <netresolve.h>
 
-    netresolve_t context = netresolve_open();
+    netresolve_t context = netresolve_context_new();
 
 Then you tweak the context configuration to your liking.
 
     netresolve_set_protocol(context, IPPROTO_TCP);
     netresolve_set_dns_srv_lookup(context, true);
 
-When you're happy with the configuration, you can run your queries using `netresolve_query()`, `netresolve_query_reverse()` or `netresolve_query_dns()`. Any of the functions waits until the query is successfully finished, failed or timed out.
+When you're happy with the configuration, you can run your queries using `netresolve_query_forward()`, `netresolve_query_reverse()` or `netresolve_query_dns()`. Any of the functions waits until the query is successfully finished, failed or timed out.
 
-    netresolve_query_t query = netresolve_query(context, "www.sourceware.org", "http");
+    netresolve_query_t query = netresolve_query_forward(context, "www.sourceware.org", "http", NULL, NULL);
 
 TODO: Error reporting.
 
@@ -125,18 +129,18 @@ You can pick up your query immediately.
 
 You can free the query object when you no longer need it.
 
-    netresolve_query_done(query);
+    netresolve_query_free(query);
 
 When you're not going to use the context to perform any queries nor use the existing query objects to examine the results, you can free the context
 together with all queries that haven't been freed as written above.
 
-    netresolve_close(context);
+    netresolve_context_free(context);
 
 An example of using netresolve in blocking mode can be found in `test/test-sync.c`.
 
-## Nonblocking mode
+## Library API – callback based nonblocking queries
 
-You can trigger nonblocking mode by using one of the alternative `netresolve_*_open()` functions. They are provided to allow you to create a netresolve context integrated with the event loop implementation of your choice.
+The nonblocking mode is designed to be independent of a specific event loop implementation. You can use one of the existing event loop connectors or write your own easily. Connectors for libevent and glib are distributed as header files to avoid additional dependencies. Connectors using epoll-style and select-style file descriptor sets are built into the library.
 
 ### Creating a libevent based context
 
@@ -144,11 +148,11 @@ Provided that you have a `struct event_base *base` pointer to the event base, cr
 
     #include <netresolve-event.h>
 
-    netresolve_t context = netresolve_event_open(base);
+    netresolve_t context = netresolve_event_new(base);
 
 Free it as usual.
 
-    netresolve_close (context);
+    netresolve_context_free(context);
 
 ### Creating a glib based context
 
@@ -156,18 +160,17 @@ With glib you can easily create a channel attached to the default context.
 
     #include <netresolve-glib.h>
 
-    netresolve_t context = netresolve_glib_open();
+    netresolve_t context = netresolve_glib_new();
 
 Free it as usual.
 
-    netresolve_close (context);
+    netresolve_context_free(context);
 
 ### Issue queries and pick up the data
 
-Issue a query and attach a callback and user data to it before giving control back to the event loop.
+Issue a query with a callback and user data.
 
-    netresolve_query_t query = netresolve_query(context, "www.sourceware.org", "http");
-    netresolve_query_set_callback(query, callback, user_data);
+    netresolve_query_t query = netresolve_query_forward(context, "www.sourceware.org", "http", callbac, user_data);
 
 Pickup the data in your callback and free the query if you no longer need it.
 
@@ -194,12 +197,10 @@ Pickup the data in your callback and free the query if you no longer need it.
             /* do something with the data */
         }
 
-        netresolve_query_done(query);
+        netresolve_query_free(query);
     }
 
-## Advanced nonblocking scenarios
-
-Without any external library, you can create a context based on *epoll* or *select* operating system APIs or a even a custom one based on file descriptor callbacks.
+Note: You can use callbacks with blocking mode as well, although it's not as useful as with nonblocking mode. This feature is especially useful in code that is written to work with both blocking and nonblocking mode.
 
 ### Context based on epoll kernel feature
 
@@ -207,7 +208,7 @@ Create the context.
 
     #include <netresolve-epoll.h>
 
-    netresolve_t context = netresolve_epoll_open();
+    netresolve_t context = netresolve_epoll_new();
 
 Retrieve the file descriptor.
 
@@ -219,7 +220,7 @@ When the epoll file descriptor is ready *ready for reading*, dispatch.
 
 Free it as usual.
 
-    netresolve_close (context);
+    netresolve_context_free(context);
 
 ### Context based on file descriptor sets
 
@@ -227,7 +228,7 @@ Create the context.
 
     #include <netresolve-select.h>
 
-    netresolve_t context = netresolve_select_open()
+    netresolve_t context = netresolve_select_new()
 
 Retrieve the file descriptors.
 
@@ -248,11 +249,11 @@ When a file descriptor in wfds is ready for writing, dispatch.
 
 Free it as usual.
 
-    netresolve_close (context);
+    netresolve_context_free(context);
 
 ### Custom nonblocking context
 
-If none of the included integration functions match your needs, you can create the context using `netresolve_open()` and then attach your own set of callbacks using `netresolve_set_fd_callbacks()`. You need to provide two callbacks. The `watch_fd()` function adds an event source consisting of a file descriptor, and a set of events (subset of `POLLIN | POLLOUT`) and an opaque pointer `data` and the `unwatch_fd()` function that removes the source. When a file descriptor event occurs, the event loop implementation calls `netresolve_dispatch()` with the respective `source` and the subset of events that occured. The integration code can optionally provide a `user_data` pointer that can ten be retrieved with `netresolve_get_user_data()` and a `free_user_data()` callback that will be called during the context destruction and a pointer for each event source returned by `watch_fd()` that will then be passed to `unwatch_fd()` as the `handle` argument. The `user_data` pointer typically points to an object representing the event loop and the `handle` pointer points to an object representing the event source.
+If none of the included integration functions match your needs, you can create the context using `netresolve_context_new()` and then attach your own set of callbacks using `netresolve_set_fd_callbacks()`. You need to provide two callbacks. The `watch_fd()` function adds an event source consisting of a file descriptor, and a set of events (subset of `POLLIN | POLLOUT`) and an opaque pointer `data` and the `unwatch_fd()` function that removes the source. When a file descriptor event occurs, the event loop implementation calls `netresolve_dispatch()` with the respective `source` and the subset of events that occured. The integration code can optionally provide a `user_data` pointer that can ten be retrieved with `netresolve_get_user_data()` and a `free_user_data()` callback that will be called during the context destruction and a pointer for each event source returned by `watch_fd()` that will then be passed to `unwatch_fd()` as the `handle` argument. The `user_data` pointer typically points to an object representing the event loop and the `handle` pointer points to an object representing the event source.
 
     void *watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source);
     void unwatch_fd(netresolve_t context, int fd, void *handle);
@@ -279,7 +280,7 @@ You can use a compatibility API most resembling the POSIX one but still allowing
 A special query constructor lets you use input arguments as with `getaddrinfo()`.
 
     struct addrinfo hints = { .ai_family = AF_UNSPEC, .ai_socktype = 0, .ai_protocol = IPPROTO_TCP, .ai_flags = 0 };
-    netresolve_query_t query = netresolve_query_getaddrinfo(context, "www.sourceware.org", "http", &hints);
+    netresolve_query_t query = netresolve_query_getaddrinfo(context, "www.sourceware.org", "http", &hints, callback, user_data);
 
 A special query result getter lets you use output arguments as with `getaddrinfo()` and destroys the query object for your convenience.
 

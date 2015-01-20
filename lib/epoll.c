@@ -74,7 +74,7 @@ free_user_data(void *user_data)
  *
  * This function is used internally by netresolve to install the default epoll
  * based main loop to support the blocking mode. In applications, use
- * `netresolve_epoll_open()` instead.
+ * `netresolve_epoll_new()` instead.
  */
 bool
 netresolve_epoll_install(netresolve_t context,
@@ -89,23 +89,25 @@ netresolve_epoll_install(netresolve_t context,
 
 	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, loop, free_loop);
 
+	debug("created epoll file descriptor: %d", loop->fd);
+
 	return true;
 }
 
-/* netresolve_epoll_open:
+/* netresolve_epoll_new:
  *
- * Use this constructor instead of `netresolve_open()` to use the library in
+ * Use this constructor instead of `netresolve_context_new()` to use the library in
  * a file descriptor based nonblocking mode. Always use
  * `netresolve_epoll_close()` to dispose of the context.
  */
 netresolve_t
-netresolve_epoll_open(void)
+netresolve_epoll_new(void)
 {
-	netresolve_t context = netresolve_open();
+	netresolve_t context = netresolve_context_new();
 
 	if (context) {
 		if (netresolve_epoll_fd(context) == -1) {
-			netresolve_close(context);
+			netresolve_context_free(context);
 			context = NULL;
 		}
 	}
@@ -119,10 +121,10 @@ netresolve_epoll_open(void)
  * descriptors to the epoll instance. Just use the file descriptor in your
  * event loop and poll it for reading.
  *
- * As a bonus, You can call this function between `netresolve_open()` and the
+ * As a bonus, You can call this function between `netresolve_context_new()` and the
  * first query to convert a blocking context to an epoll based non-blocking
- * one. A sequence of `netresolve_open()` and `netresolve_epoll_fd()` is thus
- * equivalent to `netresolve_epoll_open()` with an optional
+ * one. A sequence of `netresolve_context_new()` and `netresolve_epoll_fd()` is thus
+ * equivalent to `netresolve_epoll_new()` with an optional
  * `netresolve_epoll_fd()` to retrieve the file descriptor.
  */
 int
@@ -143,27 +145,35 @@ netresolve_epoll_fd(netresolve_t context)
 	return loop->fd;
 }
 
-static void
+static int
 dispatch_events(netresolve_t context, int timeout)
 {
 	struct netresolve_epoll *loop = netresolve_get_user_data(context);
-	static const int maxevents = 10;
+	/* FIXME: Original intention was to accept multiple events at once
+	 * but netresolve cannot currently handle the situation when an
+	 * event source is removed at the time an event with that event
+	 * source is already cached.
+	 */
+	static const int maxevents = 1;
 	struct epoll_event events[maxevents];
 	int nevents;
 	int i;
 
 	nevents = epoll_wait(loop->fd, events, maxevents, timeout);
+
 	switch (nevents) {
 	case -1:
-		perror("epoll_wait");
+		error("epoll_wait: %s", strerror(errno));
 		abort();
 	case 0:
-		return;
+		break;
 	default:
 		for (i = 0; i < nevents; i++)
 			if (!netresolve_dispatch(context, events[i].data.ptr, events[i].events))
 				abort();
 	}
+
+	return nevents;
 }
 
 /* netresolve_epoll_dispatch:
@@ -173,7 +183,13 @@ dispatch_events(netresolve_t context, int timeout)
 void
 netresolve_epoll_dispatch(netresolve_t context)
 {
-	dispatch_events(context, 0);
+	/* FIXME: We currently need to run the dispatch events repeatedly as long
+	 * as there are still pending events in order to keep asyncns_wait working
+	 * correctly with block=0 as it relies on all pending events being
+	 * processed.
+	 */
+	while (dispatch_events(context, 0) > 0)
+		;
 }
 
 /* netresolve_epoll_wait:

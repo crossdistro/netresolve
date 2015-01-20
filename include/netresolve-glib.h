@@ -102,9 +102,9 @@ unwatch_fd(netresolve_t context, int fd, void *handle)
 
 __attribute__((unused))
 static netresolve_t 
-netresolve_glib_open(void)
+netresolve_glib_new(void)
 {
-	netresolve_t context = netresolve_open();
+	netresolve_t context = netresolve_context_new();
 
 	assert(context);
 

@@ -1,6 +1,12 @@
 # TODO list
 
-## Core library
+## Core library issues
+
+ * query: don't leak sources on destruction
+ * socket: don't leak connect data on query/context destruction
+ * socket: decouple event processing from query
+
+## Features
 
  * Improve path ordering
     - use rules from http://tools.ietf.org/html/rfc6724
@@ -11,7 +17,7 @@
  * Allow backend list setting at any time or at least check whether they can be changed
  * Read a configuration file in `/etc/netresolve` in addition to environment variables
  * Consider using -fvisibility=hidden
- * Consider using a separete libnetresolve-backend.so
+ * Consider using a separate libnetresolve-backend.so
 
 ## Frontends, integration and testing
 
@@ -19,9 +25,7 @@
     - `getaddrinfo_a()`, `gai_suspend()`, `gai_error()` and `gai_cancel()` (glibc specific)
  * Implement more frontends
     - the getdns API frontend
- * Integrate with event loops/connectors
-    - GLib main loop
-    - libevent
+ * Integrate with more event loops/connectors
     - libverto
     - Python PEP 3156
     - libsystemd
@@ -39,17 +43,11 @@
 
 ## Backends
 
- * Improve `getaddrinfo` backend
-    - rename to `posix` or `libc`
-    - support reverse queries
-    - support DNS queries
  * Improve `nss` backend
-    - support reverse queries
     - consider supporting hostent listing
  * Improve the DNS backends
     - consider domain search support
-    - validation information
-    - `ai_addrconfig`-like functionality
+    - consider `ai_addrconfig`-like functionality
  * Fix `exec` backend
     - it hasn't been tested recently
     - fix the code, extend the format

@@ -28,31 +28,77 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 
-/* Channel manipulation */
 typedef struct netresolve_context *netresolve_t;
 typedef struct netresolve_query *netresolve_query_t;
 
-netresolve_t netresolve_open(void);
-void netresolve_close(netresolve_t context);
+/* Configuration options */
+enum netresolve_option {
+	NETRESOLVE_OPTION_DONE,
+/* Flags:
+ *
+ * NETRESOLVE_OPTION_DEFAULT_LOOPBACK:
+ *  - When set, NULL resolves to a loopback address, otherwise it resolves
+ *    to an empty address. The opposite of getaddrinfo's AI_PASSIVE.
+ * NETRESOLVE_OPTION_DNS_SRV_LOOKUP:
+ *  - When set, forward lookups use DNS SRV records when applicable.
+ */
+	NETRESOLVE_OPTION_DEFAULT_LOOPBACK = 0x10, /* bool default_loopback */
+	NETRESOLVE_OPTION_DNS_SRV_LOOKUP, /* bool dns_srv_lookup */
+/* Node and service name:
+ *
+ * You don't normally need to set them as they are specified as parameters
+ * to the `netresolve_query_forward()` function.
+ */
+	NETRESOLVE_OPTION_NODE_NAME = 0x100, /* const char *nodename */
+	NETRESOLVE_OPTION_SERVICE_NAME, /* const char *servname */
+/* Family, socktype and protocol:
+ *
+ * You can set them to adjust forward name resolution configuration before
+ * calling the `netresolve_query_forward()` function.
+ */
+	NETRESOLVE_OPTION_FAMILY = 0x110, /* int family */
+	NETRESOLVE_OPTION_SOCKTYPE, /* int socktype */
+	NETRESOLVE_OPTION_PROTOCOL, /* int protocol */
+/* IPv4 or IPv6 address, port number:
+ *
+ * You don't normally need to set them as they are specified as parameters
+ * to the `netresolve_query_reverse()` function.
+ */
+	NETRESOLVE_OPTION_IFINDEX = 0x200, /* int ifindex */
+	NETRESOLVE_OPTION_IP4_ADDRESS = 0x210, /* const struct in_addr *address */
+	NETRESOLVE_OPTION_IP6_ADDRESS, /* const struct in6_addr *address */
+	NETRESOLVE_OPTION_PORT = 0x220, /* int port */
+/* DNS record resolution:
+ *
+ * You don't normally need to set them as they are specified as parameters
+ * to the `netresolve_query_dns()` function.
+ */
+	NETRESOLVE_OPTION_DNS_NAME = 0x300, /* const char *dname */
+	NETRESOLVE_OPTION_DNS_CLASS, /* int class */
+	NETRESOLVE_OPTION_DNS_TYPE, /* int type */
+};
 
-/* Channel configuration */
+/* Context construction and destruction */
+netresolve_t netresolve_context_new(void);
+void netresolve_context_free(netresolve_t context);
+
+/* Context configuration */
 void netresolve_set_backend_string(netresolve_t context, const char *string);
-void netresolve_set_family(netresolve_t context, int family);
-void netresolve_set_socktype(netresolve_t context, int socktype);
-void netresolve_set_protocol(netresolve_t context, int protocol);
-void netresolve_set_default_loopback(netresolve_t context, bool value);
-void netresolve_set_dns_srv_lookup(netresolve_t context, bool value);
+void netresolve_context_set_options(netresolve_t context, ...);
 
-/* Query constructors and destructors */
-netresolve_query_t netresolve_query(netresolve_t context, const char *node, const char *service);
-netresolve_query_t netresolve_query_reverse(netresolve_t context, int family, const void *address, int ifindex, int port);
-netresolve_query_t netresolve_query_dns(netresolve_t context, const char *dname, int cls, int type);
-void netresolve_query_done(netresolve_query_t query);
-
-/* Query callback (nonblocking mode only) */
+/* Query construction and destruction */
 typedef void (*netresolve_query_callback)(netresolve_query_t query, void *user_data);
 
-void netresolve_query_set_callback(netresolve_query_t query, netresolve_query_callback callback, void *user_data);
+netresolve_query_t netresolve_query_forward(netresolve_t context,
+		const char *node, const char *service,
+		netresolve_query_callback callback, void *user_data);
+netresolve_query_t netresolve_query_reverse(netresolve_t context,
+		int family, const void *address, int ifindex, int protocol, int port,
+		netresolve_query_callback callback, void *user_data);
+netresolve_query_t netresolve_query_dns(netresolve_t context,
+		const char *dname, int cls, int type,
+		netresolve_query_callback callback, void *user_data);
+void netresolve_query_free(netresolve_query_t query);
 
 /* Query result getters (forward queries) */
 size_t netresolve_query_get_count(const netresolve_query_t query);

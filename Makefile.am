@@ -42,16 +42,16 @@ libnetresolve_la_SOURCES = \
 	include/netresolve-private.h \
 	include/netresolve-backend.h \
 	include/netresolve-cli.h \
+	lib/request.c \
+	lib/query.c \
 	lib/backend.c \
 	lib/context.c \
 	lib/compat.c \
 	lib/logging.c \
-	lib/query.c \
 	lib/event.c \
 	lib/service.c \
 	lib/socket.c \
 	lib/string.c \
-	lib/utils.c \
 	lib/epoll.c \
 	lib/select.c
 libnetresolve_la_LDFLAGS = \
@@ -111,16 +111,12 @@ libnetresolve_backend_asyncns_la_LDFLAGS = -lasyncns
 libnetresolve_backend_nss_la_SOURCES = backends/nss.c
 libnetresolve_backend_exec_la_SOURCES = backends/exec.c
 
-bin_PROGRAMS = netresolve netconnect getaddrinfo getnameinfo gethostbyname gethostbyaddr res_query
+bin_PROGRAMS = netresolve getaddrinfo getnameinfo gethostbyname gethostbyaddr res_query
 bin_SCRIPTS = tools/wrapresolve
 
-netresolve_SOURCES = tools/netresolve.c tools/common.c
+netresolve_SOURCES = tools/netresolve.c
 netresolve_LDADD = libnetresolve.la
 netresolve_LDFLAGS = $(AM_LDFLAGS) -lldns
-
-netconnect_SOURCES = tools/netconnect.c tools/common.c
-netconnect_LDADD = libnetresolve.la
-netconnect_LDFLAGS = $(AM_LDFLAGS) -lldns
 
 getaddrinfo_SOURCES = tools/getaddrinfo.c tools/compat.c
 

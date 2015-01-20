@@ -21,20 +21,14 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <stdlib.h>
+#include <netresolve-private.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <string.h>
 #include <poll.h>
-#include <errno.h>
-#include <sys/epoll.h>
-#include <sys/timerfd.h>
 #include <sys/eventfd.h>
 
-#include "netresolve-private.h"
-
-static const char *
-state_to_string(enum netresolve_state state)
+const char *
+netresolve_query_state_to_string(enum netresolve_state state)
 {
 	switch (state) {
 	case NETRESOLVE_STATE_NONE:
@@ -47,8 +41,6 @@ state_to_string(enum netresolve_state state)
 		return "waiting-more";
 	case NETRESOLVE_STATE_RESOLVED:
 		return "resolved";
-	case NETRESOLVE_STATE_CONNECTING:
-		return "connecting";
 	case NETRESOLVE_STATE_DONE:
 		return "done";
 	case NETRESOLVE_STATE_ERROR:
@@ -95,9 +87,10 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 	if (state == old_state)
 		return;
 
-	query->state = state;
+	debug_query(query, "state: %s -> %s",
+			netresolve_query_state_to_string(old_state), netresolve_query_state_to_string(state));
 
-	debug_query(query, "state: %s -> %s", state_to_string(old_state), state_to_string(state));
+	query->state = state;
 
 	/* Entering state... */
 	switch (state) {
@@ -134,7 +127,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		break;
 	case NETRESOLVE_STATE_WAITING_MORE:
 		if (query->request.partial_timeout == 0)
-			netresolve_query_set_state(query, NETRESOLVE_STATE_CONNECTING);
+			netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 		if (query->request.partial_timeout > 0)
 			query->partial_timeout_fd = netresolve_add_timeout_ms(query, query->request.partial_timeout);
 		break;
@@ -147,7 +140,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 			netresolve_watch_fd(query, query->delayed_fd, POLLIN);
 		}
 		break;
-	case NETRESOLVE_STATE_CONNECTING:
+	case NETRESOLVE_STATE_DONE:
 		cleanup_query(query);
 
 		/* Restart with the next *mandatory* backend. */
@@ -158,14 +151,6 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 			}
 		}
 
-		if (query->context->callbacks.on_connect) {
-			netresolve_connect_start(query);
-		} else
-			netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
-		break;
-	case NETRESOLVE_STATE_DONE:
-		if (query->context->callbacks.on_connect)
-			netresolve_connect_cleanup(query);
 		if (query->callback)
 			query->callback(query, query->user_data);
 		break;
@@ -210,7 +195,6 @@ netresolve_query_new(netresolve_t context, enum netresolve_request_type type)
 	if (!context->backends || !*context->backends)
 		abort();
 
-	query->first_connect_timeout = -1;
 	query->delayed_fd = -1;
 	query->timeout_fd = -1;
 	query->partial_timeout_fd = -1;
@@ -224,10 +208,103 @@ netresolve_query_new(netresolve_t context, enum netresolve_request_type type)
 	return query;
 }
 
-void
-netresolve_query_setup(netresolve_query_t query)
+netresolve_query_t
+netresolve_query( netresolve_t context, netresolve_query_callback callback, void *user_data,
+		enum netresolve_option type, ...)
 {
+	static netresolve_t default_context = NULL;
+	netresolve_query_t query;
+	va_list ap;
+
+	/* Use a static context if none is provided. */
+	if (!context) {
+		if (!default_context)
+			default_context = netresolve_context_new();
+		context = default_context;
+	}
+	if (!context)
+		return NULL;
+
+	if (!(query = netresolve_query_new(context, type)))
+		return NULL;
+
+	query->callback = callback;
+	query->user_data = user_data;
+
+	va_start(ap, type);
+	if (!netresolve_request_set_options_from_va(&query->request, ap)) {
+		netresolve_query_free(query);
+		va_end(ap);
+		return NULL;
+	}
+	va_end(ap);
+
+	if (context->config.force_family)
+		query->request.family = context->config.force_family;
+
+	/* Install default callbacks for first query in blocking mode. */
+	if (!context->callbacks.watch_fd)
+		netresolve_epoll_install(context, &context->epoll, NULL);
+
 	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
+
+	/* Wait for the context in blocking mode. */
+	if (context->callbacks.user_data == &context->epoll)
+		netresolve_epoll_wait(context);
+
+	return query;
+}
+
+netresolve_query_t
+netresolve_query_forward(netresolve_t context,
+		const char *nodename, const char *servname,
+		netresolve_query_callback callback, void *user_data)
+{
+	return netresolve_query(context, callback, user_data,
+			NETRESOLVE_REQUEST_FORWARD,
+			NETRESOLVE_OPTION_NODE_NAME, nodename,
+			NETRESOLVE_OPTION_SERVICE_NAME, servname,
+			NULL);
+}
+
+netresolve_query_t
+netresolve_query_reverse(netresolve_t context,
+		int family, const void *address, int ifindex, int protocol, int port,
+		netresolve_query_callback callback, void *user_data)
+{
+	enum netresolve_option address_option;
+
+	switch (family) {
+	case AF_INET:
+		address_option = NETRESOLVE_OPTION_IP4_ADDRESS;
+		break;
+	case AF_INET6:
+		address_option = NETRESOLVE_OPTION_IP6_ADDRESS;
+		break;
+	default:
+		return NULL;
+	}
+
+	return netresolve_query(context, callback, user_data,
+			NETRESOLVE_REQUEST_REVERSE,
+			address_option, address,
+			NETRESOLVE_OPTION_IFINDEX, ifindex,
+			NETRESOLVE_OPTION_PROTOCOL, protocol,
+			NETRESOLVE_OPTION_PORT, port,
+			NULL);
+}
+
+netresolve_query_t
+netresolve_query_dns(netresolve_t context,
+		const char *dname, int cls, int type,
+		netresolve_query_callback callback, void *user_data)
+{
+	return netresolve_query(context, callback, user_data,
+			NETRESOLVE_REQUEST_DNS,
+			NETRESOLVE_OPTION_DNS_NAME, dname,
+			NETRESOLVE_OPTION_DNS_CLASS, cls,
+			NETRESOLVE_OPTION_DNS_TYPE, type,
+			NULL);
 }
 
 static bool
@@ -254,39 +331,41 @@ netresolve_query_dispatch(netresolve_query_t query, int fd, int events)
 {
 	struct netresolve_backend *backend = query->backend ? *query->backend : NULL;
 
-	debug_query(query, "dispatching: fd=%d events=%d", fd, events);
-
 	switch (query->state) {
 	case NETRESOLVE_STATE_WAITING_MORE:
-		if (dispatch_timeout(query, &query->partial_timeout_fd, NETRESOLVE_STATE_CONNECTING, fd, events)) {
+		if (dispatch_timeout(query, &query->partial_timeout_fd, NETRESOLVE_STATE_DONE, fd, events)) {
 			debug_query(query, "partial result timed out");
 			return true;
 		}
 		/* fall through */
 	case NETRESOLVE_STATE_WAITING:
 		if (dispatch_timeout(query, &query->timeout_fd, NETRESOLVE_STATE_FAILED, fd, events)) {
-			debug_query(query, "timed out");
+			debug_query(query, "result timed out");
 			return true;
 		}
 		if (backend && backend->dispatch) {
 			backend->dispatch(query, fd, events);
 			if (query->state == NETRESOLVE_STATE_RESOLVED)
-				netresolve_query_set_state(query, NETRESOLVE_STATE_CONNECTING);
+				netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 			if (query->state == NETRESOLVE_STATE_ERROR)
 				netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
 			return true;
 		}
+		debug_query(query, "event received, not dispatched: fd=%d events=%d", fd, events);
 		return false;
 	case NETRESOLVE_STATE_RESOLVED:
-		return dispatch_timeout(query, &query->delayed_fd, NETRESOLVE_STATE_CONNECTING, fd, events);
-	case NETRESOLVE_STATE_CONNECTING:
+		return dispatch_timeout(query, &query->delayed_fd, NETRESOLVE_STATE_DONE, fd, events);
+	case NETRESOLVE_STATE_DONE:
 		return netresolve_connect_dispatch(query, fd, events);
 	default:
-		return false;
+		break;
 	}
+
+	debug_query(query, "unexpected event: fd=%d events=%d", fd, events);
+	return false;
 }
 
-/* netresolve_query_done:
+/* netresolve_query_free:
  *
  * Call this function when you are finished with the netresolve query and
  * don't need to access it any more. It cancels the query if it hasn't been
@@ -294,7 +373,7 @@ netresolve_query_dispatch(netresolve_query_t query, int fd, int events)
  * after calling it.
  */
 void
-netresolve_query_done(netresolve_query_t query)
+netresolve_query_free(netresolve_query_t query)
 {
 	cleanup_query(query);
 
@@ -303,19 +382,10 @@ netresolve_query_done(netresolve_query_t query)
 	query->previous->next = query->next;
 	query->next->previous = query->previous;
 
+	free(query->request.nodename);
+	free(query->request.servname);
+	free(query->request.dns_name);
 	free(query);
-}
-
-/* netresolve_query_set_user_data:
- *
- * Run this function just after starting the query to attach a pointer to some
- * data that you will later retrieve with `netresolve_query_get_user_data()`.
- */
-void
-netresolve_query_set_callback(netresolve_query_t query, netresolve_query_callback callback, void *user_data)
-{
-	query->callback = callback;
-	query->user_data = user_data;
 }
 
 /* netresolve_query_get_count:

@@ -22,7 +22,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <netresolve-private.h>
-#include <stdarg.h>
 
 static enum netresolve_log_level log_level = 0;
 

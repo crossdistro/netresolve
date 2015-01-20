@@ -58,7 +58,7 @@ asyncns_new (unsigned n_proc)
 	if (!(asyncns = calloc(1, sizeof *asyncns)))
 		goto fail_asyncns;
 
-    if (!(asyncns->context = netresolve_epoll_open()))
+    if (!(asyncns->context = netresolve_epoll_new()))
 		goto fail_context;
 
 	asyncns->queries.previous = asyncns->queries.next = &asyncns->queries;
@@ -89,17 +89,12 @@ asyncns_wait(asyncns_t *asyncns, int block)
 }
 
 static asyncns_query_t *
-add_query(asyncns_t *asyncns, netresolve_query_t query)
+add_query(asyncns_t *asyncns, asyncns_query_t *q, netresolve_query_t query)
 {
-	asyncns_query_t *q;
-
-	if (!query)
-		goto fail;
-
-	if (!(q = calloc(1, sizeof *q)))
-		goto fail_alloc;
-
-	netresolve_query_set_callback(query, callback, q);
+	if (!query) {
+		free(q);
+		return NULL;
+	}
 
 	q->asyncns = asyncns;
 	q->query = query;
@@ -107,10 +102,6 @@ add_query(asyncns_t *asyncns, netresolve_query_t query)
 	enqueue(&asyncns->queries, q);
 
 	return q;
-fail_alloc:
-	netresolve_query_done(query);
-fail:
-	return NULL;
 }
 
 static netresolve_query_t
@@ -127,7 +118,12 @@ remove_query(asyncns_query_t *q)
 asyncns_query_t *
 asyncns_getaddrinfo(asyncns_t *asyncns, const char *node, const char *service, const struct addrinfo *hints) 
 {
-	return add_query(asyncns, netresolve_query_getaddrinfo(asyncns->context, node, service, hints));
+	asyncns_query_t *q;
+
+	if (!(q = calloc(1, sizeof *q)))
+		return NULL;
+
+	return add_query(asyncns, q, netresolve_query_getaddrinfo(asyncns->context, node, service, hints, callback, q));
 }
 
 int
@@ -139,7 +135,12 @@ asyncns_getaddrinfo_done (asyncns_t *asyncns, asyncns_query_t *q, struct addrinf
 asyncns_query_t *
 asyncns_getnameinfo (asyncns_t *asyncns, const struct sockaddr *sa, socklen_t salen, int flags, int gethost, int getserv)
 {
-	return add_query(asyncns, netresolve_query_getnameinfo(asyncns->context, sa, salen, flags));
+	asyncns_query_t *q;
+
+	if (!(q = calloc(1, sizeof *q)))
+		return NULL;
+
+	return add_query(asyncns, q, netresolve_query_getnameinfo(asyncns->context, sa, salen, flags, callback, q));
 }
 
 int
@@ -171,7 +172,12 @@ asyncns_getnameinfo_done (asyncns_t *asyncns, asyncns_query_t *q, char *host, si
 asyncns_query_t *
 asyncns_res_query (asyncns_t *asyncns, const char *dname, int class, int type)
 {
-	return add_query(asyncns, netresolve_query_res_query(asyncns->context, dname, class, type));
+	asyncns_query_t *q;
+
+	if (!(q = calloc(1, sizeof *q)))
+		return NULL;
+
+	return add_query(asyncns, q, netresolve_query_res_query(asyncns->context, dname, class, type, callback, q));
 }
 
 asyncns_query_t *
@@ -179,7 +185,7 @@ asyncns_res_search (asyncns_t *asyncns, const char *dname, int class, int type)
 {
 	/* FIXME: enable search */
 
-	return add_query(asyncns, netresolve_query_res_query(asyncns->context, dname, class, type));
+	return asyncns_res_query(asyncns, dname, class, type);
 }
 
 int
@@ -215,7 +221,7 @@ asyncns_getnqueries (asyncns_t *asyncns)
 void
 asyncns_cancel (asyncns_t *asyncns, asyncns_query_t *q)
 {
-	netresolve_query_done(q->query);
+	netresolve_query_free(q->query);
 	dequeue(q);
 	free(q);
 }
@@ -228,7 +234,7 @@ asyncns_free (asyncns_t *asyncns)
 	while (list->next != list)
 		asyncns_cancel(asyncns, list->next);
 
-	netresolve_close(asyncns->context);
+	netresolve_context_free(asyncns->context);
 
 	free(asyncns);
 }

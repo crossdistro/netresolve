@@ -21,9 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <stdlib.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <sys/epoll.h>
@@ -159,9 +157,6 @@ add_path(netresolve_query_t query, const struct netresolve_path *path)
 	memcpy(&response->paths[i], path, sizeof *path);
 
 	debug_query(query, "added path: %s", netresolve_get_path_string(query, response->pathcount - 1));
-
-	if (query->context->callbacks.on_bind)
-		netresolve_query_bind(query, response->pathcount - 1);
 
 	if (query->state == NETRESOLVE_STATE_WAITING)
 		netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING_MORE);

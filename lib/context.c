@@ -22,14 +22,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <netresolve-private.h>
-#include <stdlib.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <string.h>
-#include <poll.h>
-#include <errno.h>
 #include <dlfcn.h>
-#include <sys/timerfd.h>
 
 static bool
 getenv_bool(const char *name, bool def)
@@ -56,7 +51,7 @@ getenv_family(const char *name, int def)
 }
 
 netresolve_t
-netresolve_open(void)
+netresolve_context_new(void)
 {
 	netresolve_t context;
 
@@ -80,12 +75,12 @@ netresolve_open(void)
 }
 
 void
-netresolve_close(netresolve_t context)
+netresolve_context_free(netresolve_t context)
 {
 	struct netresolve_query *queries = &context->queries;
 
 	while (queries->next != queries)
-		netresolve_query_done(queries->next);
+		netresolve_query_free(queries->next);
 
 	netresolve_set_backend_string(context, "");
 	if (context->epoll.fd != -1 && close(context->epoll.fd) == -1)
@@ -96,67 +91,14 @@ netresolve_close(netresolve_t context)
 	free(context);
 }
 
-static netresolve_query_t
-start_query(netresolve_t context, netresolve_query_t query)
+void
+netresolve_context_set_options(netresolve_t context, ...)
 {
-	/* Install default callbacks for first query in blocking mode. */
-	if (!context->callbacks.watch_fd)
-		netresolve_epoll_install(context, &context->epoll, NULL);
+	va_list ap;
 
-	netresolve_query_setup(query);
-
-	/* Wait for the context in blocking mode. */
-	if (context->callbacks.user_data == &context->epoll)
-		netresolve_epoll_wait(context);
-
-	return query;
-}
-
-netresolve_query_t
-netresolve_query(netresolve_t context, const char *nodename, const char *servname)
-{
-	netresolve_query_t query = netresolve_query_new(context, NETRESOLVE_REQUEST_FORWARD);
-
-	if (!query)
-		return NULL;
-
-	if (context->config.force_family)
-		query->request.family = context->config.force_family;
-	query->request.nodename = nodename;
-	query->request.servname = servname;
-
-	return start_query(context, query);
-}
-
-netresolve_query_t
-netresolve_query_reverse(netresolve_t context, int family, const void *address, int ifindex, int port)
-{
-	netresolve_query_t query = netresolve_query_new(context, NETRESOLVE_REQUEST_REVERSE);
-	size_t size = family == AF_INET ? 4 : 16;
-
-	if (!query)
-		return NULL;
-
-	query->request.family = family;
-	memcpy(query->request.address, address, size);
-	query->request.port = port;
-
-	return start_query(context, query);
-}
-
-netresolve_query_t
-netresolve_query_dns(netresolve_t context, const char *dname, int cls, int type)
-{
-	netresolve_query_t query = netresolve_query_new(context, NETRESOLVE_REQUEST_DNS);
-
-	if (!query)
-		return NULL;
-
-	query->request.dns_name = strdup(dname);
-	query->request.dns_class = cls;
-	query->request.dns_type = type;
-
-	return start_query(context, query);
+	va_start(ap, context);
+	netresolve_request_set_options_from_va(&context->request, ap);
+	va_end(ap);
 }
 
 static void
@@ -265,58 +207,3 @@ netresolve_set_backend_string(netresolve_t context, const char *string)
 		}
 	}
 }
-
-void
-netresolve_set_default_loopback(netresolve_t context, bool value)
-{
-	context->request.default_loopback = value;
-}
-
-void
-netresolve_set_dns_srv_lookup(netresolve_t context, bool value)
-{
-	context->request.dns_srv_lookup = value;
-}
-
-void
-netresolve_set_family(netresolve_t context, int family)
-{
-	context->request.family = family;
-}
-
-void
-netresolve_set_socktype(netresolve_t context, int socktype)
-{
-	context->request.socktype = socktype;
-}
-
-void
-netresolve_set_protocol(netresolve_t context, int protocol)
-{
-	context->request.protocol = protocol;
-}
-
-void
-netresolve_set_bind_callback(netresolve_t context,
-		netresolve_socket_callback_t on_bind,
-		void *user_data)
-{
-	context->callbacks.on_bind = on_bind;
-	context->callbacks.on_connect = NULL;
-	context->callbacks.user_data_sock = user_data;
-
-	netresolve_set_default_loopback(context, false);
-}
-
-void
-netresolve_set_connect_callback(netresolve_t context,
-		netresolve_socket_callback_t on_connect,
-		void *user_data)
-{
-	context->callbacks.on_bind = NULL;
-	context->callbacks.on_connect = on_connect;
-	context->callbacks.user_data_sock = user_data;
-
-	netresolve_set_default_loopback(context, true);
-}
-

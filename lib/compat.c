@@ -21,10 +21,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <stdlib.h>
 #include <string.h>
 
-/* FIXME: Would be nicer to only require `netresolve-compat.h`. */
+/* FIXME: Get rid of this. */
 #include <netresolve-private.h>
 
 /* netresolve_query_get_sockaddr:
@@ -84,19 +83,24 @@ netresolve_query_get_sockaddr(netresolve_query_t query, size_t idx,
  * `netresolve_query_getaddrinfo_free()`.
  */
 netresolve_query_t
-netresolve_query_getaddrinfo(netresolve_t context, const char *node, const char *service, const struct addrinfo *hints)
+netresolve_query_getaddrinfo(netresolve_t context,
+		const char *nodename, const char *servname, const struct addrinfo *hints,
+		netresolve_query_callback callback, void *user_data)
 {
-	struct addrinfo default_hints = { 0 };
+	static const struct addrinfo default_hints = { 0 };
 
 	if (!hints)
 		hints = &default_hints;
 
-	netresolve_set_default_loopback(context, !(hints->ai_flags & AI_PASSIVE));
-	netresolve_set_family(context, hints->ai_family);
-	netresolve_set_socktype(context, hints->ai_socktype);
-	netresolve_set_protocol(context, hints->ai_protocol);
-
-	return netresolve_query(context, node, service);
+	return netresolve_query(context, callback, user_data,
+			NETRESOLVE_REQUEST_FORWARD,
+			NETRESOLVE_OPTION_NODE_NAME, nodename,
+			NETRESOLVE_OPTION_SERVICE_NAME, servname,
+			NETRESOLVE_OPTION_FAMILY, hints->ai_family,
+			NETRESOLVE_OPTION_SOCKTYPE, hints->ai_socktype,
+			NETRESOLVE_OPTION_PROTOCOL, hints->ai_protocol,
+			NETRESOLVE_OPTION_DEFAULT_LOOPBACK, !(hints->ai_flags & AI_PASSIVE),
+			NULL);
 }
 
 int
@@ -124,7 +128,7 @@ netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **re
 		ai = ai->ai_next = calloc(1, sizeof *ai + salen);
 		if (!ai) {
 			freeaddrinfo(head.ai_next);
-			netresolve_query_done(query);
+			netresolve_query_free(query);
 			return EAI_SYSTEM;
 		}
 		ai->ai_family = sa->sa_family;
@@ -138,29 +142,32 @@ netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **re
 			ai->ai_canonname = strdup(canonname);
 	}
 
-	netresolve_query_done(query);
+	netresolve_query_free(query);
 
 	*res = head.ai_next;
 	return *res ? 0 : EAI_NODATA;
 }
 
 netresolve_query_t
-netresolve_query_getnameinfo(netresolve_t context, const struct sockaddr *sa, socklen_t salen, int flags)
+netresolve_query_getnameinfo(netresolve_t context,
+		const struct sockaddr *sa, socklen_t salen, int flags,
+		netresolve_query_callback callback, void *user_data)
 {
 	struct sockaddr_in *sa4 = (void *) sa;
 	struct sockaddr_in6 *sa6 = (void *) sa;
-
-	netresolve_set_protocol(context, flags & NI_DGRAM ? IPPROTO_UDP : IPPROTO_TCP);
+	int protocol = flags & NI_DGRAM ? IPPROTO_UDP : IPPROTO_TCP;
 
 	switch (sa->sa_family) {
 	case AF_INET:
 		if (salen != sizeof *sa4)
 			return NULL;
-		return netresolve_query_reverse(context, sa4->sin_family, &sa4->sin_addr, 0, ntohs(sa4->sin_port));
+		return netresolve_query_reverse(context, sa4->sin_family, &sa4->sin_addr, 0,
+				protocol, ntohs(sa4->sin_port), callback, user_data);
 	case AF_INET6:
 		if (salen != sizeof *sa6)
 			return NULL;
-		return netresolve_query_reverse(context, sa6->sin6_family, &sa6->sin6_addr, sa6->sin6_scope_id, ntohs(sa6->sin6_port));
+		return netresolve_query_reverse(context, sa6->sin6_family, &sa6->sin6_addr, sa6->sin6_scope_id,
+				protocol, ntohs(sa6->sin6_port), callback, user_data);
 	default:
 		return NULL;
 	}
@@ -177,7 +184,7 @@ netresolve_query_getnameinfo_done(netresolve_query_t query, char **node, char **
 	if (service)
 		*service = myservice ? strdup(myservice) : NULL;
 
-	netresolve_query_done(query);
+	netresolve_query_free(query);
 
 	return 0;
 }
@@ -193,11 +200,15 @@ netresolve_query_getnameinfo_done(netresolve_query_t query, char **node, char **
  * `netresolve_query_gethostbyname_free()`.
  */
 netresolve_query_t
-netresolve_query_gethostbyname(netresolve_t context, const char *name, int family)
+netresolve_query_gethostbyname(netresolve_t context,
+		const char *name, int family,
+		netresolve_query_callback callback, void *user_data)
 {
-	netresolve_set_family(context, family);
-
-	return netresolve_query(context, name, NULL);
+	return netresolve_query(context, callback, user_data,
+			NETRESOLVE_REQUEST_FORWARD,
+			NETRESOLVE_OPTION_NODE_NAME, name,
+			NETRESOLVE_OPTION_FAMILY, family,
+			NULL);
 }
 
 static struct hostent *
@@ -253,7 +264,7 @@ get_hostent(netresolve_query_t query, int *h_errnop, int32_t *ttlp)
 	}
 
 out:
-	netresolve_query_done(query);
+	netresolve_query_free(query);
 
 	return he;
 }
@@ -271,8 +282,9 @@ netresolve_query_gethostbyname_done(netresolve_query_t query, int *h_errnop, int
 	return get_hostent(query, h_errnop, ttlp);
 }
 
-netresolve_query_t
-netresolve_query_gethostbyaddr(netresolve_t context, const void *address, int length, int family)
+netresolve_query_t netresolve_query_gethostbyaddr(netresolve_t context,
+		const void *address, int length, int family,
+		netresolve_query_callback callback, void *user_data)
 {
 	switch (family) {
 	case AF_INET:
@@ -286,7 +298,7 @@ netresolve_query_gethostbyaddr(netresolve_t context, const void *address, int le
 		return NULL;
 	}
 
-	netresolve_query_t query = netresolve_query_reverse(context, family, address, 0, 0);
+	netresolve_query_t query = netresolve_query_reverse(context, family, address, 0, 0, 0, callback, user_data);
 
 	if (query)
 		netresolve_backend_add_path(query, family, address, 0, 0, 0, 0, 0, 0, 0);

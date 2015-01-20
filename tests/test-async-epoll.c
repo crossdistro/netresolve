@@ -25,9 +25,9 @@
 #include "common.h"
 
 netresolve_t
-context_open(struct priv_common *priv)
+context_new(struct priv_common *priv)
 {
-	netresolve_t context = netresolve_open();
+	netresolve_t context = netresolve_context_new();
 	netresolve_epoll_fd(context);
 
 	return context;
