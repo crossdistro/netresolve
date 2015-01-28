@@ -143,8 +143,11 @@ bool
 netresolve_dispatch(netresolve_t context, netresolve_source_t source, int events)
 {
 	assert(source);
-	assert(events & (POLLIN | POLLOUT));
-	assert(!(events & ~(POLLIN | POLLOUT)));
+
+	if (!(events & (POLLIN | POLLOUT)) || (events & ~(POLLIN | POLLOUT))) {
+		error("Bad poll events %d for source %p.", events, source);
+		return false;
+	}
 
 	debug_query(source->query, "dispatching: fd=%d events=%d", source->fd, events);
 
