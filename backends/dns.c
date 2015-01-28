@@ -307,6 +307,14 @@ apply_answer(struct priv_dns *priv, uint8_t *data, size_t length)
 	if (!ldns_pkt_ad(pkt))
 		priv->secure = false;
 
+	/* libunbound seems to sometimes return an empty result with
+	 * rcode set to zero
+	 */
+	if (rcode == 0 && answer->_rr_count == 0) {
+		debug("fixing up rcode because of zero rr_count after libunbound");
+		rcode = LDNS_RCODE_NXDOMAIN;
+	}
+
 	switch (rcode) {
 	case 0:
 		break;
