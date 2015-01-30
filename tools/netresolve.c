@@ -90,7 +90,7 @@ get_dns_string(netresolve_query_t query)
 	int status = ldns_wire2pkt(&pkt, answer, length);
 
 	if (status) {
-		fprintf(stderr, "ldns: %s", ldns_get_errorstr_by_id(status));
+		error("ldns: %s", ldns_get_errorstr_by_id(status));
 		return NULL;
 	}
 	
@@ -98,6 +98,21 @@ get_dns_string(netresolve_query_t query)
 
 	ldns_pkt_free(pkt);
 	return result;
+}
+
+static const char *
+sa_to_string(struct sockaddr *sender)
+{
+	static char buffer[1024];
+
+	switch (sender->sa_family) {
+	case AF_INET:
+		return inet_ntop(AF_INET, &((struct sockaddr_in *) sender)->sin_addr, buffer, sizeof buffer);
+	case AF_INET6:
+		return inet_ntop(AF_INET6, &((struct sockaddr_in6 *) sender)->sin6_addr, buffer, sizeof buffer);
+	default:
+		return NULL;
+	}
 }
 
 bool
@@ -138,7 +153,7 @@ run_ping(netresolve_query_t query, size_t idx)
 		query = netresolve_query_getnameinfo(NULL, (struct sockaddr *) &sender, salen, 0, NULL, NULL);
 		if (!query)
 			return false;
-		fprintf(stderr, "echo response from %s\n", netresolve_query_get_node_name(query));
+		fprintf(stderr, "reply from %s (%s)\n", netresolve_query_get_node_name(query), sa_to_string((struct sockaddr *) &sender));
 
 		sleep(1);
 	}
@@ -182,7 +197,7 @@ main(int argc, char **argv)
 
 	context = netresolve_context_new();
 	if (!context) {
-		fprintf(stderr, "netresolve: %s\n", strerror(errno));
+		error("netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
 
@@ -271,11 +286,11 @@ main(int argc, char **argv)
 		netresolve_connect(context, nodename, servname, -1, -1, -1, on_connect, &sock);
 
 		if (sock == -1) {
-			fprintf(stderr, "no connection\n");
+			error("no connection\n");
 			return EXIT_FAILURE;
 		}
 
-		fprintf(stderr, "Connected.\n");
+		debug("Connected.\n");
 
 		fds[0].fd = 0;
 		fds[0].events = POLLIN;
@@ -284,7 +299,7 @@ main(int argc, char **argv)
 
 		while (true) {
 			if (poll(fds, 2, -1) == -1) {
-				fprintf(stderr, "poll: %s\n", strerror(errno));
+				error("poll: %s\n", strerror(errno));
 				break;
 			}
 
@@ -308,7 +323,7 @@ main(int argc, char **argv)
 		query = netresolve_query_forward(context, nodename, servname, NULL, NULL);
 
 	if (!query) {
-		fprintf(stderr, "netresolve: %s\n", strerror(errno));
+		error("netresolve: %s\n", strerror(errno));
 		return EXIT_FAILURE;
 	}
 
