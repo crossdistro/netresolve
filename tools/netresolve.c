@@ -25,6 +25,8 @@
 #include <getopt.h>
 #include <ldns/ldns.h>
 #include <arpa/nameser.h>
+#include <netinet/ip_icmp.h>
+#include <linux/icmpv6.h>
 
 static int
 count_argv(char **argv)
@@ -98,6 +100,52 @@ get_dns_string(netresolve_query_t query)
 	return result;
 }
 
+bool
+run_ping(netresolve_query_t query, size_t idx)
+{
+	struct pollfd sock = { .fd = -1, .events = POLLIN };
+	const struct sockaddr *sa;
+	socklen_t salen;
+	struct icmphdr data4 = { .type = ICMP_ECHO };
+	struct icmp6hdr data6 = { .icmp6_type = ICMPV6_ECHO_REQUEST };
+	int status;
+	char buffer[4096];
+	struct sockaddr_storage sender;
+
+	sa = netresolve_query_get_sockaddr(query, idx, &salen, NULL, NULL, NULL);
+	if (!sa)
+		return false;
+
+	sock.fd = socket(sa->sa_family, SOCK_DGRAM, sa->sa_family == AF_INET ? IPPROTO_ICMP : IPPROTO_ICMPV6);
+	if (sock.fd == -1)
+		return false;
+
+	while (true) {
+		if (sa->sa_family == AF_INET)
+			status = sendto(sock.fd, &data4, sizeof data4, 0, sa, salen);
+		else
+			status = sendto(sock.fd, &data6, sizeof data6, 0, sa, salen);
+		if (status == -1)
+			return false;
+		fprintf(stderr, "echo request\n");
+
+		status = poll(&sock, 1, -1);
+		if (status != 1)
+			return false;
+		status = recvfrom(sock.fd, buffer, sizeof buffer, 0, (struct sockaddr *) &sender, &salen);
+		if (status == -1)
+			return false;
+		query = netresolve_query_getnameinfo(NULL, (struct sockaddr *) &sender, salen, 0, NULL, NULL);
+		if (!query)
+			return false;
+		fprintf(stderr, "echo response from %s\n", netresolve_query_get_node_name(query));
+
+		sleep(1);
+	}
+
+	return true;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -110,6 +158,7 @@ main(int argc, char **argv)
 		{ "service", 1, 0, 's' },
 		{ "family", 1, 0, 'f' },
 		{ "socktype", 1, 0, 't' },
+		{ "ping", 0, 0, 'I' },
 		{ "protocol", 1, 0, 'p' },
 		{ "backends", 1, 0, 'b' },
 		{ "srv", 0, 0, 'S' },
@@ -122,6 +171,7 @@ main(int argc, char **argv)
 	static const char *opts = "hvcn::s:f:t:p:b:Sa:P:";
 	int opt, idx = 0;
 	bool connect = false;
+	bool ping = false;
 	char *nodename = NULL, *servname = NULL;
 	char *address_str = NULL, *port_str = NULL;
 	int cls = ns_c_in, type = 0;
@@ -143,6 +193,7 @@ main(int argc, char **argv)
 					"-h,--help -- help\n"
 					"-v,--verbose -- show more verbose output\n"
 					"-c,--connect -- attempt to connect to a host like netcat/socat\n"
+					"--ping -- perform an ICMP ping"
 					"-n,--node <nodename> -- node name\n"
 					"-s,--service <servname> -- service name\n"
 					"-f,--family any|ip4|ip6 -- family name\n"
@@ -160,6 +211,9 @@ main(int argc, char **argv)
 			break;
 		case 'c':
 			connect = true;
+			break;
+		case 'I':
+			ping = true;
 			break;
 		case 'n':
 			nodename = optarg;
@@ -260,6 +314,14 @@ main(int argc, char **argv)
 
 	debug("%s", netresolve_get_request_string(query));
 
+	if (ping) {
+		for (int i = 0; i < netresolve_query_get_count(query); i++)
+			if (run_ping(query, i))
+				goto out;
+		error("netresolve: ping failed\n");
+		goto out;
+	}
+
 	const char *response_string = netresolve_get_response_string(query);
 	char *dns_string = get_dns_string(query);
 
@@ -270,6 +332,7 @@ main(int argc, char **argv)
 		free(dns_string);
 	}
 
+out:
 	netresolve_context_free(context);
 	return EXIT_SUCCESS;
 }
