@@ -1,0 +1,10 @@
+response netresolve 0.0.1
+name localhost
+ip :: stream tcp 0 0 0 0
+ip :: dgram udp 0 0 0 0
+ip :: raw any 0 0 0 0
+ip 0.0.0.0 stream tcp 0 0 0 0
+ip 0.0.0.0 dgram udp 0 0 0 0
+ip 0.0.0.0 raw any 0 0 0 0
+secure
+

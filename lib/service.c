@@ -44,7 +44,8 @@ static const struct netresolve_protocol protocols[] = {
 	{ SOCK_DGRAM, IPPROTO_UDPLITE, false, "udplite" },
 	{ SOCK_STREAM, IPPROTO_SCTP, false, "sctp" },
 	{ SOCK_SEQPACKET, IPPROTO_SCTP, false, "sctp" },
-	{ 0, 0, false, "" }
+	{ SOCK_RAW, 0, true, "raw" },
+	{ 0, 0, false, NULL }
 };
 
 struct netresolve_service {
@@ -67,7 +68,7 @@ protocol_from_string(const char *str)
 
 	if (!str)
 		return 0;
-	for (protocol = protocols; protocol->protocol; protocol++)
+	for (protocol = protocols; protocol->name; protocol++)
 		if (!strcmp(str, protocol->name))
 			return protocol->protocol;
 	return 0;
@@ -199,7 +200,7 @@ found_port(const char *name, int socktype, int proto, int port,
 {
 	const struct netresolve_protocol *protocol;
 
-	for (protocol = protocols; protocol->protocol; protocol++) {
+	for (protocol = protocols; protocol->name; protocol++) {
 		if (socktype && socktype != protocol->socktype)
 			continue;
 		if (proto && proto != protocol->protocol)

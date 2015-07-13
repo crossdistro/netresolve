@@ -468,7 +468,7 @@ netresolve_query_get_node_name(const netresolve_query_t query)
 		return NULL;
 	if (query->request.type != NETRESOLVE_REQUEST_FORWARD)
 		return NULL;
-	return query->request.nodename ? query->request.nodename : "localhost";
+	return query->request.nodename ?: "localhost";
 }
 
 /* netresolve_query_get_service_name:

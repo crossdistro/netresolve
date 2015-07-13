@@ -15,5 +15,8 @@ done
 
 ./wrapresolve ./test-asyncns-cancel
 
+test_command getaddrinfo --node localhost
+# disabled due to bug in glibc
+#test_command gethostbyname --node localhost
 test_command getnameinfo --address 127.0.0.1 --port 80
 test_command gethostbyaddr --address 127.0.0.1

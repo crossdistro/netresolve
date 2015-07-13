@@ -7,6 +7,7 @@ DATA="${srcdir:-.}/tests/data"
 # empty
 $DIFF <($NR) $DATA/any
 $DIFF <($NR --backends any) $DATA/any
+$DIFF <($NR --backends any --service '') $DATA/any-listing
 $DIFF <($NR --backends numerichost) $DATA/failed
 $DIFF <($NR --backends loopback) $DATA/localhost
 $DIFF <($NR --backends hosts) $DATA/failed
@@ -15,8 +16,8 @@ $DIFF <($NR --backends aresdns) $DATA/failed
 $DIFF <($NR --backends libc) $DATA/failed
 $DIFF <($NR --backends nss:files) $DATA/failed
 $DIFF <($NR --backends nss:bogusbogus) $DATA/failed
-$DIFF <($NR --backends nss:./.libs/libnss_netresolve.so) <(grep -v '^secure$' $DATA/any)
-$DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:getaddrinfo) <(grep -v '^secure$' $DATA/any)
+$DIFF <($NR --backends nss:./.libs/libnss_netresolve.so) <(grep -v '^secure$' $DATA/any-listing)
+$DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:getaddrinfo) <(grep -v '^secure$' $DATA/any-listing)
 $DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:gethostbyname4) $DATA/failed
 $DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:gethostbyname3) $DATA/failed
 $DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:gethostbyname2) $DATA/failed
@@ -41,14 +42,15 @@ $DIFF <($NR --node 1:2:3:4:5:6:7:8%999999x) $DATA/failed
 
 # localhost
 $DIFF <($NR --node localhost) $DATA/localhost
+$DIFF <($NR --node localhost --service '') $DATA/localhost-listing
 $DIFF <($NR --backends hosts --node localhost) $DATA/localhost
 $DIFF <($NR --backends nss:files --node localhost) <(grep -v '^secure$' $DATA/localhost)
 $DIFF <($NR --backends nss:files:gethostbyname4 --node localhost) <(grep -v '^secure$' $DATA/localhost)
 $DIFF <($NR --backends nss:files:gethostbyname3 --node localhost) <(grep -v '^secure$' $DATA/localhost)
 $DIFF <($NR --backends nss:files:gethostbyname2 --node localhost) <(grep -v '^secure$' $DATA/localhost)
 $DIFF <($NR --backends nss:files:gethostbyname --node localhost) <(grep -v '^secure$' $DATA/localhost4)
-$DIFF <($NR --backends nss:./.libs/libnss_netresolve.so --node localhost) <(grep -v '^secure$' $DATA/localhost)
-$DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:getaddrinfo --node localhost) <(grep -v '^secure$' $DATA/localhost)
+$DIFF <($NR --backends nss:./.libs/libnss_netresolve.so --node localhost) <(grep -v '^secure$' $DATA/localhost-listing)
+$DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:getaddrinfo --node localhost) <(grep -v '^secure$' $DATA/localhost-listing)
 $DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:gethostbyname4 --node localhost) <(grep -v '^secure$' $DATA/localhost)
 $DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:gethostbyname3 --node localhost) <(grep -v '^secure$' $DATA/localhost)
 $DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:gethostbyname2 --node localhost) <(grep -v '^secure$' $DATA/localhost)

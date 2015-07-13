@@ -1,0 +1,12 @@
+query:
+  api = gethostbyname
+  nodename = localhost
+result:
+  name = localhost
+  aliases:
+  addrtype = 2
+  length = 4
+  address = 7f000001
+  addresses:
+    #0 = 7f000001
+    #1 = 7f000001

@@ -89,6 +89,7 @@ _nss_netresolve_gethostbyname4_r(const char *nodename,
 {
 	struct addrinfo hints = {
 		.ai_family = AF_UNSPEC,
+		.ai_socktype = SOCK_RAW,
 		.ai_flags = AI_CANONNAME
 	};
 	int status;
@@ -131,6 +132,7 @@ _nss_netresolve_gethostbyname3_r(const char *nodename, int family,
 {
 	struct addrinfo hints = {
 		.ai_family = family,
+		.ai_socktype = SOCK_RAW,
 		.ai_flags = AI_CANONNAME
 	};
 	int status;

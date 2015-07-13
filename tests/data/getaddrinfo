@@ -1,0 +1,62 @@
+query:
+  nodename = localhost
+  servname = (null)
+status = 0
+#0:
+  family = 10
+  socktype = 1
+  protocol = 6
+  addrlen = 28
+  address:
+    family = 10
+    port = 0
+    flowinfo = 0x00000000
+    address = 0x00000000000000000000000000000001
+    scope_id = 0
+#1:
+  family = 10
+  socktype = 2
+  protocol = 17
+  addrlen = 28
+  address:
+    family = 10
+    port = 0
+    flowinfo = 0x00000000
+    address = 0x00000000000000000000000000000001
+    scope_id = 0
+#2:
+  family = 10
+  socktype = 3
+  addrlen = 28
+  address:
+    family = 10
+    port = 0
+    flowinfo = 0x00000000
+    address = 0x00000000000000000000000000000001
+    scope_id = 0
+#3:
+  family = 2
+  socktype = 1
+  protocol = 6
+  addrlen = 16
+  address:
+    family = 2
+    port = 0
+    address = 0x7f000001
+#4:
+  family = 2
+  socktype = 2
+  protocol = 17
+  addrlen = 16
+  address:
+    family = 2
+    port = 0
+    address = 0x7f000001
+#5:
+  family = 2
+  socktype = 3
+  addrlen = 16
+  address:
+    family = 2
+    port = 0
+    address = 0x7f000001

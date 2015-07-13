@@ -87,20 +87,28 @@ netresolve_query_getaddrinfo(netresolve_t context,
 		const char *nodename, const char *servname, const struct addrinfo *hints,
 		netresolve_query_callback callback, void *user_data)
 {
+	netresolve_query_t query;
 	static const struct addrinfo default_hints = { 0 };
 
 	if (!hints)
 		hints = &default_hints;
 
-	return netresolve_query(context, callback, user_data,
+	query = netresolve_query(context, callback, user_data,
 			NETRESOLVE_REQUEST_FORWARD,
 			NETRESOLVE_OPTION_NODE_NAME, nodename,
-			NETRESOLVE_OPTION_SERVICE_NAME, servname,
+			NETRESOLVE_OPTION_SERVICE_NAME, servname ?: "",
 			NETRESOLVE_OPTION_FAMILY, hints->ai_family,
 			NETRESOLVE_OPTION_SOCKTYPE, hints->ai_socktype,
 			NETRESOLVE_OPTION_PROTOCOL, hints->ai_protocol,
 			NETRESOLVE_OPTION_DEFAULT_LOOPBACK, !(hints->ai_flags & AI_PASSIVE),
-			NULL);
+			NETRESOLVE_OPTION_DONE);
+
+	if (!(hints->ai_flags & AI_CANONNAME)) {
+		free(query->response.nodename);
+		query->response.nodename = strdup("");
+	}
+
+	return query;
 }
 
 int
@@ -138,7 +146,7 @@ netresolve_query_getaddrinfo_done(netresolve_query_t query, struct addrinfo **re
 		ai->ai_addr = (struct sockaddr *) (ai + 1);
 		memcpy(ai->ai_addr, sa, salen);
 
-		if (i == 0 && canonname)
+		if (i == 0 && canonname && *canonname)
 			ai->ai_canonname = strdup(canonname);
 	}
 
@@ -208,7 +216,7 @@ netresolve_query_gethostbyname(netresolve_t context,
 			NETRESOLVE_REQUEST_FORWARD,
 			NETRESOLVE_OPTION_NODE_NAME, name,
 			NETRESOLVE_OPTION_FAMILY, family,
-			NULL);
+			NETRESOLVE_OPTION_DONE);
 }
 
 static struct hostent *
