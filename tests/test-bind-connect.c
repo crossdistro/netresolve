@@ -29,7 +29,7 @@
 
 
 static void
-on_socket(netresolve_query_t query, int idx, int sock, void *user_data)
+on_bind(netresolve_query_t query, int idx, int sock, void *user_data)
 {
 	int *psock = user_data;
 
@@ -42,29 +42,49 @@ on_socket(netresolve_query_t query, int idx, int sock, void *user_data)
 int
 do_bind(const char *node, const char *service, int family, int socktype, int protocol)
 {
+	netresolve_query_t query;
 	int sock = -1;
 
-	netresolve_bind(NULL, node, service, family, socktype, protocol, on_socket, &sock);
+	query = netresolve_bind(NULL, node, service, family, socktype, protocol, on_bind, &sock);
+	assert(query);
 
 	return sock;
+}
+
+static void
+on_connect(netresolve_query_t query, int idx, int sock, void *user_data)
+{
+	int *psock = user_data;
+
+	assert(*psock == -1);
+	*psock = sock;
+
+	if (idx == 0) {
+		close(*psock);
+		*psock = -1;
+		netresolve_connect_next(query);
+	}
 }
 
 int
 do_connect(const char *node, const char *service, int family, int socktype, int protocol)
 {
+	netresolve_query_t query;
 	int sock = -1;
 
-	netresolve_connect(NULL, node, service, family, socktype, protocol, on_socket, &sock);
+	query = netresolve_connect(NULL, node, service, family, socktype, protocol, on_connect, &sock);
+	assert(query);
 
 	return sock;
 }
+
 int
 main(int argc, char **argv)
 {
 	int sock_server, sock_client, sock_accept;
 	const char *node = NULL;
 	const char *service = "1024";
-	int family = AF_INET;
+	int family = AF_UNSPEC;
 	int socktype = SOCK_STREAM;
 	int protocol = IPPROTO_TCP;
 	int status;
@@ -79,6 +99,9 @@ main(int argc, char **argv)
 	sock_client = do_connect(node, service, family, socktype, protocol);
 	assert(sock_client > 0);
 
+	sock_accept = accept(sock_server, NULL, 0);
+	assert(sock_accept != -1);
+	close(sock_accept);
 	sock_accept = accept(sock_server, NULL, 0);
 	assert(sock_accept != -1);
 	status = send(sock_client, outbuf, strlen(outbuf), 0);

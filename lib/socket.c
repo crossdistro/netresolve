@@ -25,81 +25,188 @@
 
 #include "netresolve-private.h"
 
-#define FIRST_CONNECT_TIMEOUT 1
+#define PRIORITY_TIMEOUT 15000
 
 struct netresolve_socket {
 	netresolve_query_t query;
 	netresolve_socket_callback_t callback;
 	void *user_data;
 	int flags;
-	netresolve_timeout_t first_connect_timeout;
+	netresolve_timeout_t priority_timeout;
+	bool skip_scheduled;
 };
 
+static void pickup_connected_socket(struct netresolve_socket *priv);
+
 static void
-do_connect(netresolve_query_t query, size_t idx)
+setup_socket(struct netresolve_socket *priv, struct netresolve_path *path)
 {
 	static const int flags = O_NONBLOCK;
 	int socktype;
 	int protocol;
 	const struct sockaddr *sa;
 	socklen_t salen;
-	struct netresolve_path *path = &query->response.paths[idx];
+	int idx = path - priv->query->response.paths;
 
-	if (path->socket.state != NETRESOLVE_STATE_NONE)
-		return;
+	assert(path->socket.state == SOCKET_STATE_NONE);
 
-	sa = netresolve_query_get_sockaddr(query, path - query->response.paths, &salen, &socktype, &protocol, NULL);
+	sa = netresolve_query_get_sockaddr(priv->query, idx, &salen, &socktype, &protocol, NULL);
 	if (!sa)
 		goto fail;
 	path->socket.fd = socket(sa->sa_family, socktype | flags, protocol);
 	if (path->socket.fd == -1)
 		goto fail;
+
+	errno = 0;
 	if (connect(path->socket.fd, sa, salen) == -1 && errno != EINPROGRESS)
 		goto fail_connect;
 
-	path->socket.watch = netresolve_watch_add(query, path->socket.fd, POLLOUT, NULL);
-	path->socket.state = NETRESOLVE_STATE_WAITING;
-	return;
+	if (errno) {
+		debug_query(priv->query, "socket: connection %d via %s scheduled", idx, sa->sa_family == AF_INET ? "IPv4" : "IPv6");
 
+		path->socket.state = SOCKET_STATE_SCHEDULED;
+		path->socket.watch = netresolve_watch_add(priv->query, path->socket.fd, POLLOUT, NULL);
+	} else {
+		/* FIXME: Is it at all possible for non-blocking sockets to connect
+		 * immediately?
+		 */
+		debug_query(priv->query, "socket: connection %d via %s immediately succeeded", idx, sa->sa_family == AF_INET ? "IPv4" : "IPv6");
+
+		path->socket.state = SOCKET_STATE_READY;
+		pickup_connected_socket(priv);
+	}
+
+	return;
 fail_connect:
 	close(path->socket.fd);
 	path->socket.fd = -1;
 fail:
-	path->socket.state = NETRESOLVE_STATE_FAILED;
+	path->socket.state = SOCKET_STATE_DONE;
+
+	error("socket: connection %d failed", idx);
 }
 
 static void
-connect_callback(netresolve_query_t query, void *user_data)
+enable_sockets(struct netresolve_socket *priv)
 {
-	struct netresolve_socket *data = user_data;
-	bool ip4 = false;
-	bool ip6 = false;
-	int i;
+	netresolve_query_t query = priv->query;
+	int ip4 = 0, ip6 = 0;
 
-	debug_query(query, "socket: connecting");
-
-	data->query = query;
-	/* `data` is already stored in `query->user_data`. */
-
-	for (i = 0; i < query->response.pathcount; i++) {
+	/* Attempt to connect to one IPv4 and one IPv6 address in parallel. It is a
+	 * „happy eyeballs“ style optimization that removes a delay when packets
+	 * of the preferred protocol (typically IPvy) are dropped on the way which
+	 * is a very common network misconfiguration.
+	 */
+	for (int i = 0; i < query->response.pathcount; i++) {
 		struct netresolve_path *path = &query->response.paths[i];
 
-		if (!ip4 && path->node.family == AF_INET && path->socket.state == NETRESOLVE_STATE_NONE) {
-			do_connect(query, path - query->response.paths);
-			ip4 = true;
-		}
-		if (!ip6 && path->node.family == AF_INET6 && path->socket.state == NETRESOLVE_STATE_NONE) {
-			do_connect(query, path - query->response.paths);
-			ip6 = true;
+		/* Skip already attempted sockets. */
+		if (path->socket.state == SOCKET_STATE_DONE)
+			continue;
+
+		/* Skip all but first address for each protocol. */
+		if (path->node.family == AF_INET && ip4++)
+			continue;
+		if (path->node.family == AF_INET6 && ip6++)
+			continue;
+
+		if (path->socket.state == SOCKET_STATE_NONE)
+			setup_socket(priv, path);
+		else if (path->socket.state == SOCKET_STATE_SCHEDULED && !path->socket.watch) {
+			debug_query(priv->query, "socket: resuming connection %d", i);
+			path->socket.watch = netresolve_watch_add(priv->query, path->socket.fd, POLLOUT, NULL);
 		}
 	}
 
+	if (!ip4 && !ip6)
+		error("socket: no connection paths available");
+}
+
+static void
+pickup_connected_socket(struct netresolve_socket *priv)
+{
+	struct netresolve_path *paths = priv->query->response.paths;
+	struct netresolve_path *found;
+
+	/* Find first scheduled or ready socket. */
+	for (found = paths; found->node.family; found++) {
+		if (found->socket.state == SOCKET_STATE_SCHEDULED && !priv->skip_scheduled)
+			break;
+		if (found->socket.state == SOCKET_STATE_READY)
+			break;
+	}
+
+	/* Pass a ready socket to the application and return. */
+	if (found->socket.state == SOCKET_STATE_READY) {
+		int fd = found->socket.fd;
+
+		debug_query(priv->query, "socket: passing successful connection %d to the application", found - paths);
+
+		found->socket.state = SOCKET_STATE_DONE;
+		found->socket.fd = -1;
+
+		/* Pause all scheduled sockets. */
+		for (struct netresolve_path *path = paths; path->node.family; path++) {
+			if (path->socket.state == SOCKET_STATE_SCHEDULED) {
+				assert(path->socket.watch);
+
+				debug_query(priv->query, "socket: pausing scheduled connection %d", path - paths);
+
+				netresolve_watch_remove(priv->query, path->socket.watch, false);
+				path->socket.watch = NULL;
+			}
+		}
+
+		/* Reset priority timeout. */
+		if (priv->priority_timeout) {
+			netresolve_timeout_remove(priv->query, priv->priority_timeout);
+			priv->priority_timeout = NULL;
+			priv->skip_scheduled = false;
+		}
+
+		fcntl(fd, F_SETFL, (fcntl(fd, F_GETFL, 0) & ~(SOCK_NONBLOCK | SOCK_CLOEXEC)) | priv->flags);
+		priv->callback(priv->query, found - paths, fd, priv->user_data);
+
+		return;
+	}
+
+	/* Schedule priority timeout if there is a priority socket waiting and
+	 * another socket ready and continue.
+	 */
+	if (found->socket.state == SOCKET_STATE_SCHEDULED) {
+		for (struct netresolve_path *path = paths; path->node.family; path++) {
+			if (path->socket.state == SOCKET_STATE_READY) {
+				if (priv->priority_timeout)
+					debug_query(priv->query, "socket: priority timeout already set");
+				else {
+					debug_query(priv->query, "socket: setting up priority timeout of %d seconds", PRIORITY_TIMEOUT);
+					priv->priority_timeout = netresolve_timeout_add(priv->query, PRIORITY_TIMEOUT, 0, NULL);
+				}
+				break;
+			}
+		}
+	}
+
+	/* Make sure connections are scheduled. */
+	enable_sockets(priv);
+}
+
+static void
+query_callback(netresolve_query_t query, void *user_data)
+{
+	struct netresolve_socket *priv = user_data;
+
+	debug_query(query, "socket: name resolution done");
+
+	priv->query = query;
+
+	enable_sockets(priv);
 }
 
 static void
 bind_callback(netresolve_query_t query, void *user_data)
 {
-	struct netresolve_socket *data = user_data;
+	struct netresolve_socket *priv = user_data;
 	size_t count = netresolve_query_get_count(query);
 
 	for (size_t idx = 0; idx < count; idx++) {
@@ -120,12 +227,12 @@ bind_callback(netresolve_query_t query, void *user_data)
 			close(sock);
 			return;
 		}
-		fcntl(sock, F_SETFL, (fcntl(sock, F_GETFL, 0) & ~(SOCK_NONBLOCK | SOCK_CLOEXEC)) | data->flags);
+		fcntl(sock, F_SETFL, (fcntl(sock, F_GETFL, 0) & ~(SOCK_NONBLOCK | SOCK_CLOEXEC)) | priv->flags);
 
-		data->callback(query, idx, sock, data->user_data);
+		priv->callback(query, idx, sock, priv->user_data);
 	}
 
-	free(data);
+	free(priv);
 	netresolve_query_free(query);
 }
 
@@ -140,90 +247,65 @@ memdup(const void *source, size_t len)
 	return target;
 }
 
-static void
-do_cleanup(struct netresolve_socket *data)
+bool
+connection_callback(netresolve_query_t query, int fd, int events)
 {
-	netresolve_query_t query = data->query;
-	int i;
+	struct netresolve_socket *priv = query->user_data;
 
-	debug("socket: cleaning up...");
-
-	for (i = 0; i < query->response.pathcount; i++) {
+	for (int i = 0; i < query->response.pathcount; i++) {
 		struct netresolve_path *path = &query->response.paths[i];
 
-		switch (path->socket.state) {
-		case NETRESOLVE_STATE_WAITING:
-		case NETRESOLVE_STATE_DONE:
-			netresolve_watch_remove(query, path->socket.watch, true);
-			/* pass through */
-		default:
-			memset(&path->socket, 0, sizeof path->socket);
+		if (fd == path->socket.fd) {
+			assert(events & POLLOUT);
+			assert(path->socket.state == SOCKET_STATE_SCHEDULED);
+			assert(path->socket.watch);
+
+			socklen_t len = sizeof(errno);
+			getsockopt(path->socket.fd, SOL_SOCKET, SO_ERROR, &errno, &len);
+
+			debug_query(query, "socket: connection %s", errno ? "failed" : "succeeded");
+
+			netresolve_watch_remove(priv->query, path->socket.watch, !!errno);
+
+			path->socket.state = errno ? SOCKET_STATE_DONE : SOCKET_STATE_READY;
+			path->socket.watch = NULL;
+
+			/* See whether we can pass back a ready connection. */
+			pickup_connected_socket(priv);
+
+			return true;
 		}
 	}
 
-	if (data->first_connect_timeout) {
-		netresolve_timeout_remove(query, data->first_connect_timeout);
-		data->first_connect_timeout = NULL;
-	}
-
-	free(data);
-	netresolve_query_free(query);
+	return false;
 }
 
-static void
-connect_check(struct netresolve_socket *data)
+bool
+timeout_callback(netresolve_query_t query, int fd, int events)
 {
-	netresolve_query_t query = data->query;
-	int idx;
+	struct netresolve_socket *priv = query->user_data;
 
-	for (idx = 0; idx < query->response.pathcount; idx++) {
-		struct netresolve_path *path = &query->response.paths[idx];
+	debug_query(query, "socket: priority timeout occured");
 
-		if (path->socket.state < NETRESOLVE_STATE_DONE)
-			break;
+	priv->skip_scheduled = true;
 
-		if (path->socket.state == NETRESOLVE_STATE_DONE) {
-			int sock = path->socket.fd;
+	pickup_connected_socket(priv);
 
-			netresolve_watch_remove(query, path->socket.watch, false);
-			fcntl(sock, F_SETFL, (fcntl(sock, F_GETFL, 0) & ~(SOCK_NONBLOCK | SOCK_CLOEXEC)) | data->flags);
-			data->callback(query, idx, sock, data->user_data);
-			path->socket.state = NETRESOLVE_STATE_NONE;
-			do_cleanup(data);
-			break;
-		}
-	}
+	return true;
 }
 
-static void
-connect_finished(struct netresolve_socket *data, struct netresolve_path *path)
-{
-	netresolve_query_t query = data->query;
-
-	path->socket.state = NETRESOLVE_STATE_DONE;
-
-	if (!data->first_connect_timeout)
-		data->first_connect_timeout = netresolve_timeout_add(query, FIRST_CONNECT_TIMEOUT, 0, NULL);
-
-	connect_check(data);
-}
-
-static void
-connect_failed(struct netresolve_socket *data, struct netresolve_path *path)
-{
-	netresolve_query_t query = data->query;
-	int family = path->node.family;
-
-	path->socket.state = NETRESOLVE_STATE_FAILED;
-	close(path->socket.fd);
-
-	while (path < query->response.paths + query->response.pathcount)
-		if (path->node.family == family)
-			do_connect(query, path - query->response.paths);
-
-	connect_check(data);
-}
-
+/* netresolve_connect:
+ *
+ * Perform name resolution and connect to a host. The callback is called
+ * once, with the first successfully connected socket. If you want to
+ * retry with another address, use `netresolve_connect_next()`. The caller
+ * is responsible for closing any sockets received through the callback.
+ *
+ * You should call `netresolve_connect_free()` once you know you're not
+ * going to call `netresolve_connect_free()` or any other API functions
+ * on the query to free all resources associated with the connection
+ * request.
+ */
 netresolve_query_t
 netresolve_connect(netresolve_t context,
 		const char *nodename, const char *servname,
@@ -232,9 +314,9 @@ netresolve_connect(netresolve_t context,
 {
 	int flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC);
 
-	struct netresolve_socket data = { .callback = callback, .user_data = user_data, .flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC) };
+	struct netresolve_socket priv = { .callback = callback, .user_data = user_data, .flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC) };
 
-	return netresolve_query(context, connect_callback, memdup(&data, sizeof data),
+	return netresolve_query(context, query_callback, memdup(&priv, sizeof priv),
 			NETRESOLVE_REQUEST_FORWARD,
 			NETRESOLVE_OPTION_NODE_NAME, nodename,
 			NETRESOLVE_OPTION_SERVICE_NAME, servname,
@@ -245,70 +327,103 @@ netresolve_connect(netresolve_t context,
 			NULL);
 }
 
+/* netresolve_connect_next:
+ *
+ * When multiple addresses have been found for the target, retry connection
+ * with the next available address.
+ */
+void
+netresolve_connect_next(netresolve_query_t query)
+{
+	struct netresolve_socket *priv = query->user_data;
+
+	enable_sockets(priv);
+}
+
+/* netresolve_connect_free:
+ *
+ * Destroys the query object and releases any related resources.
+ */
+void
+netresolve_connect_free(netresolve_query_t query)
+{
+	struct netresolve_socket *priv = query->user_data;
+
+	debug("socket: cleaning up...");
+
+	for (int i = 0; i < query->response.pathcount; i++) {
+		struct netresolve_path *path = &query->response.paths[i];
+
+		switch (path->socket.state) {
+		case SOCKET_STATE_SCHEDULED:
+			netresolve_watch_remove(query, path->socket.watch, true);
+			/* pass through */
+		case SOCKET_STATE_READY:
+			close(path->socket.fd);
+			break;
+		default:
+			break;
+		}
+
+		memset(&path->socket, 0, sizeof path->socket);
+	}
+
+	if (priv->priority_timeout)
+		netresolve_timeout_remove(query, priv->priority_timeout);
+
+	memset(priv, 0, sizeof *priv);
+	free(priv);
+
+	netresolve_query_free(query);
+}
+
+/* netresolve_bind:
+ *
+ * Perform name resolution, bind to all discovered addresses. Resulting
+ * file descriptors are passed to the caller via a series of calls to
+ * the provided callback.
+ */
 netresolve_query_t
 netresolve_bind(netresolve_t context,
 		const char *nodename, const char *servname,
 		int family, int socktype, int protocol,
 		netresolve_socket_callback_t callback, void *user_data)
 {
-	struct netresolve_socket data = { .callback = callback, .user_data = user_data, .flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC) };
+	struct netresolve_socket priv = { .callback = callback, .user_data = user_data, .flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC) };
 
-	return netresolve_query(context, bind_callback, memdup(&data, sizeof data),
+	return netresolve_query(context, bind_callback, memdup(&priv, sizeof priv),
 			NETRESOLVE_REQUEST_FORWARD,
 			NETRESOLVE_OPTION_NODE_NAME, nodename,
 			NETRESOLVE_OPTION_SERVICE_NAME, servname,
 			NETRESOLVE_OPTION_FAMILY, family,
-			NETRESOLVE_OPTION_SOCKTYPE, socktype & ~data.flags,
+			NETRESOLVE_OPTION_SOCKTYPE, socktype & ~priv.flags,
 			NETRESOLVE_OPTION_PROTOCOL, protocol,
 			NETRESOLVE_OPTION_DEFAULT_LOOPBACK, false,
 			NULL);
 }
 
+/* netresolve_bind_free:
+ *
+ * Destroys the query object and releases any related resources.
+ */
+void
+netresolve_bind_free(netresolve_query_t query)
+{
+	netresolve_query_free(query);
+}
+
 bool
 netresolve_connect_dispatch(netresolve_query_t query, int fd, int events)
 {
-	struct netresolve_socket *data = query->user_data;
-	int i;
+	struct netresolve_socket *priv = query->user_data;
 
 	debug("socket: dispatching file descriptor: %d %d", fd, events);
 
-	for (i = 0; i < query->response.pathcount; i++) {
-		struct netresolve_path *path = &query->response.paths[i];
-
-		if (fd == path->socket.fd) {
-			assert(events & POLLOUT);
-
-			socklen_t len = sizeof(errno);
-			getsockopt(path->socket.fd, SOL_SOCKET, SO_ERROR, &errno, &len);
-
-			if (errno)
-				connect_failed(data, path);
-			else
-				connect_finished(data, path);
-
-			return true;
-		}
-	}
-
-	if (fd == data->first_connect_timeout->fd) {
-		for (i = 0; i < query->response.pathcount; i++) {
-			struct netresolve_path *path = &query->response.paths[i];
-
-			switch (path->socket.state) {
-			case NETRESOLVE_STATE_WAITING:
-				netresolve_watch_remove(query, path->socket.watch, true);
-				/* pass through */
-			case NETRESOLVE_STATE_NONE:
-				path->socket.state = NETRESOLVE_STATE_FAILED;
-				break;
-			default:
-				break;
-			}
-		}
-
-		connect_check(data);
+	if (connection_callback(query, fd, events))
 		return true;
-	}
+
+	if (fd == priv->priority_timeout->fd && timeout_callback(query, fd, events))
+		return true;
 
 	return false;
 }

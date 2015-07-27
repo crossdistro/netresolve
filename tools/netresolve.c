@@ -280,17 +280,20 @@ main(int argc, char **argv)
 		abort();
 
 	if (connect) {
+		netresolve_query_t query;
 		int sock = -1;
 		struct pollfd fds[2];
-
-		netresolve_connect(context, nodename, servname, -1, -1, -1, on_connect, &sock);
+		
+		query = netresolve_connect(context, nodename, servname, -1, -1, -1, on_connect, &sock);
 
 		if (sock == -1) {
 			fprintf(stderr, "no connection\n");
 			return EXIT_FAILURE;
 		}
 
-		fprintf(stderr, "Connected.\n");
+		netresolve_connect_free(query);
+
+		debug("Connected.\n");
 
 		fds[0].fd = 0;
 		fds[0].events = POLLIN;

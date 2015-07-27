@@ -2,7 +2,6 @@
 
 ## Core library issues
 
- * socket: don't leak connect data on query/context destruction
  * socket: decouple event processing from query
 
 ## Features
@@ -10,9 +9,6 @@
  * Improve path ordering
     - use rules from http://tools.ietf.org/html/rfc6724
     - use /etc/gai.conf
- * Improve socket API and happy eyeballs
-    - support TCP application layer happy eyeballs
-    - support UDP happy eyeballs
  * Allow backend list setting at any time or at least check whether they can be changed
  * Read a configuration file in `/etc/netresolve` in addition to environment variables
  * Consider using -fvisibility=hidden

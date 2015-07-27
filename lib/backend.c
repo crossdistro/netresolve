@@ -151,10 +151,11 @@ add_path(netresolve_query_t query, const struct netresolve_path *path)
 		if (path_cmp(path, &response->paths[i]) < 0)
 			break;
 
-	response->paths = realloc(response->paths, (response->pathcount + 1) * sizeof *path);
+	response->paths = realloc(response->paths, (response->pathcount + 2) * sizeof *path);
 	memmove(&response->paths[i+1], &response->paths[i],
 			(response->pathcount++ - i) * sizeof *response->paths);
 	memcpy(&response->paths[i], path, sizeof *path);
+	memset(&response->paths[response->pathcount], 0, sizeof *response->paths);
 
 	debug_query(query, "added path: %s", netresolve_get_path_string(query, response->pathcount - 1));
 

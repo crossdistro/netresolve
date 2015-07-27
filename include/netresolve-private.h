@@ -63,6 +63,13 @@ enum netresolve_state {
 	NETRESOLVE_STATE_FAILED
 };
 
+enum netresolve_socket_state {
+	SOCKET_STATE_NONE,
+	SOCKET_STATE_SCHEDULED,
+	SOCKET_STATE_READY,
+	SOCKET_STATE_DONE
+};
+
 enum netresolve_request_type {
 	NETRESOLVE_REQUEST_FORWARD,
 	NETRESOLVE_REQUEST_REVERSE,
@@ -111,7 +118,7 @@ struct netresolve_path {
 	int weight;
 	int ttl;
 	struct {
-		enum netresolve_state state;
+		enum netresolve_socket_state state;
 		netresolve_watch_t watch;
 		int fd;
 	} socket;
