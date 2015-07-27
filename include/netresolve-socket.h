@@ -32,9 +32,13 @@ netresolve_query_t netresolve_connect(netresolve_t context,
 		const char *nodename, const char *servname,
 		int family, int socktype, int protocol,
 		netresolve_socket_callback_t callback, void *user_data);
+void netresolve_connect_next(netresolve_query_t query);
+void netresolve_connect_done(netresolve_query_t query);
+
 netresolve_query_t netresolve_bind(netresolve_t context,
 		const char *nodename, const char *servname,
 		int family, int socktype, int protocol,
 		netresolve_socket_callback_t callback, void *user_data);
+void netresolve_bind_done(netresolve_query_t query);
 
 #endif /* NETRESOLVE_SOCKET_H */
