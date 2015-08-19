@@ -2,7 +2,6 @@
 
 ## Core library issues
 
- * query: don't leak sources on destruction
  * socket: don't leak connect data on query/context destruction
  * socket: decouple event processing from query
 
@@ -44,6 +43,7 @@
 ## Backends
 
  * Improve `nss` backend
+    - support `/etc/nsswitch` configuration
     - consider supporting hostent listing
  * Improve the DNS backends
     - consider domain search support
@@ -60,9 +60,8 @@
 
 ## Portability
 
- * Support non-epoll platforms
-    - by passing multiple file descriptors to application using `watch_fd()` calls
-    - emulate timerfd file descriptors and/or pass a timeout to the application
+ * Support non-timerfd platforms
+    - pass timeout creation and removal request to the application/connector
 
 ## Documentation and non-development stuff
 

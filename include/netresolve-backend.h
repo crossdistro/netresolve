@@ -24,6 +24,8 @@
 #ifndef NETRESOLVE_BACKEND_H
 #define NETRESOLVE_BACKEND_H
 
+#include <netresolve-nonblock.h>
+
 #include <stdbool.h>
 #include <string.h>
 #include <fcntl.h>
@@ -35,6 +37,7 @@
 #include <poll.h>
 
 typedef struct netresolve_query *netresolve_query_t;
+typedef struct netresolve_watch *netresolve_timeout_t;
 
 __attribute__((unused))
 static struct in_addr inaddr_any = { 0 };
@@ -91,12 +94,15 @@ void netresolve_backend_apply_hostent(netresolve_query_t query,
 /* Tools */
 void *netresolve_backend_new_priv(netresolve_query_t query, size_t size);
 void *netresolve_backend_get_priv(netresolve_query_t query);
-void netresolve_backend_watch_fd(netresolve_query_t query, int fd, int events);
-void netresolve_backend_unwatch_fd(netresolve_query_t query, int fd);
-int netresolve_backend_add_timeout(netresolve_query_t query, time_t sec, long nsec);
-void netresolve_backend_remove_timeout(netresolve_query_t query, int fd);
 void netresolve_backend_finished(netresolve_query_t query);
 void netresolve_backend_failed(netresolve_query_t query);
+
+/* Events */
+netresolve_watch_t netresolve_watch_add(netresolve_query_t query, int fd, int events, void *data);
+void netresolve_watch_remove(netresolve_query_t query, netresolve_watch_t watch, bool do_close);
+netresolve_timeout_t netresolve_timeout_add(netresolve_query_t query, time_t sec, long nsec, void *data);
+netresolve_timeout_t netresolve_timeout_add_ms(netresolve_query_t query, long msec, void *data);
+void netresolve_timeout_remove(netresolve_query_t query, netresolve_timeout_t timeout);
 
 /* Logging */
 #define error(...) netresolve_log(0x20, __VA_ARGS__)
@@ -115,7 +121,7 @@ bool netresolve_backend_parse_path(const char *str,
 void setup_forward(netresolve_query_t query, char **settings);
 void setup_reverse(netresolve_query_t query, char **settings);
 void setup_dns(netresolve_query_t query, char **settings);
-void dispatch(netresolve_query_t query, int fd, int revents);
+void dispatch(netresolve_query_t query, int fd, int revents, void *data);
 void cleanup(netresolve_query_t query);
 
 /* String functions */

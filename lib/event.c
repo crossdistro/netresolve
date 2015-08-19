@@ -28,16 +28,16 @@
 
 void
 netresolve_set_fd_callbacks(netresolve_t context,
-		netresolve_watch_fd_callback_t watch_fd,
-		netresolve_unwatch_fd_callback_t unwatch_fd,
+		netresolve_watch_add_callback_t add_watch,
+		netresolve_watch_remove_callback_t remove_watch,
 		void *user_data,
 		netresolve_free_user_data_callback_t free_user_data)
 {
-	assert(watch_fd && unwatch_fd);
-	assert(!context->callbacks.watch_fd && !context->callbacks.unwatch_fd);
+	assert(add_watch && remove_watch);
+	assert(!context->callbacks.add_watch && !context->callbacks.remove_watch);
 
-	context->callbacks.watch_fd = watch_fd;
-	context->callbacks.unwatch_fd = unwatch_fd;
+	context->callbacks.add_watch = add_watch;
+	context->callbacks.remove_watch = remove_watch;
 
 	context->callbacks.user_data = user_data;
 	context->callbacks.free_user_data = free_user_data;
@@ -49,110 +49,108 @@ netresolve_get_user_data(netresolve_t context)
     return context->callbacks.user_data;
 }
 
-void
-netresolve_watch_fd(netresolve_query_t query, int fd, int events)
+netresolve_watch_t
+netresolve_watch_add(netresolve_query_t query, int fd, int events, void *data)
 {
-	struct netresolve_source *sources = &query->sources;
-	struct netresolve_source *source;
+	struct netresolve_watch *watches = &query->watches;
+	struct netresolve_watch *watch;
 
 	assert(fd >= 0);
 	assert(events && !(events & ~(POLLIN | POLLOUT)));
 
-	if (!(source = calloc(1, sizeof(*source))))
+	if (!(watch = calloc(1, sizeof(*watch))))
 		abort();
 
-	source->query = query;
-	source->fd = fd;
-	source->handle = query->context->callbacks.watch_fd(query->context, fd, events, source);
+	watch->query = query;
+	watch->fd = fd;
+	watch->data = data;
+	watch->handle = query->context->callbacks.add_watch(query->context, fd, events, watch);
 
-	source->previous = sources->previous;
-	source->next = sources;
-	source->previous->next = source->next->previous = source;
+	watch->previous = watches->previous;
+	watch->next = watches;
+	watch->previous->next = watch->next->previous = watch;
 
 	query->nfds++;
 	query->context->nfds++;
 
-	debug_query(query, "added file descriptor: fd=%d events=%d source=%p (total %d/%d)", fd, events, source, query->nfds, query->context->nfds);
+	debug_query(query, "added file descriptor: fd=%d events=%d watch=%p (total %d/%d)", fd, events, watch, query->nfds, query->context->nfds);
+
+	return watch;
 }
 
 void
-netresolve_unwatch_fd(netresolve_query_t query, int fd)
+netresolve_watch_remove(netresolve_query_t query, netresolve_watch_t watch, bool do_close)
 {
-	struct netresolve_source *sources = &query->sources;
-	struct netresolve_source *source;
-
-	assert(fd >= 0);
-
-	for (source = sources->next; source != sources; source = source->next)
-		if (source->fd == fd)
-			break;
+	struct netresolve_watch *watches = &query->watches;
 
 	assert(query->nfds > 0);
 	assert(query->context->nfds > 0);
-	assert(source != sources);
+	assert(watch != watches);
 
-	source->previous->next = source->next;
-	source->next->previous = source->previous;
+	watch->previous->next = watch->next;
+	watch->next->previous = watch->previous;
 
 	query->nfds--;
 	query->context->nfds--;
 
-	query->context->callbacks.unwatch_fd(query->context, fd, source->handle);
+	query->context->callbacks.remove_watch(query->context, watch->fd, watch->handle);
 
-	debug_query(query, "removed file descriptor: fd=%d source=%p (total %d/%d)", fd, source, query->nfds, query->context->nfds);
+	debug_query(query, "removed file descriptor: fd=%d watch=%p (total %d/%d)", watch->fd, watch, query->nfds, query->context->nfds);
 
-	memset(source, 0, sizeof *source);
-	free(source);
+	if (do_close) {
+		close(watch->fd);
+		debug_query(query, "closed file descriptor: fd=%d", watch->fd);
+	}
+
+	memset(watch, 0, sizeof *watch);
+	free(watch);
 }
 
-int
-netresolve_add_timeout(netresolve_query_t query, time_t sec, long nsec)
+netresolve_timeout_t
+netresolve_timeout_add(netresolve_query_t query, time_t sec, long nsec, void *data)
 {
 	int fd;
 	struct itimerspec timerspec = {{0, 0}, {sec, nsec}};
 
 	if ((fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK)) == -1)
-		return -1;
+		return NULL;
 
 	if (timerfd_settime(fd, 0, &timerspec, NULL) == -1) {
 		close(fd);
-		return -1;
+		return NULL;
 	}
 
 	debug_query(query, "adding timeout: fd=%d sec=%d nsec=%ld", fd, (int) sec, nsec);
 
-	netresolve_watch_fd(query, fd, POLLIN);
-
-	return fd;
+	return netresolve_watch_add(query, fd, POLLIN, data);
 }
 
-int
-netresolve_add_timeout_ms(netresolve_query_t query, time_t msec)
+netresolve_timeout_t
+netresolve_timeout_add_ms(netresolve_query_t query, time_t msec, void *data)
 {
-	return netresolve_add_timeout(query, msec / 1000, (msec % 1000) * 1000000L);
+	return netresolve_timeout_add(query, msec / 1000, (msec % 1000) * 1000000L, data);
 }
 
 void
-netresolve_remove_timeout(netresolve_query_t query, int fd)
+netresolve_timeout_remove(netresolve_query_t query, netresolve_timeout_t timeout)
 {
-	netresolve_unwatch_fd(query, fd);
-	close(fd);
+	debug_query(query, "removing timeout: %p timeoutfd=%d", timeout, timeout->fd);
 
-	debug_query(query, "removed timeout: fd=%d", fd);
+	netresolve_watch_remove(query, timeout, true);
 }
 
 bool
-netresolve_dispatch(netresolve_t context, netresolve_source_t source, int events)
+netresolve_dispatch(netresolve_t context, netresolve_watch_t watch, int events)
 {
-	assert(source);
-	assert(source->query);
+	assert(watch);
+	assert(watch->query);
 
 	if (!(events & (POLLIN | POLLOUT)) || (events & ~(POLLIN | POLLOUT))) {
-		error("Bad poll events %d for source %p.", events, source);
+		error("Bad poll events %d for watch %p.", events, watch);
 		return false;
 	}
 
-	debug_query(source->query, "dispatching: fd=%d events=%d source=%p", source->fd, events, source);
+	debug_query(watch->query, "dispatching: fd=%d events=%d watch=%p", watch->fd, events, watch);
 
-	return netresolve_query_dispatch(source->query, source->fd, events);
+	return netresolve_query_dispatch(watch->query, watch->fd, events, watch->data);
 }

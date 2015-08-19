@@ -29,11 +29,11 @@
 struct netresolve_select {
 	fd_set rfds, wfds;
 	int nfds;
-	netresolve_source_t *sources;
+	netresolve_watch_t *sources;
 };
 
 static void *
-watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
+add_watch(netresolve_t context, int fd, int events, netresolve_watch_t source)
 {
 	struct netresolve_select *loop = netresolve_get_user_data(context);
 
@@ -58,7 +58,7 @@ watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
 }
 
 static void
-unwatch_fd(netresolve_t context, int fd, void *handle)
+remove_watch(netresolve_t context, int fd, void *handle)
 {
 	struct netresolve_select *loop = netresolve_get_user_data(context);
 
@@ -97,7 +97,7 @@ netresolve_select_new()
 	if (!(context = netresolve_context_new()))
 		goto fail_context;
 
-	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, loop, free_user_data);
+	netresolve_set_fd_callbacks(context, add_watch, remove_watch, loop, free_user_data);
 
 	return context;
 fail_context:

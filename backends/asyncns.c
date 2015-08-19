@@ -40,13 +40,13 @@ setup_forward(netresolve_query_t query, char **settings)
 		return;
 	}
 
-	netresolve_backend_watch_fd(query, asyncns_fd(priv->asyncns), POLLIN);
+	netresolve_watch_add(query, asyncns_fd(priv->asyncns), POLLIN, NULL);
 
 	return;
 }
 
 void
-dispatch(netresolve_query_t query, int fd, int events)
+dispatch(netresolve_query_t query, int fd, int events, void *data)
 {
 	struct priv_asyncns *priv = netresolve_backend_get_priv(query);
 	asyncns_query_t *q;

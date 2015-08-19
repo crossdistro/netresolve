@@ -301,30 +301,6 @@ netresolve_backend_get_priv(netresolve_query_t query)
 }
 
 void
-netresolve_backend_watch_fd(netresolve_query_t query, int fd, int events)
-{
-	netresolve_watch_fd(query, fd, events);
-}
-
-void
-netresolve_backend_unwatch_fd(netresolve_query_t query, int fd)
-{
-	netresolve_unwatch_fd(query, fd);
-}
-
-int
-netresolve_backend_add_timeout(netresolve_query_t query, time_t sec, long nsec)
-{
-	return netresolve_add_timeout(query, sec, nsec);
-}
-
-void
-netresolve_backend_remove_timeout(netresolve_query_t query, int fd)
-{
-	netresolve_remove_timeout(query, fd);
-}
-
-void
 netresolve_backend_finished(netresolve_query_t query)
 {
 	netresolve_query_set_state(query, NETRESOLVE_STATE_RESOLVED);

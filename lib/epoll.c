@@ -22,16 +22,19 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <netresolve-epoll.h>
-#include <netresolve-nonblock.h>
 #include <netresolve-private.h>
 #include <unistd.h>
 #include <assert.h>
 
+#define EPOLL_MAXEVENTS 128
+
 static void *
-watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
+add_watch(netresolve_t context, int fd, int events, netresolve_watch_t watch)
 {
 	struct netresolve_epoll *loop = netresolve_get_user_data(context);
-	struct epoll_event event = { .events = events, .data = { .ptr = source } };
+	struct epoll_event event = { .events = events, .data = { .ptr = watch } };
+
+	assert(watch);
 
 	if (epoll_ctl(loop->fd, EPOLL_CTL_ADD, fd, &event) == -1) {
 		error("epoll_ctl: %s", strerror(errno));
@@ -40,19 +43,26 @@ watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
 
 	loop->count++;
 
-	return NULL;
+	return watch;
 }
 
 static void
-unwatch_fd(netresolve_t context, int fd, void *handle)
+remove_watch(netresolve_t context, int fd, void *handle)
 {
 	struct netresolve_epoll *loop = netresolve_get_user_data(context);
-
-	assert(handle == NULL);
+	int i;
 
 	if (epoll_ctl(loop->fd, EPOLL_CTL_DEL, fd, NULL) == -1) {
 		error("epoll_ctl: %s", strerror(errno));
 		abort();
+	}
+
+	/* Disable any pending events. */
+	for (i = 0; i < loop->nevents; i++) {
+		if (handle == loop->events[i].data.ptr) {
+			loop->events[i].data.ptr = NULL;
+			debug_context(context, "epoll: disabled pending event %d for removed watch %p", i, handle);
+		}
 	}
 
 	loop->count--;
@@ -66,7 +76,9 @@ free_user_data(void *user_data)
 	assert(!loop->count);
 
 	if (close(loop->fd) == -1)
-		abort();
+		error("close: %s", strerror(errno));
+
+	free(loop->events);
 	free(loop);
 }
 
@@ -81,17 +93,27 @@ netresolve_epoll_install(netresolve_t context,
 		struct netresolve_epoll *loop,
 		netresolve_free_user_data_callback_t free_loop)
 {
+	assert(!loop->events);
+
+	if (!(loop->events = calloc(EPOLL_MAXEVENTS, sizeof *loop->events)))
+		goto fail_events;
+
 	if ((loop->fd = epoll_create1(EPOLL_CLOEXEC)) == -1) {
 		error("epoll_create1: %s", strerror(errno));
-		free(loop);
-		return false;
+		goto fail_epoll;
 	}
 
-	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, loop, free_loop);
+	netresolve_set_fd_callbacks(context, add_watch, remove_watch, loop, free_loop);
 
 	debug("created epoll file descriptor: %d", loop->fd);
 
 	return true;
+fail_epoll:
+	free(loop->events);
+fail_events:
+	free(loop);
+
+	return false;
 }
 
 /* netresolve_epoll_new:
@@ -149,31 +171,27 @@ static int
 dispatch_events(netresolve_t context, int timeout)
 {
 	struct netresolve_epoll *loop = netresolve_get_user_data(context);
-	/* FIXME: Original intention was to accept multiple events at once
-	 * but netresolve cannot currently handle the situation when an
-	 * event source is removed at the time an event with that event
-	 * source is already cached.
-	 */
-	static const int maxevents = 1;
-	struct epoll_event events[maxevents];
-	int nevents;
 	int i;
 
-	nevents = epoll_wait(loop->fd, events, maxevents, timeout);
+	debug_context(context, "epoll: waiting");
+	loop->nevents = epoll_wait(loop->fd, loop->events, EPOLL_MAXEVENTS, timeout);
 
-	switch (nevents) {
+	switch (loop->nevents) {
 	case -1:
 		error("epoll_wait: %s", strerror(errno));
 		abort();
 	case 0:
+		error("epoll_wait: no events");
 		break;
 	default:
-		for (i = 0; i < nevents; i++)
-			if (!netresolve_dispatch(context, events[i].data.ptr, events[i].events))
-				abort();
+		debug_context(context, "epoll_wait: new events: %d", loop->nevents);
+		for (i = 0; i < loop->nevents; i++)
+			if (loop->events[i].data.ptr)
+				if (!netresolve_dispatch(context, loop->events[i].data.ptr, loop->events[i].events))
+					error("event %d for watch %p not dispatched", i, loop->events[i].data.ptr);
 	}
 
-	return nevents;
+	return loop->nevents;
 }
 
 /* netresolve_epoll_dispatch:

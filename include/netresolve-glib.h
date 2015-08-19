@@ -35,7 +35,7 @@
 struct netresolve_glib_source {
 	netresolve_t context;
 	GIOChannel *stream;
-	netresolve_source_t source;
+	netresolve_watch_t source;
 };
 
 static int
@@ -76,7 +76,7 @@ handler(GIOChannel *stream, GIOCondition condition, gpointer data)
 }
 
 static void*
-watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
+add_watch(netresolve_t context, int fd, int events, netresolve_watch_t source)
 {
 	struct netresolve_glib_source *glib_source = calloc(1, sizeof *glib_source);
 
@@ -92,7 +92,7 @@ watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
 }
 
 static void
-unwatch_fd(netresolve_t context, int fd, void *handle)
+remove_watch(netresolve_t context, int fd, void *handle)
 {
 	struct netresolve_glib_source *glib_source = handle;
 
@@ -108,7 +108,7 @@ netresolve_glib_new(void)
 
 	assert(context);
 
-	netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, NULL, NULL);
+	netresolve_set_fd_callbacks(context, add_watch, remove_watch, NULL, NULL);
 
 	return context;
 }

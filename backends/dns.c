@@ -54,10 +54,12 @@ struct priv_dns {
 #if defined(USE_UNBOUND)
 	struct ub_ctx* ctx;
 	bool validate;
+	netresolve_watch_t watch;
 #elif defined(USE_ARES)
 	ares_channel channel;
 	fd_set rfds, wfds;
 	int nfds;
+	netresolve_watch_t *watches;
 #endif
 };
 
@@ -122,12 +124,13 @@ watch_file_descriptors(struct priv_dns *priv)
 	assert(priv->nfds == 0);
 
 	priv->nfds = ares_fds(priv->channel, &priv->rfds, &priv->wfds);
+	priv->watches = realloc(priv->watches, priv->nfds * sizeof *priv->watches);
 
 	for (int fd = 0; fd < priv->nfds; fd++) {
 		if (FD_ISSET(fd, &priv->rfds))
-			netresolve_backend_watch_fd(priv->query, fd, POLLIN);
+			priv->watches[fd] = netresolve_watch_add(priv->query, fd, POLLIN, NULL);
 		if (FD_ISSET(fd, &priv->wfds))
-			netresolve_backend_watch_fd(priv->query, fd, POLLOUT);
+			priv->watches[fd] = netresolve_watch_add(priv->query, fd, POLLOUT, NULL);
 	}
 }
 
@@ -138,7 +141,7 @@ unwatch_file_descriptors(struct priv_dns *priv)
 
 	for (int fd = 0; fd < priv->nfds; fd++)
 		if (FD_ISSET(fd, &priv->rfds))
-			netresolve_backend_unwatch_fd(priv->query, fd);
+			netresolve_watch_remove(priv->query, priv->watches[fd], false);
 
 	FD_ZERO(&priv->rfds);
 	FD_ZERO(&priv->wfds);
@@ -408,7 +411,7 @@ setup(netresolve_query_t query, char **settings)
 		error("libunbound: %s", ub_strerror(status));
 		return NULL;
 	}
-	netresolve_backend_watch_fd(query, ub_fd(priv->ctx), POLLIN);
+	priv->watch = netresolve_watch_add(query, ub_fd(priv->ctx), POLLIN, NULL);
 #elif defined(USE_ARES)
 	/* ares doesn't seem to accept const options */
 	static struct ares_options options = {
@@ -489,7 +492,7 @@ setup_dns(netresolve_query_t query, char **settings)
 }
 
 void
-dispatch(netresolve_query_t query, int fd, int events)
+dispatch(netresolve_query_t query, int fd, int events, void *data)
 {
 	struct priv_dns *priv = netresolve_backend_get_priv(query);
 
@@ -533,13 +536,14 @@ cleanup(netresolve_query_t query)
 	free(priv->name);
 
 #if defined(USE_UNBOUND)
-	if (priv->ctx) {
-		netresolve_backend_unwatch_fd(query, ub_fd(priv->ctx));
+	if (priv->watch)
+		netresolve_watch_remove(query, priv->watch, false);
+	if (priv->ctx);
 		ub_ctx_delete(priv->ctx);
-	}
 #elif defined(USE_ARES)
 	if (priv->nfds)
 		unwatch_file_descriptors(priv);
+	free(priv->watches);
 	ares_destroy(priv->channel);
 #endif
 }

@@ -35,7 +35,7 @@
 struct netresolve_event_source {
 	netresolve_t context;
 	struct event *event;
-	netresolve_source_t source;
+	netresolve_watch_t source;
 };
 
 static int
@@ -74,7 +74,7 @@ handler(int fd, short condition, void *data)
 }
 
 static void*
-watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
+add_watch(netresolve_t context, int fd, int events, netresolve_watch_t source)
 {
 	struct event_base *base = netresolve_get_user_data(context);
 	struct netresolve_event_source *event_source = calloc(1, sizeof *event_source);
@@ -93,7 +93,7 @@ watch_fd(netresolve_t context, int fd, int events, netresolve_source_t source)
 }
 
 static void
-unwatch_fd(netresolve_t context, int fd, void *handle)
+remove_watch(netresolve_t context, int fd, void *handle)
 {
 	struct netresolve_event_source *event_source = handle;
 
@@ -108,7 +108,7 @@ netresolve_event_new(struct event_base *base)
 	netresolve_t context = netresolve_context_new();
 
 	if (context)
-		netresolve_set_fd_callbacks(context, watch_fd, unwatch_fd, base, NULL);
+		netresolve_set_fd_callbacks(context, add_watch, remove_watch, base, NULL);
 
 	return context;
 }

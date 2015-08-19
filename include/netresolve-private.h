@@ -78,6 +78,8 @@ enum netresolve_security {
 struct netresolve_epoll {
 	int fd;
 	int count;
+	int nevents;
+	struct epoll_event *events;
 };
 
 struct netresolve_backend {
@@ -85,7 +87,7 @@ struct netresolve_backend {
 	char **settings;
 	void *dl_handle;
 	void (*setup[_NETRSOLVE_REQUEST_TYPES])(netresolve_query_t query, char **settings);
-	void (*dispatch)(netresolve_query_t query, int fd, int revents);
+	void (*dispatch)(netresolve_query_t query, int fd, int revents, void *data);
 	void (*cleanup)(netresolve_query_t query);
 	void *data;
 };
@@ -110,25 +112,27 @@ struct netresolve_path {
 	int ttl;
 	struct {
 		enum netresolve_state state;
+		netresolve_watch_t watch;
 		int fd;
 	} socket;
 };
 
 struct netresolve_query {
 	struct netresolve_context *context;
-	struct netresolve_source {
+	struct netresolve_watch {
 		netresolve_query_t query;
 		int fd;
+		void *data;
 		void *handle;
-		struct netresolve_source *previous, *next;
-	} sources;
+		struct netresolve_watch *previous, *next;
+	} watches;
 	netresolve_query_callback callback;
 	void *user_data;
 	enum netresolve_state state;
 	int nfds;
-	int delayed_fd;
-	int timeout_fd;
-	int partial_timeout_fd;
+	netresolve_timeout_t delayed;
+	netresolve_timeout_t timeout;
+	netresolve_timeout_t partial_timeout;
 	struct netresolve_backend **backend;
 	struct netresolve_request {
 		enum netresolve_request_type type;
@@ -197,8 +201,8 @@ struct netresolve_context {
 	int nfds;
 	struct netresolve_backend **backends;
 	struct {
-		netresolve_watch_fd_callback_t watch_fd;
-		netresolve_unwatch_fd_callback_t unwatch_fd;
+		netresolve_watch_add_callback_t add_watch;
+		netresolve_watch_remove_callback_t remove_watch;
 		void *user_data;
 		netresolve_free_user_data_callback_t free_user_data;
 	} callbacks;
@@ -212,18 +216,11 @@ netresolve_query_t netresolve_query(netresolve_t context, netresolve_query_callb
 		enum netresolve_option type, ...);
 const char *netresolve_query_state_to_string(enum netresolve_state state);
 void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
-bool netresolve_query_dispatch(netresolve_query_t query, int fd, int events);
+bool netresolve_query_dispatch(netresolve_query_t query, int fd, int events, void *data);
 
 /* Request */
 bool netresolve_request_set_options_from_va(struct netresolve_request *request, va_list ap);
 bool netresolve_request_get_options_from_va(struct netresolve_request *request, va_list ap);
-
-/* Event handling */
-void netresolve_watch_fd(netresolve_query_t query, int fd, int events);
-void netresolve_unwatch_fd(netresolve_query_t query, int fd);
-int netresolve_add_timeout(netresolve_query_t query, time_t sec, long nsec);
-int netresolve_add_timeout_ms(netresolve_query_t query, time_t msec);
-void netresolve_remove_timeout(netresolve_query_t query, int fd);
 
 /* Services */
 struct netresolve_service_list;

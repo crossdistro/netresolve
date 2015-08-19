@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#include <netresolve-backend.h>
+#include <netresolve-private.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <signal.h>
@@ -36,9 +36,9 @@ struct buffer {
 struct priv_exec {
 	int pid;
 	struct buffer inbuf;
-	int infd;
+	netresolve_watch_t input;
 	struct buffer outbuf;
-	int outfd;
+	netresolve_watch_t output;
 };
 
 static bool
@@ -89,7 +89,7 @@ static void
 send_stdin(netresolve_query_t query, struct priv_exec *priv)
 {
 	if (priv->inbuf.start != priv->inbuf.end) {
-		ssize_t size = write(priv->infd, priv->inbuf.start, priv->inbuf.end - priv->inbuf.start);
+		ssize_t size = write(priv->input->fd, priv->inbuf.start, priv->inbuf.end - priv->inbuf.start);
 		if (size > 0) {
 			priv->inbuf.start += size;
 			return;
@@ -97,9 +97,8 @@ send_stdin(netresolve_query_t query, struct priv_exec *priv)
 		debug("write failed: %s", strerror(errno));
 	}
 
-	netresolve_backend_unwatch_fd(query, priv->infd);
-	close(priv->infd);
-	priv->infd = -1;
+	netresolve_watch_remove(query, priv->input, true);
+	priv->input->fd = -1;
 }
 
 static bool
@@ -150,7 +149,7 @@ pickup_stdout(netresolve_query_t query, struct priv_exec *priv)
 		return;
 	}
 
-	size = read(priv->outfd, priv->outbuf.start, priv->outbuf.end - priv->outbuf.start);
+	size = read(priv->output->fd, priv->outbuf.start, priv->outbuf.end - priv->outbuf.start);
 	if (size <= 0) {
 		abort();
 		if (size < 0)
@@ -176,11 +175,10 @@ void
 setup_forward(netresolve_query_t query, char **settings)
 {
 	struct priv_exec *priv = netresolve_backend_new_priv(query, sizeof *priv);
+	int infd;
+	int outfd;
 
-	priv->infd = -1;
-	priv->outfd = -1;
-
-	if (!priv || !start_subprocess(settings, &priv->pid, &priv->infd, &priv->outfd)) {
+	if (!priv || !start_subprocess(settings, &priv->pid, &infd, &outfd)) {
 		netresolve_backend_failed(query);
 		return;
 	}
@@ -189,22 +187,22 @@ setup_forward(netresolve_query_t query, char **settings)
 	priv->inbuf.start = priv->inbuf.buffer;
 	priv->inbuf.end = priv->inbuf.buffer + strlen(priv->inbuf.buffer);
 
-	netresolve_backend_watch_fd(query, priv->infd, POLLOUT);
-	netresolve_backend_watch_fd(query, priv->outfd, POLLIN);
+	priv->input = netresolve_watch_add(query, infd, POLLOUT, NULL);
+	priv->output = netresolve_watch_add(query, outfd, POLLIN, NULL);
 }
 
 void
-dispatch(netresolve_query_t query, int fd, int events)
+dispatch(netresolve_query_t query, int fd, int events, void *data)
 {
 	struct priv_exec *priv = netresolve_backend_get_priv(query);
 
 	debug("exec: events %d on fd %d", events, fd);
 
-	if (fd == priv->infd && events & POLLOUT)
+	if (fd == priv->input->fd && events & POLLOUT)
 		send_stdin(query, priv);
-	else if (fd == priv->outfd && events & POLLIN) {
+	else if (fd == priv->output->fd && events & POLLIN) {
 		pickup_stdout(query, priv);
-	} else if (fd == priv->outfd && events & POLLHUP) {
+	} else if (fd == priv->output->fd && events & POLLHUP) {
 		error("exec: incomplete response");
 		netresolve_backend_failed(query);
 	} else {
@@ -218,14 +216,10 @@ cleanup(netresolve_query_t query)
 {
 	struct priv_exec *priv = netresolve_backend_get_priv(query);
 
-	if (priv->infd != -1) {
-		netresolve_backend_unwatch_fd(query, priv->infd);
-		close(priv->infd);
-	}
-	if (priv->outfd != -1) {
-		netresolve_backend_unwatch_fd(query, priv->outfd);
-		close(priv->outfd);
-	}
+	if (priv->input)
+		netresolve_watch_remove(query, priv->input, true);
+	if (priv->output)
+		netresolve_watch_remove(query, priv->output, true);
 	/* TODO: Implement proper child handling. */
 	kill(priv->pid, SIGKILL);
 	free(priv->inbuf.buffer);

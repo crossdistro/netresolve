@@ -56,6 +56,7 @@ main(int argc, char **argv)
 	query2 = netresolve_query_forward(context, node2, service, callback2, &priv);
 	assert(query1 && query2);
 
+	usleep(100000);
 	context_wait(context);
 	assert(priv.finished == 2);
 

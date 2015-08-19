@@ -79,6 +79,8 @@ netresolve_context_free(netresolve_t context)
 {
 	struct netresolve_query *queries = &context->queries;
 
+	debug_context(context, "destroying context");
+
 	while (queries->next != queries)
 		netresolve_query_free(queries->next);
 

@@ -53,13 +53,13 @@ netresolve_query_state_to_string(enum netresolve_state state)
 }
 
 static void
-clear_timeout(netresolve_query_t query, int *tfd)
+clear_timeout(netresolve_query_t query, netresolve_timeout_t *timeout)
 {
-	if (*tfd == -1)
+	if (!*timeout)
 		return;
 
-	netresolve_remove_timeout(query, *tfd);
-	*tfd = -1;
+	netresolve_timeout_remove(query, *timeout);
+	*timeout = NULL;
 }
 
 static void
@@ -67,9 +67,9 @@ cleanup_query(netresolve_query_t query)
 {
 	struct netresolve_backend *backend = query->backend ? *query->backend : NULL;
 
-	clear_timeout(query, &query->delayed_fd);
-	clear_timeout(query, &query->timeout_fd);
-	clear_timeout(query, &query->partial_timeout_fd);
+	clear_timeout(query, &query->delayed);
+	clear_timeout(query, &query->timeout);
+	clear_timeout(query, &query->partial_timeout);
 
 	if (backend && backend->data) {
 		if (backend->cleanup)
@@ -123,21 +123,23 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 		break;
 	case NETRESOLVE_STATE_WAITING:
 		if (query->request.timeout > 0)
-			query->timeout_fd = netresolve_add_timeout_ms(query, query->request.timeout);
+			query->timeout = netresolve_timeout_add_ms(query, query->request.timeout, NULL);
 		break;
 	case NETRESOLVE_STATE_WAITING_MORE:
 		if (query->request.partial_timeout == 0)
 			netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 		if (query->request.partial_timeout > 0)
-			query->partial_timeout_fd = netresolve_add_timeout_ms(query, query->request.partial_timeout);
+			query->partial_timeout = netresolve_timeout_add_ms(query, query->request.partial_timeout, NULL);
 		break;
 	case NETRESOLVE_STATE_RESOLVED:
 		if (old_state == NETRESOLVE_STATE_SETUP) {
-			if ((query->delayed_fd = eventfd(1, EFD_NONBLOCK)) == -1) {
+			int fd;
+
+			if ((fd = eventfd(1, EFD_NONBLOCK)) == -1) {
 				error("can't create eventfd");
 				abort();
 			}
-			netresolve_watch_fd(query, query->delayed_fd, POLLIN);
+			query->delayed = netresolve_watch_add(query, fd, POLLIN, NULL);
 		}
 		break;
 	case NETRESOLVE_STATE_DONE:
@@ -188,16 +190,13 @@ netresolve_query_new(netresolve_t context, enum netresolve_request_type type)
 	query->previous->next = query->next->previous = query;
 
 	query->context = context;
-	query->sources.previous = query->sources.next = &query->sources;
+	query->watches.previous = query->watches.next = &query->watches;
 
 	if (!context->backends)
 		netresolve_set_backend_string(context, secure_getenv("NETRESOLVE_BACKENDS"));
 	if (!context->backends || !*context->backends)
 		abort();
 
-	query->delayed_fd = -1;
-	query->timeout_fd = -1;
-	query->partial_timeout_fd = -1;
 	query->backend = context->backends;
 	memcpy(&query->request, &context->request, sizeof context->request);
 
@@ -243,7 +242,7 @@ netresolve_query( netresolve_t context, netresolve_query_callback callback, void
 		query->request.family = context->config.force_family;
 
 	/* Install default callbacks for first query in blocking mode. */
-	if (!context->callbacks.watch_fd)
+	if (!context->callbacks.add_watch)
 		netresolve_epoll_install(context, &context->epoll, NULL);
 
 	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
@@ -308,12 +307,12 @@ netresolve_query_dns(netresolve_t context,
 }
 
 static bool
-dispatch_timeout(netresolve_query_t query, int *tfd, enum netresolve_state state, int fd, int events)
+dispatch_timeout(netresolve_query_t query, netresolve_timeout_t *timeout, enum netresolve_state state, int fd, int events)
 {
-	if (fd != *tfd)
+	if (fd != (*timeout)->fd)
 		return false;
 
-	clear_timeout(query, tfd);
+	clear_timeout(query, timeout);
 	netresolve_query_set_state(query, state);
 
 	return true;
@@ -327,24 +326,24 @@ dispatch_timeout(netresolve_query_t query, int *tfd, enum netresolve_state state
  * query.
  */
 bool
-netresolve_query_dispatch(netresolve_query_t query, int fd, int events)
+netresolve_query_dispatch(netresolve_query_t query, int fd, int events, void *data)
 {
 	struct netresolve_backend *backend = query->backend ? *query->backend : NULL;
 
 	switch (query->state) {
 	case NETRESOLVE_STATE_WAITING_MORE:
-		if (dispatch_timeout(query, &query->partial_timeout_fd, NETRESOLVE_STATE_DONE, fd, events)) {
+		if (dispatch_timeout(query, &query->partial_timeout, NETRESOLVE_STATE_DONE, fd, events)) {
 			debug_query(query, "partial result timed out");
 			return true;
 		}
 		/* fall through */
 	case NETRESOLVE_STATE_WAITING:
-		if (dispatch_timeout(query, &query->timeout_fd, NETRESOLVE_STATE_FAILED, fd, events)) {
+		if (dispatch_timeout(query, &query->timeout, NETRESOLVE_STATE_FAILED, fd, events)) {
 			debug_query(query, "result timed out");
 			return true;
 		}
 		if (backend && backend->dispatch) {
-			backend->dispatch(query, fd, events);
+			backend->dispatch(query, fd, events, data);
 			if (query->state == NETRESOLVE_STATE_RESOLVED)
 				netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 			if (query->state == NETRESOLVE_STATE_ERROR)
@@ -354,7 +353,7 @@ netresolve_query_dispatch(netresolve_query_t query, int fd, int events)
 		debug_query(query, "event received, not dispatched: fd=%d events=%d", fd, events);
 		return false;
 	case NETRESOLVE_STATE_RESOLVED:
-		return dispatch_timeout(query, &query->delayed_fd, NETRESOLVE_STATE_DONE, fd, events);
+		return dispatch_timeout(query, &query->delayed, NETRESOLVE_STATE_DONE, fd, events);
 	case NETRESOLVE_STATE_DONE:
 		return netresolve_connect_dispatch(query, fd, events);
 	default:
@@ -375,12 +374,20 @@ netresolve_query_dispatch(netresolve_query_t query, int fd, int events)
 void
 netresolve_query_free(netresolve_query_t query)
 {
+	debug_query(query, "destroying query");
+
 	cleanup_query(query);
 
 	netresolve_query_set_state(query, NETRESOLVE_STATE_NONE);
 
+	assert(query->nfds == 0);
+	assert(query->watches.next == &query->watches);
+	assert(query->watches.previous == &query->watches);
+
 	query->previous->next = query->next;
 	query->next->previous = query->previous;
+
+	assert(query->nfds == 0);
 
 	free(query->request.nodename);
 	free(query->request.servname);
