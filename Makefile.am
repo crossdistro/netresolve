@@ -86,30 +86,41 @@ lib_LTLIBRARIES += \
 	libnetresolve-backend-numerichost.la \
 	libnetresolve-backend-hosts.la \
 	libnetresolve-backend-hostname.la \
-	libnetresolve-backend-aresdns.la \
-	libnetresolve-backend-ubdns.la \
 	libnetresolve-backend-libc.la \
 	libnetresolve-backend-asyncns.la \
 	libnetresolve-backend-nss.la \
 	libnetresolve-backend-exec.la
+
+if BUILD_BACKEND_ARESDNS
+lib_LTLIBRARIES += libnetresolve-backend-aresdns.la
+endif
+if BUILD_BACKEND_UBDNS
+lib_LTLIBRARIES += libnetresolve-backend-ubdns.la
+endif
+
 libnetresolve_backend_unix_la_SOURCES = backends/unix.c
 libnetresolve_backend_any_la_SOURCES = backends/any.c
 libnetresolve_backend_loopback_la_SOURCES = backends/loopback.c
 libnetresolve_backend_numerichost_la_SOURCES = backends/numerichost.c
 libnetresolve_backend_hosts_la_SOURCES = backends/hosts.c
 libnetresolve_backend_hostname_la_SOURCES = backends/hostname.c
-libnetresolve_backend_aresdns_la_SOURCES = backends/dns.c
-libnetresolve_backend_aresdns_la_CPPFLAGS = $(AM_CPPFLAGS) $(ARES_CFLAGS) -DUSE_ARES=1
-libnetresolve_backend_aresdns_la_LDFLAGS = $(AM_LDFLAGS) $(ARES_LIBS)
-libnetresolve_backend_ubdns_la_SOURCES = backends/dns.c
-libnetresolve_backend_ubdns_la_LDFLAGS = $(AM_LDFLAGS) $(UNBOUND_LIBS) -lldns
-libnetresolve_backend_ubdns_la_CPPFLAGS = $(AM_CPPFLAGS) -DUSE_UNBOUND=1
 libnetresolve_backend_libc_la_SOURCES = backends/libc.c
 libnetresolve_backend_libc_la_LDFLAGS = $(AM_LDFLAGS) -lresolv
 libnetresolve_backend_asyncns_la_SOURCES = backends/asyncns.c
 libnetresolve_backend_asyncns_la_LDFLAGS = -lasyncns
 libnetresolve_backend_nss_la_SOURCES = backends/nss.c
 libnetresolve_backend_exec_la_SOURCES = backends/exec.c
+
+if BUILD_BACKEND_ARESDNS
+libnetresolve_backend_aresdns_la_SOURCES = backends/dns.c
+libnetresolve_backend_aresdns_la_LDFLAGS = $(AM_LDFLAGS) $(ARES_LIBS)
+libnetresolve_backend_aresdns_la_CPPFLAGS = $(AM_CPPFLAGS) $(ARES_CFLAGS) -DUSE_ARES=1
+endif
+if BUILD_BACKEND_UBDNS
+libnetresolve_backend_ubdns_la_SOURCES = backends/dns.c
+libnetresolve_backend_ubdns_la_LDFLAGS = $(AM_LDFLAGS) -lunbound
+libnetresolve_backend_ubdns_la_CPPFLAGS = $(AM_CPPFLAGS) -DUSE_UNBOUND=1
+endif
 
 bin_PROGRAMS = netresolve getaddrinfo getnameinfo gethostbyname gethostbyaddr res_query
 bin_SCRIPTS = tools/wrapresolve
@@ -134,8 +145,6 @@ TESTS = \
 	test-sync \
 	test-epoll \
 	test-select \
-	test-libevent \
-	test-glib \
 	test-bind-connect \
 	tests/test-compat.sh
 EXTRA_DIST = \
@@ -166,8 +175,6 @@ noinst_PROGRAMS = \
 	test-sync \
 	test-epoll \
 	test-select \
-	test-libevent \
-	test-glib \
 	test-bind-connect \
 	test-getaddrinfo \
 	test-gethostbyname \
@@ -176,6 +183,14 @@ noinst_PROGRAMS = \
 	test-gethostbyname2_r \
 	test-asyncns \
 	test-asyncns-cancel
+if BUILD_ALL_TESTS
+TESTS += \
+	test-libevent \
+	test-glib
+noinst_PROGRAMS += \
+	test-libevent \
+	test-glib
+endif
 
 test_sync_SOURCES = tests/test-sync.c tests/common.c tests/common.h
 test_sync_LDADD = libnetresolve.la
