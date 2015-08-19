@@ -97,6 +97,9 @@ endif
 if BUILD_BACKEND_UBDNS
 lib_LTLIBRARIES += libnetresolve-backend-ubdns.la
 endif
+if BUILD_BACKEND_AVAHI
+lib_LTLIBRARIES += libnetresolve-backend-avahi.la
+endif
 
 libnetresolve_backend_unix_la_SOURCES = backends/unix.c
 libnetresolve_backend_any_la_SOURCES = backends/any.c
@@ -120,6 +123,11 @@ if BUILD_BACKEND_UBDNS
 libnetresolve_backend_ubdns_la_SOURCES = backends/dns.c
 libnetresolve_backend_ubdns_la_LDFLAGS = $(AM_LDFLAGS) -lunbound
 libnetresolve_backend_ubdns_la_CPPFLAGS = $(AM_CPPFLAGS) -DUSE_UNBOUND=1
+endif
+if BUILD_BACKEND_AVAHI
+libnetresolve_backend_avahi_la_SOURCES = backends/avahi.c
+libnetresolve_backend_avahi_la_LDFLAGS = $(AM_LDFLAGS) $(AVAHI_LIBS)
+libnetresolve_backend_avahi_la_CPPFLAGS = $(AM_CPPFLAGS)
 endif
 
 bin_PROGRAMS = netresolve getaddrinfo getnameinfo gethostbyname gethostbyaddr res_query

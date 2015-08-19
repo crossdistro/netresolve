@@ -338,17 +338,17 @@ Support for `socket()`, `bind()` and `connect()` is included. The only thing the
 
 The list of backends can be chosen using `netresolve_set_backend_string()` or via the `NETRESOLVE_BACKENDS` environment variable. Backends are separated by a comma and accept options separated by a colon. A plus sign prepended to the backend name can be used to run that backend even if another backend already succeeded.
 
-    export NETRESOLVE_BACKENDS=any,loopback,numerichost,hosts,hostname,ubdns
+    export NETRESOLVE_BACKENDS=any,loopback,numerichost,hosts,hostname,avahi,ubdns
 
 The command line interface also supports an option to select the backend.
 
-    netresolve --backend any,loopback,numerichost,hosts,hostname,ubdns
+    netresolve --backend any,loopback,numerichost,hosts,hostname,avahi,ubdns
 
-The backends listed in the above comments are those used by default. You need to change the list to actually change the behavior of netresolve.
+The default list of backends is slightly wider then the example one above and attempts all sorts of name resolution tools in order to give you full results.
 
 ### General purpose backends
 
-Three backends, `any`, `loopback` and `numerichost`, are available that perform trivial translations. The `hosts` backends uses `/etc/hosts` database of nodes. Nonblocking API is most useful for remote services. We have two nonblocking DNS backends, the default `ubdns` based on libunbound, and an alternative `aresdns` using *c-ares*. We support special configuration of the two DNS backends, `aresdns:trust` reads the DNS AD flag and marks the query result secure and `ubdns:validate` instructs libunbound to perform the validation.
+Three backends, `any`, `loopback` and `numerichost`, are available that perform trivial translations. The `hosts` backends uses `/etc/hosts` database of nodes. Nonblocking API is most useful for remote services. We have two nonblocking DNS backends, the default `ubdns` based on libunbound, and an alternative `aresdns` using *c-ares*. We support special configuration of the two DNS backends, `aresdns:trust` reads the DNS AD flag and marks the query result secure and `ubdns:validate` instructs libunbound to perform the validation. On systems with Avahi service running, the `avahi` backend offers Multicast DNS name resolution.
 
 ### POSIX and glibc compatibility backends
 

@@ -33,6 +33,13 @@ if test "$build_ubdns" != no; then
 fi
 AM_CONDITIONAL(BUILD_BACKEND_UBDNS, [test $build_ubdns])
 
+AC_ARG_WITH(avahi, AS_HELP_STRING([--with-avahi|--without-avahi], [Build libavahi backend (Default: yes)]), [build_avahi="$with_avahi"])
+if test "$build_avahi" != no; then
+	PKG_CHECK_MODULES([AVAHI], [avahi-client], [build_avahi=yes], [build_avahi=no])
+	if test "$with_avahi" = yes -a "$build_avahi" = no; then AC_MSG_ERROR([Support for libavahi requested but not available.]); fi
+fi
+AM_CONDITIONAL(BUILD_BACKEND_AVAHI, [test $build_avahi])
+
 AC_ARG_ENABLE(tests, AS_HELP_STRING([--enable-tests|--disable-tests], [Build tests using additional dependencies (Default: no)]))
 AS_IF([test "$enable_tests" = "yes"],
 	PKG_CHECK_MODULES([GLIB], [glib-2.0])
@@ -62,4 +69,5 @@ ldflags: ${LDFLAGS}
 echo "Optional backends:"
 echo " * aresdns: $build_aresdns"
 echo " * ubdns: $build_ubdns"
+echo " * avahi: $build_avahi"
 echo

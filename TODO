@@ -42,6 +42,8 @@
 
 ## Backends
 
+ * Improve `avahi` backend
+    - list *all* addresses, not just one from each protocol
  * Improve `nss` backend
     - support `/etc/nsswitch` configuration
     - consider supporting hostent listing
@@ -54,7 +56,6 @@
     - add automated tests
  * Implement more backends
     - nonblocking systemd-resolved based backend (blocking mode available via nss-resolve)
-    - standalone nonblocking multicast DNS backend
     - standalone nonblocking LLMNR backend
     - the getdns API backend
 
