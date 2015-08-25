@@ -25,7 +25,7 @@
 
 #include "netresolve-private.h"
 
-#define PRIORITY_TIMEOUT 15000
+#define PRIORITY_TIMEOUT 1
 
 struct netresolve_socket {
 	netresolve_query_t query;
