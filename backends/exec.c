@@ -34,6 +34,7 @@ struct buffer {
 };
 
 struct priv_exec {
+	netresolve_query_t query;
 	int pid;
 	struct buffer inbuf;
 	netresolve_watch_t input;
@@ -85,22 +86,6 @@ err_pipe1:
 	return false;
 }
 
-static void
-send_stdin(netresolve_query_t query, struct priv_exec *priv)
-{
-	if (priv->inbuf.start != priv->inbuf.end) {
-		ssize_t size = write(priv->input->fd, priv->inbuf.start, priv->inbuf.end - priv->inbuf.start);
-		if (size > 0) {
-			priv->inbuf.start += size;
-			return;
-		}
-		debug("write failed: %s", strerror(errno));
-	}
-
-	netresolve_watch_remove(query, priv->input, true);
-	priv->input->fd = -1;
-}
-
 static bool
 received_line(netresolve_query_t query, struct priv_exec *priv, const char *line)
 {
@@ -134,10 +119,43 @@ received_line(netresolve_query_t query, struct priv_exec *priv, const char *line
 }
 
 static void
-pickup_stdout(netresolve_query_t query, struct priv_exec *priv)
+dispatch_input(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
 {
+	struct priv_exec *priv = data;
+
+	assert(events & POLLOUT);
+
+	debug("exec: events %d on fd %d", events, fd);
+
+	if (priv->inbuf.start != priv->inbuf.end) {
+		ssize_t size = write(priv->input->fd, priv->inbuf.start, priv->inbuf.end - priv->inbuf.start);
+		if (size > 0) {
+			priv->inbuf.start += size;
+			return;
+		}
+		debug("write failed: %s", strerror(errno));
+	}
+
+	netresolve_watch_remove(query, priv->input, true);
+	priv->input->fd = -1;
+}
+
+static void
+dispatch_output(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
+{
+	struct priv_exec *priv = data;
 	char *nl;
 	int size;
+
+	assert(events & (POLLIN | POLLHUP));
+
+	debug("exec: events %d on fd %d", events, fd);
+
+	if (events & POLLHUP) {
+		error("exec: incomplete response");
+		netresolve_backend_failed(query);
+		return;
+	}
 
 	if (!priv->outbuf.buffer) {
 		priv->outbuf.buffer = priv->outbuf.start = malloc(1024);
@@ -172,11 +190,28 @@ pickup_stdout(netresolve_query_t query, struct priv_exec *priv)
 }
 
 void
-setup_forward(netresolve_query_t query, char **settings)
+cleanup(void *data)
 {
-	struct priv_exec *priv = netresolve_backend_new_priv(query, sizeof *priv);
+	struct priv_exec *priv = data;
+
+	if (priv->input)
+		netresolve_watch_remove(priv->query, priv->input, true);
+	if (priv->output)
+		netresolve_watch_remove(priv->query, priv->output, true);
+	/* TODO: Implement proper child handling. */
+	kill(priv->pid, SIGKILL);
+	free(priv->inbuf.buffer);
+	free(priv->outbuf.buffer);
+}
+
+void
+query_forward(netresolve_query_t query, char **settings)
+{
+	struct priv_exec *priv = netresolve_backend_new_priv(query, sizeof *priv, cleanup);
 	int infd;
 	int outfd;
+
+	priv->query = query;
 
 	if (!priv || !start_subprocess(settings, &priv->pid, &infd, &outfd)) {
 		netresolve_backend_failed(query);
@@ -187,41 +222,6 @@ setup_forward(netresolve_query_t query, char **settings)
 	priv->inbuf.start = priv->inbuf.buffer;
 	priv->inbuf.end = priv->inbuf.buffer + strlen(priv->inbuf.buffer);
 
-	priv->input = netresolve_watch_add(query, infd, POLLOUT, NULL);
-	priv->output = netresolve_watch_add(query, outfd, POLLIN, NULL);
-}
-
-void
-dispatch(netresolve_query_t query, int fd, int events, void *data)
-{
-	struct priv_exec *priv = netresolve_backend_get_priv(query);
-
-	debug("exec: events %d on fd %d", events, fd);
-
-	if (fd == priv->input->fd && events & POLLOUT)
-		send_stdin(query, priv);
-	else if (fd == priv->output->fd && events & POLLIN) {
-		pickup_stdout(query, priv);
-	} else if (fd == priv->output->fd && events & POLLHUP) {
-		error("exec: incomplete response");
-		netresolve_backend_failed(query);
-	} else {
-		error("exec: unknown events %d on fd %d", events, fd);
-		netresolve_backend_failed(query);
-	}
-}
-
-void
-cleanup(netresolve_query_t query)
-{
-	struct priv_exec *priv = netresolve_backend_get_priv(query);
-
-	if (priv->input)
-		netresolve_watch_remove(query, priv->input, true);
-	if (priv->output)
-		netresolve_watch_remove(query, priv->output, true);
-	/* TODO: Implement proper child handling. */
-	kill(priv->pid, SIGKILL);
-	free(priv->inbuf.buffer);
-	free(priv->outbuf.buffer);
+	priv->input = netresolve_watch_add(query, infd, POLLOUT, dispatch_input, priv);
+	priv->output = netresolve_watch_add(query, outfd, POLLIN, dispatch_output, priv);
 }

@@ -39,6 +39,43 @@ struct netresolve_socket {
 static void pickup_connected_socket(struct netresolve_socket *priv);
 
 static void
+connection_callback(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
+{
+	struct netresolve_socket *priv = query->user_data;
+	struct netresolve_path *path = data;
+
+	assert(fd == path->socket.fd);
+	assert(events & POLLOUT);
+	assert(path->socket.state == SOCKET_STATE_SCHEDULED);
+	assert(path->socket.watch);
+
+	socklen_t len = sizeof(errno);
+	getsockopt(path->socket.fd, SOL_SOCKET, SO_ERROR, &errno, &len);
+
+	debug_query(query, "socket: connection %s", errno ? "failed" : "succeeded");
+
+	netresolve_watch_remove(priv->query, path->socket.watch, !!errno);
+
+	path->socket.state = errno ? SOCKET_STATE_DONE : SOCKET_STATE_READY;
+	path->socket.watch = NULL;
+
+	/* See whether we can pass back a ready connection. */
+	pickup_connected_socket(priv);
+}
+
+void
+timeout_callback(netresolve_query_t query, netresolve_timeout_t timeout, void *data)
+{
+	struct netresolve_socket *priv = data;
+
+	debug_query(query, "socket: priority timeout occured");
+
+	priv->skip_scheduled = true;
+
+	pickup_connected_socket(priv);
+}
+
+static void
 setup_socket(struct netresolve_socket *priv, struct netresolve_path *path)
 {
 	static const int flags = O_NONBLOCK;
@@ -65,7 +102,7 @@ setup_socket(struct netresolve_socket *priv, struct netresolve_path *path)
 		debug_query(priv->query, "socket: connection %d via %s scheduled", idx, sa->sa_family == AF_INET ? "IPv4" : "IPv6");
 
 		path->socket.state = SOCKET_STATE_SCHEDULED;
-		path->socket.watch = netresolve_watch_add(priv->query, path->socket.fd, POLLOUT, NULL);
+		path->socket.watch = netresolve_watch_add(priv->query, path->socket.fd, POLLOUT, connection_callback, path);
 	} else {
 		/* FIXME: Is it at all possible for non-blocking sockets to connect
 		 * immediately?
@@ -114,7 +151,7 @@ enable_sockets(struct netresolve_socket *priv)
 			setup_socket(priv, path);
 		else if (path->socket.state == SOCKET_STATE_SCHEDULED && !path->socket.watch) {
 			debug_query(priv->query, "socket: resuming connection %d", i);
-			path->socket.watch = netresolve_watch_add(priv->query, path->socket.fd, POLLOUT, NULL);
+			path->socket.watch = netresolve_watch_add(priv->query, path->socket.fd, POLLOUT, connection_callback, path);
 		}
 	}
 
@@ -180,7 +217,7 @@ pickup_connected_socket(struct netresolve_socket *priv)
 					debug_query(priv->query, "socket: priority timeout already set");
 				else {
 					debug_query(priv->query, "socket: setting up priority timeout of %d seconds", PRIORITY_TIMEOUT);
-					priv->priority_timeout = netresolve_timeout_add(priv->query, PRIORITY_TIMEOUT, 0, NULL);
+					priv->priority_timeout = netresolve_timeout_add(priv->query, PRIORITY_TIMEOUT, 0, timeout_callback, priv);
 				}
 				break;
 			}
@@ -204,9 +241,9 @@ query_callback(netresolve_query_t query, void *user_data)
 }
 
 static void
-bind_callback(netresolve_query_t query, void *user_data)
+bind_callback(netresolve_query_t query, void *data)
 {
-	struct netresolve_socket *priv = user_data;
+	struct netresolve_socket *priv = data;
 	size_t count = netresolve_query_get_count(query);
 
 	for (size_t idx = 0; idx < count; idx++) {
@@ -245,53 +282,6 @@ memdup(const void *source, size_t len)
 		memcpy(target, source, len);
 
 	return target;
-}
-
-bool
-connection_callback(netresolve_query_t query, int fd, int events)
-{
-	struct netresolve_socket *priv = query->user_data;
-
-	for (int i = 0; i < query->response.pathcount; i++) {
-		struct netresolve_path *path = &query->response.paths[i];
-
-		if (fd == path->socket.fd) {
-			assert(events & POLLOUT);
-			assert(path->socket.state == SOCKET_STATE_SCHEDULED);
-			assert(path->socket.watch);
-
-			socklen_t len = sizeof(errno);
-			getsockopt(path->socket.fd, SOL_SOCKET, SO_ERROR, &errno, &len);
-
-			debug_query(query, "socket: connection %s", errno ? "failed" : "succeeded");
-
-			netresolve_watch_remove(priv->query, path->socket.watch, !!errno);
-
-			path->socket.state = errno ? SOCKET_STATE_DONE : SOCKET_STATE_READY;
-			path->socket.watch = NULL;
-
-			/* See whether we can pass back a ready connection. */
-			pickup_connected_socket(priv);
-
-			return true;
-		}
-	}
-
-	return false;
-}
-
-bool
-timeout_callback(netresolve_query_t query, int fd, int events)
-{
-	struct netresolve_socket *priv = query->user_data;
-
-	debug_query(query, "socket: priority timeout occured");
-
-	priv->skip_scheduled = true;
-
-	pickup_connected_socket(priv);
-
-	return true;
 }
 
 /* netresolve_connect:
@@ -410,20 +400,4 @@ void
 netresolve_bind_free(netresolve_query_t query)
 {
 	netresolve_query_free(query);
-}
-
-bool
-netresolve_connect_dispatch(netresolve_query_t query, int fd, int events)
-{
-	struct netresolve_socket *priv = query->user_data;
-
-	debug("socket: dispatching file descriptor: %d %d", fd, events);
-
-	if (connection_callback(query, fd, events))
-		return true;
-
-	if (fd == priv->priority_timeout->fd && timeout_callback(query, fd, events))
-		return true;
-
-	return false;
 }

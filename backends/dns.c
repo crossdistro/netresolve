@@ -64,6 +64,7 @@ struct priv_dns {
 };
 
 static void apply_answer(struct priv_dns *priv, uint8_t *answer, size_t length);
+static void check(struct priv_dns *priv);
 
 #if defined(USE_UNBOUND)
 
@@ -92,9 +93,43 @@ callback(void *arg, int status, struct ub_result* result)
 	}
 
 	ub_resolve_free(result);
+
+	check(priv);
 }
 
 #elif defined(USE_ARES)
+
+static void dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data);
+
+static void
+watch_file_descriptors(struct priv_dns *priv)
+{
+	assert(priv->nfds == 0);
+
+	priv->nfds = ares_fds(priv->channel, &priv->rfds, &priv->wfds);
+	priv->watches = realloc(priv->watches, priv->nfds * sizeof *priv->watches);
+
+	for (int fd = 0; fd < priv->nfds; fd++) {
+		if (FD_ISSET(fd, &priv->rfds))
+			priv->watches[fd] = netresolve_watch_add(priv->query, fd, POLLIN, dispatch, NULL);
+		if (FD_ISSET(fd, &priv->wfds))
+			priv->watches[fd] = netresolve_watch_add(priv->query, fd, POLLOUT, dispatch, NULL);
+	}
+}
+
+static void
+unwatch_file_descriptors(struct priv_dns *priv)
+{
+	assert(priv->nfds != 0);
+
+	for (int fd = 0; fd < priv->nfds; fd++)
+		if (FD_ISSET(fd, &priv->rfds))
+			netresolve_watch_remove(priv->query, priv->watches[fd], false);
+
+	FD_ZERO(&priv->rfds);
+	FD_ZERO(&priv->wfds);
+	priv->nfds = 0;
+}
 
 static void
 callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
@@ -116,36 +151,8 @@ callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
 	}
 
 	apply_answer(priv, abuf, alen);
-}
 
-static void
-watch_file_descriptors(struct priv_dns *priv)
-{
-	assert(priv->nfds == 0);
-
-	priv->nfds = ares_fds(priv->channel, &priv->rfds, &priv->wfds);
-	priv->watches = realloc(priv->watches, priv->nfds * sizeof *priv->watches);
-
-	for (int fd = 0; fd < priv->nfds; fd++) {
-		if (FD_ISSET(fd, &priv->rfds))
-			priv->watches[fd] = netresolve_watch_add(priv->query, fd, POLLIN, NULL);
-		if (FD_ISSET(fd, &priv->wfds))
-			priv->watches[fd] = netresolve_watch_add(priv->query, fd, POLLOUT, NULL);
-	}
-}
-
-static void
-unwatch_file_descriptors(struct priv_dns *priv)
-{
-	assert(priv->nfds != 0);
-
-	for (int fd = 0; fd < priv->nfds; fd++)
-		if (FD_ISSET(fd, &priv->rfds))
-			netresolve_watch_remove(priv->query, priv->watches[fd], false);
-
-	FD_ZERO(&priv->rfds);
-	FD_ZERO(&priv->wfds);
-	priv->nfds = 0;
+	check(priv);
 }
 
 #endif
@@ -374,10 +381,72 @@ out:
 	ldns_pkt_free(pkt);
 }
 
+static void
+check(struct priv_dns *priv)
+{
+	if (!priv->pending) {
+		if (priv->answered) {
+			if (priv->name) {
+				char *last = priv->name + strlen(priv->name) - 1;
+
+				if (*last == '.')
+					*last = '\0';
+
+				netresolve_backend_add_name_info(priv->query, priv->name, NULL);
+			}
+
+			if (priv->secure)
+				netresolve_backend_set_secure(priv->query);
+		}
+
+		if (priv->failed)
+			netresolve_backend_failed(priv->query);
+		else
+			netresolve_backend_finished(priv->query);
+	}
+}
+
+static void
+dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
+{
+	struct priv_dns *priv = netresolve_backend_get_priv(query);
+
+#if defined(USE_UNBOUND)
+	ub_process(priv->ctx);
+#elif defined(USE_ARES)
+	unwatch_file_descriptors(priv);
+	ares_process_fd(priv->channel,
+			events & POLLIN ? fd : ARES_SOCKET_BAD,
+			events & POLLOUT ? fd : ARES_SOCKET_BAD);
+	watch_file_descriptors(priv);
+#endif
+
+	check(priv);
+}
+static void
+cleanup(void *data)
+{
+	struct priv_dns *priv = data;
+
+	free(priv->name);
+
+#if defined(USE_UNBOUND)
+	if (priv->watch)
+		netresolve_watch_remove(priv->query, priv->watch, false);
+	if (priv->ctx);
+		ub_ctx_delete(priv->ctx);
+#elif defined(USE_ARES)
+	if (priv->nfds)
+		unwatch_file_descriptors(priv);
+	free(priv->watches);
+	ares_destroy(priv->channel);
+#endif
+}
+
 static struct priv_dns *
 setup(netresolve_query_t query, char **settings)
 {
-	struct priv_dns *priv = netresolve_backend_new_priv(query, sizeof *priv);
+	struct priv_dns *priv = netresolve_backend_new_priv(query, sizeof *priv, cleanup);
 	int status;
 
 	if (!priv)
@@ -411,7 +480,7 @@ setup(netresolve_query_t query, char **settings)
 		error("libunbound: %s", ub_strerror(status));
 		return NULL;
 	}
-	priv->watch = netresolve_watch_add(query, ub_fd(priv->ctx), POLLIN, NULL);
+	priv->watch = netresolve_watch_add(query, ub_fd(priv->ctx), POLLIN, dispatch, NULL);
 #elif defined(USE_ARES)
 	/* ares doesn't seem to accept const options */
 	static struct ares_options options = {
@@ -436,7 +505,7 @@ setup(netresolve_query_t query, char **settings)
 }
 
 void
-setup_forward(netresolve_query_t query, char **settings)
+query_forward(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv;
 
@@ -457,7 +526,7 @@ setup_forward(netresolve_query_t query, char **settings)
 }
 
 void
-setup_reverse(netresolve_query_t query, char **settings)
+query_reverse(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv;
 
@@ -474,7 +543,7 @@ setup_reverse(netresolve_query_t query, char **settings)
 }
 
 void
-setup_dns(netresolve_query_t query, char **settings)
+query_dns(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv;
 
@@ -488,62 +557,5 @@ setup_dns(netresolve_query_t query, char **settings)
 
 #if defined(USE_ARES)
 	watch_file_descriptors(priv);
-#endif
-}
-
-void
-dispatch(netresolve_query_t query, int fd, int events, void *data)
-{
-	struct priv_dns *priv = netresolve_backend_get_priv(query);
-
-#if defined(USE_UNBOUND)
-	ub_process(priv->ctx);
-#elif defined(USE_ARES)
-	unwatch_file_descriptors(priv);
-	ares_process_fd(priv->channel,
-			events & POLLIN ? fd : ARES_SOCKET_BAD,
-			events & POLLOUT ? fd : ARES_SOCKET_BAD);
-	watch_file_descriptors(priv);
-#endif
-
-	if (!priv->pending) {
-		if (priv->answered) {
-			if (priv->name) {
-				char *last = priv->name + strlen(priv->name) - 1;
-
-				if (*last == '.')
-					*last = '\0';
-
-				netresolve_backend_add_name_info(query, priv->name, NULL);
-			}
-
-			if (priv->secure)
-				netresolve_backend_set_secure(query);
-		}
-
-		if (priv->failed)
-			netresolve_backend_failed(query);
-		else
-			netresolve_backend_finished(query);
-	}
-}
-
-void
-cleanup(netresolve_query_t query)
-{
-	struct priv_dns *priv = netresolve_backend_get_priv(query);
-
-	free(priv->name);
-
-#if defined(USE_UNBOUND)
-	if (priv->watch)
-		netresolve_watch_remove(query, priv->watch, false);
-	if (priv->ctx);
-		ub_ctx_delete(priv->ctx);
-#elif defined(USE_ARES)
-	if (priv->nfds)
-		unwatch_file_descriptors(priv);
-	free(priv->watches);
-	ares_destroy(priv->channel);
 #endif
 }

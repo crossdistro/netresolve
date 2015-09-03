@@ -92,16 +92,24 @@ void netresolve_backend_apply_hostent(netresolve_query_t query,
 		int priority, int weight, int32_t ttl);
 
 /* Tools */
-void *netresolve_backend_new_priv(netresolve_query_t query, size_t size);
+typedef void (*netresolve_backend_cleanup_t)(void *priv);
+
+void *netresolve_backend_new_priv(netresolve_query_t query, size_t size, netresolve_backend_cleanup_t cleanup);
 void *netresolve_backend_get_priv(netresolve_query_t query);
 void netresolve_backend_finished(netresolve_query_t query);
 void netresolve_backend_failed(netresolve_query_t query);
 
 /* Events */
-netresolve_watch_t netresolve_watch_add(netresolve_query_t query, int fd, int events, void *data);
+typedef void (*netresolve_watch_callback_t)(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data);
+typedef void (*netresolve_timeout_callback_t)(netresolve_query_t query, netresolve_timeout_t timeout, void *data);
+
+netresolve_watch_t netresolve_watch_add(netresolve_query_t query, int fd, int events,
+		netresolve_watch_callback_t callback, void *data);
 void netresolve_watch_remove(netresolve_query_t query, netresolve_watch_t watch, bool do_close);
-netresolve_timeout_t netresolve_timeout_add(netresolve_query_t query, time_t sec, long nsec, void *data);
-netresolve_timeout_t netresolve_timeout_add_ms(netresolve_query_t query, long msec, void *data);
+netresolve_timeout_t netresolve_timeout_add(netresolve_query_t query, time_t sec, long nsec,
+		netresolve_timeout_callback_t callback, void *data);
+netresolve_timeout_t netresolve_timeout_add_ms(netresolve_query_t query, long msec,
+		netresolve_timeout_callback_t callback, void *data);
 void netresolve_timeout_remove(netresolve_query_t query, netresolve_timeout_t timeout);
 
 /* Logging */
@@ -118,11 +126,9 @@ bool netresolve_backend_parse_path(const char *str,
 		int *socktype, int *protocol, int *port);
 
 /* Backend function prototypes */
-void setup_forward(netresolve_query_t query, char **settings);
-void setup_reverse(netresolve_query_t query, char **settings);
-void setup_dns(netresolve_query_t query, char **settings);
-void dispatch(netresolve_query_t query, int fd, int revents, void *data);
-void cleanup(netresolve_query_t query);
+void query_forward(netresolve_query_t query, char **settings);
+void query_reverse(netresolve_query_t query, char **settings);
+void query_dns(netresolve_query_t query, char **settings);
 
 /* String functions */
 const char *netresolve_get_request_string(netresolve_query_t query);

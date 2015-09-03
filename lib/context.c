@@ -68,8 +68,8 @@ netresolve_context_new(void)
 
 	context->request.default_loopback = getenv_bool("NETRESOLVE_FLAG_DEFAULT_LOOPBACK", false);
 	context->request.clamp_ttl = getenv_int("NETRESOLVE_CLAMP_TTL", -1);
-	context->request.timeout = getenv_int("NETRESOLVE_TIMEOUT", 15000);
-	context->request.partial_timeout = getenv_int("NETRESOLVE_PARTIAL_TIMEOUT", 5000);
+	context->request.request_timeout = getenv_int("NETRESOLVE_REQUEST_TIMEOUT", 15000);
+	context->request.result_timeout = getenv_int("NETRESOLVE_RESULT_TIMEOUT", 5000);
 
 	return context;
 }
@@ -146,14 +146,9 @@ load_backend(char **take_settings)
 		goto fail;
 	}
 
-	backend->setup[NETRESOLVE_REQUEST_FORWARD] = dlsym(backend->dl_handle, "setup_forward");
-	backend->setup[NETRESOLVE_REQUEST_REVERSE] = dlsym(backend->dl_handle, "setup_reverse");
-	backend->setup[NETRESOLVE_REQUEST_DNS] = dlsym(backend->dl_handle, "setup_dns");
-	backend->dispatch = dlsym(backend->dl_handle, "dispatch");
-	backend->cleanup = dlsym(backend->dl_handle, "cleanup");
-
-	if (!backend->setup)
-		goto fail;
+	backend->setup[NETRESOLVE_REQUEST_FORWARD] = dlsym(backend->dl_handle, "query_forward");
+	backend->setup[NETRESOLVE_REQUEST_REVERSE] = dlsym(backend->dl_handle, "query_reverse");
+	backend->setup[NETRESOLVE_REQUEST_DNS] = dlsym(backend->dl_handle, "query_dns");
 
 	return backend;
 fail:

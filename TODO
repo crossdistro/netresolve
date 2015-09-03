@@ -40,12 +40,15 @@
 
  * Improve `avahi` backend
     - list *all* addresses, not just one from each protocol
+    - support reverse queries
  * Improve `nss` backend
     - support `/etc/nsswitch` configuration
     - consider supporting hostent listing
  * Improve the DNS backends
     - consider domain search support
     - consider `ai_addrconfig`-like functionality
+    - support multiple PTR records
+    - support multiple SRV records
  * Fix `exec` backend
     - it hasn't been tested recently
     - fix the code, extend the format

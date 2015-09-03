@@ -94,8 +94,7 @@ struct netresolve_backend {
 	char **settings;
 	void *dl_handle;
 	void (*setup[_NETRSOLVE_REQUEST_TYPES])(netresolve_query_t query, char **settings);
-	void (*dispatch)(netresolve_query_t query, int fd, int revents, void *data);
-	void (*cleanup)(netresolve_query_t query);
+	netresolve_backend_cleanup_t cleanup;
 	void *data;
 };
 
@@ -129,6 +128,8 @@ struct netresolve_query {
 	struct netresolve_watch {
 		netresolve_query_t query;
 		int fd;
+		netresolve_watch_callback_t callback;
+		netresolve_timeout_callback_t timeout_callback;
 		void *data;
 		void *handle;
 		struct netresolve_watch *previous, *next;
@@ -138,8 +139,8 @@ struct netresolve_query {
 	enum netresolve_state state;
 	int nfds;
 	netresolve_timeout_t delayed;
-	netresolve_timeout_t timeout;
-	netresolve_timeout_t partial_timeout;
+	netresolve_timeout_t request_timeout;
+	netresolve_timeout_t result_timeout;
 	struct netresolve_backend **backend;
 	struct netresolve_request {
 		enum netresolve_request_type type;
@@ -175,8 +176,8 @@ struct netresolve_query {
 		int dns_class;
 		int dns_type;
 		/* Timeout configuration */
-		int timeout;
-		int partial_timeout;
+		int request_timeout;
+		int result_timeout;
 	} request;
 	struct netresolve_response {
 		struct netresolve_path *paths;
@@ -223,7 +224,7 @@ netresolve_query_t netresolve_query(netresolve_t context, netresolve_query_callb
 		enum netresolve_option type, ...);
 const char *netresolve_query_state_to_string(enum netresolve_state state);
 void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
-bool netresolve_query_dispatch(netresolve_query_t query, int fd, int events, void *data);
+bool netresolve_query_dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data);
 
 /* Request */
 bool netresolve_request_set_options_from_va(struct netresolve_request *request, va_list ap);
@@ -247,9 +248,6 @@ int netresolve_protocol_from_string(const char *str);
 const char *netresolve_get_request_string(netresolve_query_t query);
 const char *netresolve_get_path_string(netresolve_query_t query, int i);
 const char *netresolve_get_response_string(netresolve_query_t query);
-
-/* Socket */
-bool netresolve_connect_dispatch(netresolve_query_t query, int fd, int events);
 
 /* Event loop for blocking mode */
 bool netresolve_epoll_install(netresolve_t context,

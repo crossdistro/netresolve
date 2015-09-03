@@ -22,31 +22,8 @@ struct priv_asyncns {
 	asyncns_t *asyncns;
 };
 
-void
-setup_forward(netresolve_query_t query, char **settings)
-{
-	struct priv_asyncns *priv = netresolve_backend_new_priv(query, sizeof *priv);
-	const char *nodename = netresolve_backend_get_nodename(query);
-	const char *servname = netresolve_backend_get_servname(query);
-	struct addrinfo hints = netresolve_backend_get_addrinfo_hints(query);
-
-	if (!priv || !(priv->asyncns = asyncns_new(2))) {
-		netresolve_backend_failed(query);
-		return;
-	}
-
-	if (!asyncns_getaddrinfo(priv->asyncns, nodename, servname, &hints)) {
-		netresolve_backend_failed(query);
-		return;
-	}
-
-	netresolve_watch_add(query, asyncns_fd(priv->asyncns), POLLIN, NULL);
-
-	return;
-}
-
-void
-dispatch(netresolve_query_t query, int fd, int events, void *data)
+static void
+dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
 {
 	struct priv_asyncns *priv = netresolve_backend_get_priv(query);
 	asyncns_query_t *q;
@@ -63,10 +40,33 @@ dispatch(netresolve_query_t query, int fd, int events, void *data)
 	asyncns_freeaddrinfo(result);
 }
 
-void
-cleanup(netresolve_query_t query)
+static void
+cleanup(void *data)
 {
-	struct priv_asyncns *priv = netresolve_backend_get_priv(query);
+	struct priv_asyncns *priv = data;
 
 	asyncns_free(priv->asyncns);
+}
+
+void
+query_forward(netresolve_query_t query, char **settings)
+{
+	struct priv_asyncns *priv = netresolve_backend_new_priv(query, sizeof *priv, cleanup);
+	const char *nodename = netresolve_backend_get_nodename(query);
+	const char *servname = netresolve_backend_get_servname(query);
+	struct addrinfo hints = netresolve_backend_get_addrinfo_hints(query);
+
+	if (!priv || !(priv->asyncns = asyncns_new(2))) {
+		netresolve_backend_failed(query);
+		return;
+	}
+
+	if (!asyncns_getaddrinfo(priv->asyncns, nodename, servname, &hints)) {
+		netresolve_backend_failed(query);
+		return;
+	}
+
+	netresolve_watch_add(query, asyncns_fd(priv->asyncns), POLLIN, dispatch, NULL);
+
+	return;
 }

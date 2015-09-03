@@ -53,7 +53,7 @@ is_loopback(int family, const void *address)
 }
 
 void
-setup_forward(netresolve_query_t query, char **settings)
+query_forward(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
 	bool ipv4 = !node || !*node || !strcmp(node, "localhost") || !strcmp(node, "localhost4");
@@ -75,7 +75,7 @@ setup_forward(netresolve_query_t query, char **settings)
 }
 
 void
-setup_reverse(netresolve_query_t query, char **settings)
+query_reverse(netresolve_query_t query, char **settings)
 {
 	int family = netresolve_backend_get_family(query);
 	const void *address = netresolve_backend_get_address(query);

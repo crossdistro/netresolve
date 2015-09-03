@@ -66,7 +66,7 @@ add_addresses(netresolve_query_t query, struct ifaddrs *list, bool filter)
 }
 
 void
-setup_forward(netresolve_query_t query, char **settings)
+query_forward(netresolve_query_t query, char **settings)
 {
 	const char *nodename = netresolve_backend_get_nodename(query);
 	struct ifaddrs *list;

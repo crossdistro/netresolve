@@ -27,7 +27,7 @@
 #define SIZE 16 * 1024
 
 void
-setup_forward(netresolve_query_t query, char **settings)
+query_forward(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
 	const char *service = netresolve_backend_get_servname(query);
@@ -44,7 +44,7 @@ setup_forward(netresolve_query_t query, char **settings)
 }
 
 void
-setup_reverse(netresolve_query_t query, char **settings)
+query_reverse(netresolve_query_t query, char **settings)
 {
 	int flags = 0;
 	union {
@@ -83,7 +83,7 @@ setup_reverse(netresolve_query_t query, char **settings)
 }
 
 void
-setup_dns(netresolve_query_t query, char **settings)
+query_dns(netresolve_query_t query, char **settings)
 {
 	const char *dname = netresolve_backend_get_nodename(query);
 	bool search = netresolve_backend_get_dns_search(query);

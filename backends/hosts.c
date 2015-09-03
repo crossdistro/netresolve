@@ -144,7 +144,7 @@ out:
 }
 
 void
-setup_forward(netresolve_query_t query, char **settings)
+query_forward(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
 	struct hosts_list list = { 0 };
@@ -176,7 +176,7 @@ setup_forward(netresolve_query_t query, char **settings)
 }
 
 void
-setup_reverse(netresolve_query_t query, char **settings)
+query_reverse(netresolve_query_t query, char **settings)
 {
 	int family = netresolve_backend_get_family(query);
 	const void *address = netresolve_backend_get_address(query);

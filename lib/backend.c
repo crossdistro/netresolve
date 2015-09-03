@@ -281,18 +281,20 @@ netresolve_backend_set_dns_answer(netresolve_query_t query, const void *answer, 
 }
 
 void *
-netresolve_backend_new_priv(netresolve_query_t query, size_t size)
+netresolve_backend_new_priv(netresolve_query_t query, size_t size, netresolve_backend_cleanup_t cleanup)
 {
-	if ((*query->backend)->data) {
-		error("Backend data already present.");
-		free((*query->backend)->data);
-	}
+	struct netresolve_backend *backend = *query->backend;
 
-	(*query->backend)->data = calloc(1, size);
-	if (!(*query->backend)->data)
+	assert(backend);
+	assert(!backend->data);
+
+	backend->cleanup = cleanup;
+	backend->data = calloc(1, size);
+
+	if (!backend->data)
 		netresolve_backend_failed(query);
 
-	return (*query->backend)->data;
+	return backend->data;
 }
 
 void *

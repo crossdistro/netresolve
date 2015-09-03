@@ -50,7 +50,8 @@ netresolve_get_user_data(netresolve_t context)
 }
 
 netresolve_watch_t
-netresolve_watch_add(netresolve_query_t query, int fd, int events, void *data)
+netresolve_watch_add(netresolve_query_t query, int fd, int events,
+		netresolve_watch_callback_t callback, void *data)
 {
 	struct netresolve_watch *watches = &query->watches;
 	struct netresolve_watch *watch;
@@ -63,6 +64,7 @@ netresolve_watch_add(netresolve_query_t query, int fd, int events, void *data)
 
 	watch->query = query;
 	watch->fd = fd;
+	watch->callback = callback;
 	watch->data = data;
 	watch->handle = query->context->callbacks.add_watch(query->context, fd, events, watch);
 
@@ -74,6 +76,8 @@ netresolve_watch_add(netresolve_query_t query, int fd, int events, void *data)
 	query->context->nfds++;
 
 	debug_query(query, "added file descriptor: fd=%d events=%d watch=%p (total %d/%d)", fd, events, watch, query->nfds, query->context->nfds);
+
+	assert(watch);
 
 	return watch;
 }
@@ -106,9 +110,17 @@ netresolve_watch_remove(netresolve_query_t query, netresolve_watch_t watch, bool
 	free(watch);
 }
 
-netresolve_timeout_t
-netresolve_timeout_add(netresolve_query_t query, time_t sec, long nsec, void *data)
+static void
+timeout_watch_callback(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
 {
+	watch->timeout_callback(query, watch, data);
+}
+
+netresolve_timeout_t
+netresolve_timeout_add(netresolve_query_t query, time_t sec, long nsec,
+		netresolve_timeout_callback_t callback, void *data)
+{
+	netresolve_watch_t watch;
 	int fd;
 	struct itimerspec timerspec = {{0, 0}, {sec, nsec}};
 
@@ -122,13 +134,23 @@ netresolve_timeout_add(netresolve_query_t query, time_t sec, long nsec, void *da
 
 	debug_query(query, "adding timeout: fd=%d sec=%d nsec=%ld", fd, (int) sec, nsec);
 
-	return netresolve_watch_add(query, fd, POLLIN, data);
+	watch = netresolve_watch_add(query, fd, POLLIN, NULL, data);
+
+	if (watch && callback) {
+		watch->callback = timeout_watch_callback;
+		watch->timeout_callback = callback;
+	}
+
+	assert(watch);
+
+	return watch;
 }
 
 netresolve_timeout_t
-netresolve_timeout_add_ms(netresolve_query_t query, time_t msec, void *data)
+netresolve_timeout_add_ms(netresolve_query_t query, time_t msec,
+		netresolve_timeout_callback_t callback, void *data)
 {
-	return netresolve_timeout_add(query, msec / 1000, (msec % 1000) * 1000000L, data);
+	return netresolve_timeout_add(query, msec / 1000, (msec % 1000) * 1000000L, callback, data);
 }
 
 void
@@ -152,5 +174,5 @@ netresolve_dispatch(netresolve_t context, netresolve_watch_t watch, int events)
 
 	debug_query(watch->query, "dispatching: fd=%d events=%d watch=%p", watch->fd, events, watch);
 
-	return netresolve_query_dispatch(watch->query, watch->fd, events, watch->data);
+	return netresolve_query_dispatch(watch->query, watch, watch->fd, events, watch->data);
 }

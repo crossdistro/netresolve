@@ -27,7 +27,7 @@
 #include <string.h>
 
 void
-setup_forward(netresolve_query_t query, char **settings)
+query_forward(netresolve_query_t query, char **settings)
 {
 	const char *node = netresolve_backend_get_nodename(query);
 	int family = netresolve_backend_get_family(query);

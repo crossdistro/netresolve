@@ -39,12 +39,7 @@ struct priv_avahi {
 	int pending;
 };
 
-struct event {
-	void (*callback)(void *data, int events);
-};
-
 struct AvahiWatch {
-	struct event e;
 	netresolve_query_t query;
 	netresolve_watch_t watch;
 	int fd;
@@ -54,7 +49,6 @@ struct AvahiWatch {
 };
 
 struct AvahiTimeout {
-	struct event e;
 	netresolve_query_t query;
 	netresolve_timeout_t timeout;
 	int fd;
@@ -63,10 +57,16 @@ struct AvahiTimeout {
 };
 
 void
+watch_callback(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
+{
+	AvahiWatch *w = data;
+
+	w->callback(w, w->fd, events, w->userdata);
+}
+
+void
 watch_update(AvahiWatch *w, AvahiWatchEvent event)
 {
-	assert(w->e.callback);
-
 	if (w->watch) {
 		netresolve_watch_remove(w->query, w->watch, false);
 		w->watch = NULL;
@@ -74,15 +74,7 @@ watch_update(AvahiWatch *w, AvahiWatchEvent event)
 
 	/* FIXME: The event should be properly translated but so far it worked. */
 	if (event)
-		w->watch = netresolve_watch_add(w->query, w->fd, event, w);
-}
-
-void
-watch_callback(void *data, int events)
-{
-	AvahiWatch *w = data;
-
-	w->callback(w, w->fd, events, w->userdata);
+		w->watch = netresolve_watch_add(w->query, w->fd, event, watch_callback, w);
 }
 
 AvahiWatch *
@@ -91,7 +83,6 @@ watch_new(const AvahiPoll *api, int fd, AvahiWatchEvent event, AvahiWatchCallbac
 	struct priv_avahi *priv = api->userdata;
 	AvahiWatch *w = calloc(1, sizeof *w);
 
-	w->e.callback = watch_callback;
 	w->query = priv->query;
 	w->fd = fd;
 	w->callback = callback;
@@ -111,11 +102,17 @@ watch_free(AvahiWatch *w)
 	free(w);
 }
 
+void
+timeout_callback(netresolve_query_t query, netresolve_timeout_t timeout, void *data)
+{
+	AvahiTimeout *t = data;
+
+	t->callback(t, t->userdata);
+}
+
 static void
 timeout_update(AvahiTimeout *t, const struct timeval *tv)
 {
-	assert(t->e.callback);
-
 	if (t->timeout) {
 		netresolve_timeout_remove(t->query, t->timeout);
 		t->timeout = NULL;
@@ -127,16 +124,8 @@ timeout_update(AvahiTimeout *t, const struct timeval *tv)
 
 		if (sec == 0 && nsec == 0)
 			nsec = 1;
-		t->timeout = netresolve_timeout_add(t->query, sec, nsec, t);
+		t->timeout = netresolve_timeout_add(t->query, sec, nsec, timeout_callback, t);
 	}
-}
-
-void
-timeout_callback(void *data, int events)
-{
-	AvahiTimeout *t = data;
-
-	t->callback(t, t->userdata);
 }
 
 AvahiTimeout *
@@ -145,7 +134,6 @@ timeout_new(const AvahiPoll *api, const struct timeval *tv, AvahiTimeoutCallback
 	struct priv_avahi *priv = api->userdata;
 	AvahiTimeout *t = calloc(1, sizeof *t);
 
-	t->e.callback = timeout_callback;
 	t->query = priv->query;
 	t->fd = -1;
 	t->callback = callback;
@@ -227,10 +215,21 @@ lookup_host(struct priv_avahi *priv, int protocol)
 	priv->pending++;
 }
 
+void
+cleanup(void *data)
+{
+	struct priv_avahi *priv = data;
+
+	if (priv->client)
+		avahi_client_free(priv->client);
+
+	free(priv->name);
+}
+
 static struct priv_avahi *
 setup(netresolve_query_t query, char **settings)
 {
-	struct priv_avahi *priv = netresolve_backend_new_priv(query, sizeof *priv);
+	struct priv_avahi *priv = netresolve_backend_new_priv(query, sizeof *priv, cleanup);
 	int error;
 
 	if (!priv)
@@ -261,7 +260,7 @@ setup(netresolve_query_t query, char **settings)
 }
 
 void
-setup_forward(netresolve_query_t query, char **settings)
+query_forward(netresolve_query_t query, char **settings)
 {
 	struct priv_avahi *priv;
 
@@ -274,27 +273,4 @@ setup_forward(netresolve_query_t query, char **settings)
 		lookup_host(priv, AVAHI_PROTO_INET);
 	if (priv->family == AF_INET6 || priv->family == AF_UNSPEC)
 		lookup_host(priv, AVAHI_PROTO_INET6);
-}
-
-void
-dispatch(netresolve_query_t query, int fd, int events, void *data)
-{
-	struct priv_avahi *priv = netresolve_backend_get_priv(query);
-	struct event *e = data;
-
-	e->callback(e, events);
-
-	if (!priv->pending)
-		netresolve_backend_finished(query);
-}
-
-void
-cleanup(netresolve_query_t query)
-{
-	struct priv_avahi *priv = netresolve_backend_get_priv(query);
-
-	if (priv->client)
-		avahi_client_free(priv->client);
-
-	free(priv->name);
 }
