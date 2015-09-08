@@ -181,7 +181,7 @@ netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state
 			}
 			/* FIXME: should also work with zero! */
 			/* FIXME: might not even be needed any more! */
-			query->delayed = netresolve_timeout_add_ms(query, 1, dispatch_delayed, NULL);
+			query->delayed = netresolve_timeout_add_ms(query, 0, dispatch_delayed, NULL);
 		}
 		break;
 	case NETRESOLVE_STATE_DONE:

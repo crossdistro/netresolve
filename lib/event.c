@@ -122,7 +122,7 @@ netresolve_timeout_add(netresolve_query_t query, time_t sec, long nsec,
 {
 	netresolve_watch_t watch;
 	int fd;
-	struct itimerspec timerspec = {{0, 0}, {sec, nsec}};
+	struct itimerspec timerspec = {{0, 0}, {sec, (sec != 0 || nsec != 0) ? nsec : 1}};
 
 	if ((fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK)) == -1)
 		return NULL;

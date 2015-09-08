@@ -122,8 +122,6 @@ timeout_update(AvahiTimeout *t, const struct timeval *tv)
 		long int sec = tv->tv_sec;
 		long int nsec = tv->tv_usec * 1000;
 
-		if (sec == 0 && nsec == 0)
-			nsec = 1;
 		t->timeout = netresolve_timeout_add(t->query, sec, nsec, timeout_callback, t);
 	}
 }
