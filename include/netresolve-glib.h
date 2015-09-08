@@ -69,8 +69,7 @@ handler(GIOChannel *stream, GIOCondition condition, gpointer data)
 {
 	struct netresolve_glib_source *glib_source = data;
 
-	if (!netresolve_dispatch(glib_source->context, glib_source->source, condition_to_events(condition)))
-		abort();
+	netresolve_dispatch(glib_source->context, glib_source->source, condition_to_events(condition));
 
 	return TRUE;
 }

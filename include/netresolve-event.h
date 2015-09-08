@@ -69,8 +69,7 @@ handler(int fd, short condition, void *data)
 {
 	struct netresolve_event_source *event_source = data;
 
-	if (!netresolve_dispatch(event_source->context, event_source->source, condition_to_events(condition)))
-		abort();
+	netresolve_dispatch(event_source->context, event_source->source, condition_to_events(condition));
 }
 
 static void*

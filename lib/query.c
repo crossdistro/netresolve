@@ -351,11 +351,9 @@ netresolve_query_dns(netresolve_t context,
 /* netresolve_query_dispatch:
  *
  * This internal function is called by the netresolve context object to hand
- * over file descriptor events to a query. The query must return `false` if
- * it didn't handle the query so that the context can pass it to the next
- * query.
+ * over file descriptor events to a query.
  */
-bool
+void
 netresolve_query_dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
 {
 	assert(watch->callback);
@@ -369,8 +367,6 @@ netresolve_query_dispatch(netresolve_query_t query, netresolve_watch_t watch, in
 		netresolve_query_set_state(query, NETRESOLVE_STATE_DONE);
 	if (query->state == NETRESOLVE_STATE_ERROR)
 		netresolve_query_set_state(query, NETRESOLVE_STATE_FAILED);
-
-	return true;
 }
 
 /* netresolve_query_free:

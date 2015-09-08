@@ -38,6 +38,6 @@ void netresolve_set_fd_callbacks(netresolve_t context,
 		void *user_data,
 		netresolve_free_user_data_callback_t free_user_data);
 void *netresolve_get_user_data(netresolve_t context);
-bool netresolve_dispatch(netresolve_t context, netresolve_watch_t source, int events);
+void netresolve_dispatch(netresolve_t context, netresolve_watch_t watch, int events);
 
 #endif /* NETRESOLVE_NONBLOCK_H */

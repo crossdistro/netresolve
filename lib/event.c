@@ -161,18 +161,13 @@ netresolve_timeout_remove(netresolve_query_t query, netresolve_timeout_t timeout
 	netresolve_watch_remove(query, timeout, true);
 }
 
-bool
+void
 netresolve_dispatch(netresolve_t context, netresolve_watch_t watch, int events)
 {
 	assert(watch);
 	assert(watch->query);
 
-	if (!(events & (POLLIN | POLLOUT)) || (events & ~(POLLIN | POLLOUT))) {
-		error("Bad poll events %d for watch %p.", events, watch);
-		return false;
-	}
-
 	debug_query(watch->query, "dispatching: fd=%d events=%d watch=%p", watch->fd, events, watch);
 
-	return netresolve_query_dispatch(watch->query, watch, watch->fd, events, watch->data);
+	netresolve_query_dispatch(watch->query, watch, watch->fd, events, watch->data);
 }

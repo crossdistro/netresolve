@@ -224,7 +224,7 @@ netresolve_query_t netresolve_query(netresolve_t context, netresolve_query_callb
 		enum netresolve_option type, ...);
 const char *netresolve_query_state_to_string(enum netresolve_state state);
 void netresolve_query_set_state(netresolve_query_t query, enum netresolve_state state);
-bool netresolve_query_dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data);
+void netresolve_query_dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data);
 
 /* Request */
 bool netresolve_request_set_options_from_va(struct netresolve_request *request, va_list ap);

@@ -187,8 +187,7 @@ dispatch_events(netresolve_t context, int timeout)
 		debug_context(context, "epoll_wait: new events: %d", loop->nevents);
 		for (i = 0; i < loop->nevents; i++)
 			if (loop->events[i].data.ptr)
-				if (!netresolve_dispatch(context, loop->events[i].data.ptr, loop->events[i].events))
-					error("event %d for watch %p not dispatched", i, loop->events[i].data.ptr);
+				netresolve_dispatch(context, loop->events[i].data.ptr, loop->events[i].events);
 	}
 
 	return loop->nevents;
