@@ -87,8 +87,8 @@ netresolve_context_free(netresolve_t context)
 	netresolve_set_backend_string(context, "");
 	if (context->epoll.fd != -1 && close(context->epoll.fd) == -1)
 		abort();
-	if (context->callbacks.free_user_data)
-		context->callbacks.free_user_data(context->callbacks.user_data);
+	if (context->callbacks.cleanup)
+		context->callbacks.cleanup(context->callbacks.user_data);
 	memset(context, 0, sizeof *context);
 	free(context);
 }

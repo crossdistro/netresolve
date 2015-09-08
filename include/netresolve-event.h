@@ -107,7 +107,7 @@ netresolve_event_new(struct event_base *base)
 	netresolve_t context = netresolve_context_new();
 
 	if (context)
-		netresolve_set_fd_callbacks(context, add_watch, remove_watch, base, NULL);
+		netresolve_set_fd_callbacks(context, add_watch, remove_watch, NULL, base);
 
 	return context;
 }

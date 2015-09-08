@@ -212,7 +212,7 @@ struct netresolve_context {
 		netresolve_watch_add_callback_t add_watch;
 		netresolve_watch_remove_callback_t remove_watch;
 		void *user_data;
-		netresolve_free_user_data_callback_t free_user_data;
+		netresolve_cleanup_callback_t cleanup;
 	} callbacks;
 	struct netresolve_config {
 		int force_family;
@@ -252,7 +252,7 @@ const char *netresolve_get_response_string(netresolve_query_t query);
 /* Event loop for blocking mode */
 bool netresolve_epoll_install(netresolve_t context,
 		struct netresolve_epoll *loop,
-		netresolve_free_user_data_callback_t free_loop);
+		netresolve_cleanup_callback_t cleanup);
 void netresolve_epoll_wait(netresolve_t context);
 
 #endif /* NETRESOLVE_PRIVATE_H */

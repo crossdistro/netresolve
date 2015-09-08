@@ -30,13 +30,13 @@ typedef struct netresolve_watch *netresolve_watch_t;
 
 typedef void *(*netresolve_watch_add_callback_t)(netresolve_t context, int fd, int events, netresolve_watch_t source);
 typedef void (*netresolve_watch_remove_callback_t)(netresolve_t context, int fd, void *handle);
-typedef void (*netresolve_free_user_data_callback_t)(void *user_data);
+typedef void (*netresolve_cleanup_callback_t)(void *user_data);
 
 void netresolve_set_fd_callbacks(netresolve_t context,
 		netresolve_watch_add_callback_t add_watch,
 		netresolve_watch_remove_callback_t remove_watch,
-		void *user_data,
-		netresolve_free_user_data_callback_t free_user_data);
+		netresolve_cleanup_callback_t cleanup,
+		void *user_data);
 void *netresolve_get_user_data(netresolve_t context);
 void netresolve_dispatch(netresolve_t context, netresolve_watch_t watch, int events);
 

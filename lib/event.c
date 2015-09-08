@@ -30,17 +30,17 @@ void
 netresolve_set_fd_callbacks(netresolve_t context,
 		netresolve_watch_add_callback_t add_watch,
 		netresolve_watch_remove_callback_t remove_watch,
-		void *user_data,
-		netresolve_free_user_data_callback_t free_user_data)
+		netresolve_cleanup_callback_t cleanup,
+		void *user_data)
 {
 	assert(add_watch && remove_watch);
 	assert(!context->callbacks.add_watch && !context->callbacks.remove_watch);
 
 	context->callbacks.add_watch = add_watch;
 	context->callbacks.remove_watch = remove_watch;
+	context->callbacks.cleanup = cleanup;
 
 	context->callbacks.user_data = user_data;
-	context->callbacks.free_user_data = free_user_data;
 }
 
 void *

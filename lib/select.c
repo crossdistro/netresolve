@@ -77,7 +77,7 @@ remove_watch(netresolve_t context, int fd, void *handle)
 }
 
 static void
-free_user_data(void *user_data)
+cleanup(void *user_data)
 {
 	struct netresolve_select *loop = user_data;
 
@@ -97,7 +97,7 @@ netresolve_select_new()
 	if (!(context = netresolve_context_new()))
 		goto fail_context;
 
-	netresolve_set_fd_callbacks(context, add_watch, remove_watch, loop, free_user_data);
+	netresolve_set_fd_callbacks(context, add_watch, remove_watch, cleanup, loop);
 
 	return context;
 fail_context:
