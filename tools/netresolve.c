@@ -161,6 +161,44 @@ run_ping(netresolve_query_t query, size_t idx)
 	return true;
 }
 
+void
+usage(void)
+{
+	fprintf(stderr,
+			"netresolve [ OPTIONS ]\n"
+			"\n"
+			"Forward query:\n"
+			"  -n,--node <nodename> -- node name\n"
+			"  -s,--service <servname> -- service name\n"
+			"  -f,--family any|ip4|ip6 -- family name\n"
+			"  -t,--socktype any|stream|dgram|seqpacket -- socket type\n"
+			"  -p,--protocol any|tcp|udp|sctp -- transport protocol\n"
+			"  -S,--srv -- use SRV records\n"
+			"\n"
+			"Reverse query:\n"
+			"  -a,--address -- IPv4/IPv6 address (reverse query)\n"
+			"  -P,--port -- TCP/UDP port\n"
+			"\n"
+			"DNS query:\n"
+			"  -C,--class -- DNS record class\n"
+			"  -T,--type -- DNS record type\n"
+			"\n"
+			"Socket API:\n"
+			"  -c,--connect -- attempt to connect to a host like netcat/socat\n"
+			"  --ping -- perform an ICMP ping"
+			"\n"
+			"Miscellaneous:\n"
+			"  -b,--backends <backends> -- comma-separated list of backends\n"
+			"  -h,--help -- help\n"
+			"  -v,--verbose -- show more verbose output\n"
+			"\n"
+			"Examples:\n"
+			"  netresolve --node www.sourceforge.net --service http\n"
+			"  netresolve --address 8.8.8.8 --port 80\n"
+			"  netresolve --node jabber.org --type SRV\n");
+	exit(EXIT_SUCCESS);
+}
+
 int
 main(int argc, char **argv)
 {
@@ -204,23 +242,7 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(count_argv(argv), argv, opts, longopts, &idx)) != -1) {
 		switch (opt) {
 		case 'h':
-			fprintf(stderr,
-					"-h,--help -- help\n"
-					"-v,--verbose -- show more verbose output\n"
-					"-c,--connect -- attempt to connect to a host like netcat/socat\n"
-					"--ping -- perform an ICMP ping"
-					"-n,--node <nodename> -- node name\n"
-					"-s,--service <servname> -- service name\n"
-					"-f,--family any|ip4|ip6 -- family name\n"
-					"-t,--socktype any|stream|dgram|seqpacket -- socket type\n"
-					"-p,--protocol any|tcp|udp|sctp -- transport protocol\n"
-					"-b,--backends <backends> -- comma-separated list of backends\n"
-					"-S,--srv -- resolve DNS SRV record\n"
-					"-a,--address -- IPv4/IPv6 address (reverse query)\n"
-					"-P,--port -- TCP/UDP port\n"
-					"-C,--class -- DNS record class\n"
-					"-T,--type -- DNS record type\n");
-			exit(EXIT_SUCCESS);
+			usage();
 		case 'v':
 			netresolve_set_log_level(NETRESOLVE_LOG_LEVEL_DEBUG);
 			break;
@@ -277,7 +299,7 @@ main(int argc, char **argv)
 	}
 
 	if (argv[optind])
-		abort();
+		usage();
 
 	if (connect) {
 		netresolve_query_t query;
