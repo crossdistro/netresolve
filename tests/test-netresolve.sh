@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -xe
 
 DIFF="diff -u"
 NR="./netresolve"
@@ -7,7 +7,7 @@ DATA="${srcdir:-.}/tests/data"
 # empty
 $DIFF <($NR) $DATA/any
 $DIFF <($NR --backends any) $DATA/any
-$DIFF <($NR --backends any --service '') $DATA/any-listing
+$DIFF <($NR --backends any --service '' | grep -v sctp) $DATA/any-listing
 $DIFF <($NR --backends numerichost) $DATA/failed
 $DIFF <($NR --backends loopback) $DATA/localhost
 $DIFF <($NR --backends hosts) $DATA/failed
@@ -28,7 +28,7 @@ $DIFF <(NETRESOLVE_FLAG_DEFAULT_LOOPBACK=yes $NR) $DATA/localhost
 
 # empty/http
 $DIFF <($NR --service http) $DATA/services
-$DIFF <($NR --backend libc --service http) <(grep -v '^secure$' $DATA/services)
+$DIFF <($NR --backend libc --service http | grep -v sctp) <(grep -v '^secure$' $DATA/services)
 
 # numeric
 $DIFF <($NR --node 1.2.3.4) $DATA/numeric4
@@ -58,7 +58,7 @@ $DIFF <($NR --backends nss:./.libs/libnss_netresolve.so:gethostbyname --node loc
 
 # localhost/http
 $DIFF <($NR --node localhost) $DATA/localhost
-$DIFF <($NR --backends libc --node localhost --service http) <(grep -v '^secure$' $DATA/localhost-http)
+$DIFF <($NR --backends libc --node localhost --service http | grep -v sctp) <(grep -v '^secure$' $DATA/localhost-http)
 $DIFF <($NR --backends nss:files --node localhost --service http) <(grep -v '^secure$' $DATA/localhost-http)
 $DIFF <($NR --backends nss:files:gethostbyname4 --node localhost --service http) <(grep -v '^secure$' $DATA/localhost-http)
 $DIFF <($NR --backends nss:files:gethostbyname3 --node localhost --service http) <(grep -v '^secure$' $DATA/localhost-http)
