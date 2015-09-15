@@ -26,7 +26,10 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>
+
+#ifdef USE_LDNS
 #include <ldns/ldns.h>
+#endif
 
 static const char *
 socktype_to_string(int socktype)
@@ -213,6 +216,7 @@ netresolve_get_response_string(netresolve_query_t query)
 			bprintf(&start, end, "%02hhx", answer[i]);
 		bprintf(&start, end, "\n", length);
 
+#ifdef USE_LDNS
 		ldns_pkt *pkt;
 		int status = ldns_wire2pkt(&pkt, answer, length);
 		if (status) {
@@ -222,6 +226,7 @@ netresolve_get_response_string(netresolve_query_t query)
 			bprintf(&start, end, "%s\n", ldns_pkt2str(pkt));
 			ldns_pkt_free(pkt);
 		}
+#endif
 	}
 	if (secure)
 		bprintf(&start, end, "secure\n");
