@@ -1,4 +1,8 @@
-#!/bin/sh -e
+#!/bin/bash -xe
+
 mkdir -p m4
 autoreconf --install --symlink
-./configure "$@"
+
+if [ -z "$NOCONFIGURE" ]; then
+    ./configure "$@";
+fi
