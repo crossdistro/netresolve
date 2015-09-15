@@ -23,10 +23,13 @@
  */
 #include <netresolve-private.h>
 #include <getopt.h>
-#include <ldns/ldns.h>
 #include <arpa/nameser.h>
 #include <netinet/ip_icmp.h>
 #include <linux/icmpv6.h>
+
+#ifdef USE_LDNS
+#include <ldns/ldns.h>
+#endif
 
 static int
 count_argv(char **argv)
@@ -79,6 +82,7 @@ on_connect(netresolve_query_t context, int idx, int sock, void *user_data)
 static char *
 get_dns_string(netresolve_query_t query)
 {
+#ifdef USE_LDNS
 	const uint8_t *answer;
 	size_t length;
 
@@ -98,6 +102,9 @@ get_dns_string(netresolve_query_t query)
 
 	ldns_pkt_free(pkt);
 	return result;
+#else
+	return NULL;
+#endif
 }
 
 static const char *
@@ -288,10 +295,18 @@ main(int argc, char **argv)
 			port_str = optarg;
 			break;
 		case 'C':
+#ifdef USE_LDNS
 			cls = ldns_get_rr_class_by_name(optarg);
+#else
+			cls = strtoll(optarg, NULL, 10);
+#endif
 			break;
 		case 'T':
+#ifdef USE_LDNS
 			type = ldns_get_rr_type_by_name(optarg);
+#else
+			type = strtoll(optarg, NULL, 10);
+#endif
 			break;
 		default:
 			exit(EXIT_FAILURE);

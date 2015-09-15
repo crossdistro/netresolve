@@ -35,7 +35,6 @@ include_HEADERS = \
 lib_LTLIBRARIES = \
 	libnetresolve.la \
 	libnetresolve-libc.la \
-	libnetresolve-asyncns.la \
 	libnss_netresolve.la
 
 libnetresolve_la_SOURCES = \
@@ -55,7 +54,7 @@ libnetresolve_la_SOURCES = \
 	lib/epoll.c \
 	lib/select.c
 libnetresolve_la_LDFLAGS = \
-	$(AM_LDFLAGS) -lldns \
+	$(AM_LDFLAGS) $(LDNS_LIBS) \
 	-export-symbols-regex '^netresolve_'
 
 libnetresolve_libc_la_SOURCES = \
@@ -67,6 +66,9 @@ libnetresolve_libc_la_LDFLAGS = \
 libnetresolve_libc_la_LIBADD = \
 	libnetresolve.la
 
+if BUILD_FRONTEND_ASYNCNS
+lib_LTLIBRARIES += libnetresolve-asyncns.la
+
 libnetresolve_asyncns_la_SOURCES = \
 	compat/asyncns.c
 libnetresolve_asyncns_la_LDFLAGS = \
@@ -74,6 +76,7 @@ libnetresolve_asyncns_la_LDFLAGS = \
 	--export-all-symbols
 libnetresolve_asyncns_la_LIBADD = \
 	libnetresolve.la
+endif
 
 libnss_netresolve_la_SOURCES = \
 	compat/nsswitch.c
@@ -87,10 +90,12 @@ lib_LTLIBRARIES += \
 	libnetresolve-backend-hosts.la \
 	libnetresolve-backend-hostname.la \
 	libnetresolve-backend-libc.la \
-	libnetresolve-backend-asyncns.la \
 	libnetresolve-backend-nss.la \
 	libnetresolve-backend-exec.la
 
+if BUILD_BACKEND_ASYNCNS
+lib_LTLIBRARIES += libnetresolve-backend-asyncns.la
+endif
 if BUILD_BACKEND_ARESDNS
 lib_LTLIBRARIES += libnetresolve-backend-aresdns.la
 endif
@@ -109,8 +114,6 @@ libnetresolve_backend_hosts_la_SOURCES = backends/hosts.c
 libnetresolve_backend_hostname_la_SOURCES = backends/hostname.c
 libnetresolve_backend_libc_la_SOURCES = backends/libc.c
 libnetresolve_backend_libc_la_LDFLAGS = $(AM_LDFLAGS) -lresolv
-libnetresolve_backend_asyncns_la_SOURCES = backends/asyncns.c
-libnetresolve_backend_asyncns_la_LDFLAGS = -lasyncns
 libnetresolve_backend_nss_la_SOURCES = backends/nss.c
 libnetresolve_backend_exec_la_SOURCES = backends/exec.c
 
@@ -121,7 +124,7 @@ libnetresolve_backend_aresdns_la_CPPFLAGS = $(AM_CPPFLAGS) $(ARES_CFLAGS) -DUSE_
 endif
 if BUILD_BACKEND_UBDNS
 libnetresolve_backend_ubdns_la_SOURCES = backends/dns.c
-libnetresolve_backend_ubdns_la_LDFLAGS = $(AM_LDFLAGS) -lunbound
+libnetresolve_backend_ubdns_la_LDFLAGS = $(AM_LDFLAGS) $(UNBOUND_LIBS)
 libnetresolve_backend_ubdns_la_CPPFLAGS = $(AM_CPPFLAGS) -DUSE_UNBOUND=1
 endif
 if BUILD_BACKEND_AVAHI
@@ -129,13 +132,17 @@ libnetresolve_backend_avahi_la_SOURCES = backends/avahi.c
 libnetresolve_backend_avahi_la_LDFLAGS = $(AM_LDFLAGS) $(AVAHI_LIBS)
 libnetresolve_backend_avahi_la_CPPFLAGS = $(AM_CPPFLAGS)
 endif
+if BUILD_BACKEND_ASYNCNS
+libnetresolve_backend_asyncns_la_SOURCES = backends/asyncns.c
+libnetresolve_backend_asyncns_la_LDFLAGS = $(ASYNCNS_LIBS)
+endif
 
 bin_PROGRAMS = netresolve getaddrinfo getnameinfo gethostbyname gethostbyaddr res_query
 bin_SCRIPTS = tools/wrapresolve
 
 netresolve_SOURCES = tools/netresolve.c
 netresolve_LDADD = libnetresolve.la
-netresolve_LDFLAGS = $(AM_LDFLAGS) -lldns
+netresolve_LDFLAGS = $(AM_LDFLAGS) $(LDNS_LIBS)
 
 getaddrinfo_SOURCES = tools/getaddrinfo.c tools/compat.c
 
@@ -146,7 +153,7 @@ gethostbyname_SOURCES = tools/gethostbyname.c tools/compat.c
 gethostbyaddr_SOURCES = tools/gethostbyaddr.c tools/compat.c
 
 res_query_SOURCES = tools/res_query.c tools/compat.c
-res_query_LDFLAGS = $(AM_LDFLAGS) -lresolv -lldns
+res_query_LDFLAGS = $(AM_LDFLAGS) $(LDNS_LIBS) -lresolv
 
 TESTS = \
 	tests/test-netresolve.sh \
@@ -188,9 +195,12 @@ noinst_PROGRAMS = \
 	test-gethostbyname \
 	test-gethostbyname2 \
 	test-gethostbyname_r \
-	test-gethostbyname2_r \
+	test-gethostbyname2_r
+if BUILD_FRONTEND_ASYNCNS
+noinst_PROGRAMS += \
 	test-asyncns \
 	test-asyncns-cancel
+endif
 if BUILD_ALL_TESTS
 TESTS += \
 	test-libevent \

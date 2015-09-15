@@ -38,6 +38,7 @@
 #include <net/if.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
+#include <unistd.h>
 #include <assert.h>
 
 #define debug_context(context, format, ...) debug( \
