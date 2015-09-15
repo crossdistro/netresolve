@@ -24,21 +24,21 @@ if test "$build_aresdns" != no; then
 	PKG_CHECK_MODULES([ARES], [libcares], [build_aresdns=yes], [build_aresdns=no])
 	if test "$with_c_ares" = yes -a "$build_aresdns" = no; then AC_MSG_ERROR([Support for c-ares requested but not available.]); fi
 fi
-AM_CONDITIONAL(BUILD_BACKEND_ARESDNS, [test $build_aresdns])
+AM_CONDITIONAL(BUILD_BACKEND_ARESDNS, [test $build_aresdns = "yes"])
 
 AC_ARG_WITH(unbound, AS_HELP_STRING([--with-unbound|--without-unbound], [Build libunbound backend (Default: yes)]), [build_ubdns="$with_unbound"])
 if test "$build_ubdns" != no; then
 	AC_CHECK_LIB([unbound], [ub_ctx_create], [build_ubdns=yes], [build_ubdns=no])
 	if test "$with_unbound" = yes -a "$build_ubdns" = no; then AC_MSG_ERROR([Support for libunbound requested but not available.]); fi
 fi
-AM_CONDITIONAL(BUILD_BACKEND_UBDNS, [test $build_ubdns])
+AM_CONDITIONAL(BUILD_BACKEND_UBDNS, [test $build_ubdns = "yes"])
 
 AC_ARG_WITH(avahi, AS_HELP_STRING([--with-avahi|--without-avahi], [Build libavahi backend (Default: yes)]), [build_avahi="$with_avahi"])
 if test "$build_avahi" != no; then
 	PKG_CHECK_MODULES([AVAHI], [avahi-client], [build_avahi=yes], [build_avahi=no])
 	if test "$with_avahi" = yes -a "$build_avahi" = no; then AC_MSG_ERROR([Support for libavahi requested but not available.]); fi
 fi
-AM_CONDITIONAL(BUILD_BACKEND_AVAHI, [test $build_avahi])
+AM_CONDITIONAL(BUILD_BACKEND_AVAHI, [test $build_avahi = "yes"])
 
 AC_ARG_ENABLE(tests, AS_HELP_STRING([--enable-tests|--disable-tests], [Build tests using additional dependencies (Default: no)]))
 AS_IF([test "$enable_tests" = "yes"],
