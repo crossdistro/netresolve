@@ -252,7 +252,7 @@ const char *netresolve_get_response_string(netresolve_query_t query);
 /* Event loop for blocking mode */
 bool netresolve_epoll_install(netresolve_t context,
 		struct netresolve_epoll *loop,
-		netresolve_cleanup_callback_t cleanup);
+		bool internal);
 void netresolve_epoll_wait(netresolve_t context);
 
 #endif /* NETRESOLVE_PRIVATE_H */

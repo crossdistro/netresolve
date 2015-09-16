@@ -85,10 +85,10 @@ netresolve_context_free(netresolve_t context)
 		netresolve_query_free(queries->next);
 
 	netresolve_set_backend_string(context, "");
-	if (context->epoll.fd != -1 && close(context->epoll.fd) == -1)
-		abort();
+
 	if (context->callbacks.cleanup)
 		context->callbacks.cleanup(context->callbacks.user_data);
+
 	memset(context, 0, sizeof *context);
 	free(context);
 }
@@ -177,6 +177,10 @@ netresolve_set_backend_string(netresolve_t context, const char *string)
 		free(context->backends);
 		context->backends = NULL;
 	}
+
+	/* Empty string suggest we only clean up. */
+	if (!*string)
+		return;
 
 	/* Install new set of backends */
 	for (setup = end = string; true; end++) {

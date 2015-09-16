@@ -285,7 +285,7 @@ netresolve_query( netresolve_t context, netresolve_query_callback callback, void
 
 	/* Install default callbacks for first query in blocking mode. */
 	if (!context->callbacks.add_watch)
-		netresolve_epoll_install(context, &context->epoll, NULL);
+		netresolve_epoll_install(context, &context->epoll, true);
 
 	netresolve_query_set_state(query, NETRESOLVE_STATE_SETUP);
 

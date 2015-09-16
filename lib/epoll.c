@@ -69,17 +69,24 @@ remove_watch(netresolve_t context, int fd, void *handle)
 }
 
 static void
-cleanup(void *user_data)
+cleanup_members(void *user_data)
 {
 	struct netresolve_epoll *loop = user_data;
 
 	assert(!loop->count);
 
 	if (close(loop->fd) == -1)
-		error("close: %s", strerror(errno));
+		error("closing epoll file descriptor %d: %s", loop->fd, strerror(errno));
 
 	free(loop->events);
-	free(loop);
+	memset(loop, 0, sizeof *loop);
+}
+
+static void
+cleanup(void *user_data)
+{
+	cleanup_members(user_data);
+	free(user_data);
 }
 
 /* netresolve_epoll_install:
@@ -91,7 +98,7 @@ cleanup(void *user_data)
 bool
 netresolve_epoll_install(netresolve_t context,
 		struct netresolve_epoll *loop,
-		netresolve_cleanup_callback_t cleanup)
+		bool internal)
 {
 	assert(!loop->events);
 
@@ -103,7 +110,7 @@ netresolve_epoll_install(netresolve_t context,
 		goto fail_epoll;
 	}
 
-	netresolve_set_fd_callbacks(context, add_watch, remove_watch, cleanup, loop);
+	netresolve_set_fd_callbacks(context, add_watch, remove_watch, internal ? cleanup_members : cleanup, loop);
 
 	debug("created epoll file descriptor: %d", loop->fd);
 
@@ -158,7 +165,7 @@ netresolve_epoll_fd(netresolve_t context)
 	if (!loop) {
 		if (!(loop = calloc(1, sizeof *loop)))
 			return -1;
-		if (!netresolve_epoll_install(context, loop, cleanup)) {
+		if (!netresolve_epoll_install(context, loop, false)) {
 			free(loop);
 			return -1;
 		}
