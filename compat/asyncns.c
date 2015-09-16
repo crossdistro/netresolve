@@ -177,7 +177,7 @@ asyncns_res_query (asyncns_t *asyncns, const char *dname, int class, int type)
 	if (!(q = calloc(1, sizeof *q)))
 		return NULL;
 
-	return add_query(asyncns, q, netresolve_query_res_query(asyncns->context, dname, class, type, callback, q));
+	return add_query(asyncns, q, netresolve_query_dns(asyncns->context, dname, class, type, callback, q));
 }
 
 asyncns_query_t *
@@ -191,7 +191,15 @@ asyncns_res_search (asyncns_t *asyncns, const char *dname, int class, int type)
 int
 asyncns_res_done (asyncns_t *asyncns, asyncns_query_t *q, unsigned char **answer)
 {
-	return netresolve_query_res_query_done(remove_query(q), answer);
+	size_t length;
+	const char *query_answer = netresolve_query_get_dns_answer(q->query, &length);
+
+	*answer = malloc(length);
+	memcpy(*answer, query_answer, length);
+
+	netresolve_query_free(remove_query(q));
+
+	return 0;
 }
 
 asyncns_query_t *

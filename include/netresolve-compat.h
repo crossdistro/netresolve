@@ -55,12 +55,6 @@ netresolve_query_t netresolve_query_gethostbyaddr(netresolve_t context,
 struct hostent *netresolve_query_gethostbyaddr_done(netresolve_query_t query,
 		int *h_errnop, int32_t *ttlp);
 
-/* Functions resembling POSIX DNS resolver API */
-netresolve_query_t netresolve_query_res_query(netresolve_t context,
-		const char *dname, int cls, int type,
-		netresolve_query_callback callback, void *user_data);
-int netresolve_query_res_query_done(netresolve_query_t query, uint8_t **answer);
-
 /* Destructors */
 void netresolve_freeaddrinfo(struct addrinfo *ai);
 void netresolve_freehostent(struct hostent *he);
