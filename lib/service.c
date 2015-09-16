@@ -51,7 +51,7 @@ static const struct netresolve_protocol protocols[] = {
 struct netresolve_service {
 	int protocol;
 	int port;
-	const char *name;
+	char *name;
 };
 
 struct netresolve_service_list {
@@ -189,6 +189,9 @@ netresolve_service_list_free(struct netresolve_service_list *services)
 {
 	if (!services)
 		return;
+
+	for (struct netresolve_service *item = services->items; item->name; item++)
+		free(item->name);
 
 	free(services->items);
 	free(services);
