@@ -123,7 +123,7 @@ initialize(struct priv_nss *priv, netresolve_query_t query, char **settings)
 
 	if (!settings || !*settings) {
 		error("missing argument");
-		return;
+		goto out;
 	}
 
 	/* parse settings */
@@ -148,7 +148,7 @@ initialize(struct priv_nss *priv, netresolve_query_t query, char **settings)
 	priv->dl_handle = dlopen(priv->filename, RTLD_LAZY);
 	if (!priv->dl_handle) {
 		error("%s", dlerror());
-		return;
+		goto out;
 	}
 
 	/* find nsswitch entry points */
@@ -158,6 +158,7 @@ initialize(struct priv_nss *priv, netresolve_query_t query, char **settings)
 	try_symbol_pattern(query, priv, (void *) &priv->gethostbyname4_r, "_nss_%s_gethostbyname4_r", "gethostbyname4");
 	try_symbol_pattern(query, priv, (void *) &priv->getaddrinfo, "_nss_%s_getaddrinfo", "getaddrinfo");
 
+out:
 	free(priv->name);
 	priv->name = NULL;
 	free(priv->filename);
