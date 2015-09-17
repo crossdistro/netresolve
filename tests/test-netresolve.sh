@@ -1,7 +1,7 @@
 #!/bin/bash -xe
 
 DIFF="diff -u"
-NR="./netresolve"
+NR="${NETRESOLVE_TEST_COMMAND:-./netresolve}"
 DATA="${srcdir:-.}/tests/data"
 
 # empty
