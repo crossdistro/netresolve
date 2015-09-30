@@ -4,7 +4,7 @@ DIFF="diff -u"
 DATA="${srcdir:-.}/tests/data"
 
 test_command() {
-    $DIFF <(./$@ | grep -v localdomain) tests/data/$1
+    $DIFF <(./$@ | grep -vE 'localhost[46]|localdomain') tests/data/$1
     $DIFF <(./wrapresolve ./"$@") tests/data/$1
 }
 
