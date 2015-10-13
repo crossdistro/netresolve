@@ -448,6 +448,9 @@ setup(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv = netresolve_backend_new_priv(query, sizeof *priv, cleanup);
 	int status;
+#if defined(USE_UNBOUND)
+	const char *server = NULL;
+#endif
 
 	if (!priv)
 		return NULL;;
@@ -458,6 +461,8 @@ setup(netresolve_query_t query, char **settings)
 #if defined(USE_UNBOUND)
 		else if (!strcmp(*settings, "validate"))
 			priv->validate = priv->secure = true;
+		else if (!strncmp(*settings, "server=", 7))
+			server = *settings + 7;
 #endif
 	}
 
@@ -472,9 +477,16 @@ setup(netresolve_query_t query, char **settings)
 	if(!priv->ctx)
 		return NULL;;
 
-	if ((status = ub_ctx_resolvconf(priv->ctx, NULL)) != 0) {
-		error("libunbound: %s", ub_strerror(status));
-		return NULL;;
+	if (server) {
+		if ((status = ub_ctx_set_fwd(priv->ctx, server)) != 0) {
+			error("libunbound: %s", ub_strerror(status));
+			return NULL;
+		}
+	} else {
+		if ((status = ub_ctx_resolvconf(priv->ctx, NULL)) != 0) {
+			error("libunbound: %s", ub_strerror(status));
+			return NULL;;
+		}
 	}
 	if (priv->validate && (status = ub_ctx_add_ta_file(priv->ctx, "/etc/dnssec/root-anchors.txt"))) {
 		error("libunbound: %s", ub_strerror(status));
