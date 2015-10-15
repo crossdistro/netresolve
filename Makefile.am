@@ -128,9 +128,9 @@ libnetresolve_backend_ubdns_la_LDFLAGS = $(AM_LDFLAGS) $(UNBOUND_LIBS)
 libnetresolve_backend_ubdns_la_CPPFLAGS = $(AM_CPPFLAGS) -DUSE_UNBOUND=1
 endif
 if BUILD_BACKEND_AVAHI
-libnetresolve_backend_avahi_la_SOURCES = backends/avahi.c
+libnetresolve_backend_avahi_la_SOURCES = backends/dns.c
 libnetresolve_backend_avahi_la_LDFLAGS = $(AM_LDFLAGS) $(AVAHI_LIBS)
-libnetresolve_backend_avahi_la_CPPFLAGS = $(AM_CPPFLAGS)
+libnetresolve_backend_avahi_la_CPPFLAGS = $(AM_CPPFLAGS) -DUSE_AVAHI=1
 endif
 if BUILD_BACKEND_ASYNCNS
 libnetresolve_backend_asyncns_la_SOURCES = backends/asyncns.c

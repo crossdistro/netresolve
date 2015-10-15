@@ -29,24 +29,68 @@
 #include <unbound.h>
 #define priv_dns priv_dns
 
+static void ubdns_callback(void *arg, int status, struct ub_result* result);
+
 #elif defined(USE_ARES)
 
 #include <ares.h>
 #define priv_dns priv_aresdns
 
+static void aresdns_callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen);
+
+#elif defined(USE_AVAHI)
+
+#include <avahi-client/client.h>
+#include <avahi-client/lookup.h>
+#include <avahi-common/error.h>
+#define priv_dns priv_avahi
+
+static void record_callback (
+	AvahiRecordBrowser *b,
+	AvahiIfIndex interface,
+	AvahiProtocol protocol,
+	AvahiBrowserEvent event,
+	const char *name,
+	uint16_t class,
+	uint16_t type,
+	const void *rdata,
+	size_t size,
+	AvahiLookupResultFlags flags,
+	void *userdata);
+static void address_callback (
+	AvahiAddressResolver *r,
+	AvahiIfIndex interface,
+	AvahiProtocol protocol,
+	AvahiResolverEvent event,
+	const AvahiAddress *a,
+	const char *name,
+	AvahiLookupResultFlags flags,
+	void *userdata);
+
 #endif
+
+struct priv_srv {
+	struct priv_dns *priv;
+	struct priv_srv *previous, *next;
+	int priority;
+	int weight;
+	uint16_t port;
+	char *name;
+};
 
 struct priv_dns {
 	netresolve_query_t query;
 	int protocol;
-	uint16_t port;
-	int priority;
-	int weight;
-	char *name;
 	int family;
+#if defined(USE_AVAHI)
+	AvahiAddress address;
+#else
 	const uint8_t *address;
+#endif
 	int cls;
 	int type;
+
+	struct priv_srv srv;
 	int pending;
 	bool answered;
 	bool failed;
@@ -60,114 +104,42 @@ struct priv_dns {
 	fd_set rfds, wfds;
 	int nfds;
 	netresolve_watch_t *watches;
+#elif defined(USE_AVAHI)
+	struct AvahiClient *client;
+	struct AvahiHostNameResolver *resolver;
+	struct AvahiPoll poll_config;
+	AvahiLookupFlags flags;
 #endif
 };
 
-static void apply_answer(struct priv_dns *priv, uint8_t *answer, size_t length);
-static void check(struct priv_dns *priv);
-
-#if defined(USE_UNBOUND)
-
 static void
-callback(void *arg, int status, struct ub_result* result)
+lookup_dns(struct priv_srv *srv, const char *name, int type, int class)
 {
-	struct priv_dns *priv = arg;
+	struct priv_dns *priv = srv->priv;
 
-	priv->pending--;
-
-	if (status) {
-		error("libunbound: %s", ub_strerror(status));
-		priv->failed = true;
-		return;
-	}
-
-	if (!result->secure)
-		priv->secure = false;
-
-	if (!result->bogus)
-		apply_answer(priv, result->answer_packet, result->answer_len);
-	else {
-		error("libunbound: received bogus result");
-		priv->secure = false;
-		priv->failed = true;
-	}
-
-	ub_resolve_free(result);
-
-	check(priv);
-}
-
-#elif defined(USE_ARES)
-
-static void dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data);
-
-static void
-watch_file_descriptors(struct priv_dns *priv)
-{
-	assert(priv->nfds == 0);
-
-	priv->nfds = ares_fds(priv->channel, &priv->rfds, &priv->wfds);
-	priv->watches = realloc(priv->watches, priv->nfds * sizeof *priv->watches);
-
-	for (int fd = 0; fd < priv->nfds; fd++) {
-		if (FD_ISSET(fd, &priv->rfds))
-			priv->watches[fd] = netresolve_watch_add(priv->query, fd, POLLIN, dispatch, NULL);
-		if (FD_ISSET(fd, &priv->wfds))
-			priv->watches[fd] = netresolve_watch_add(priv->query, fd, POLLOUT, dispatch, NULL);
-	}
-}
-
-static void
-unwatch_file_descriptors(struct priv_dns *priv)
-{
-	assert(priv->nfds != 0);
-
-	for (int fd = 0; fd < priv->nfds; fd++)
-		if (FD_ISSET(fd, &priv->rfds))
-			netresolve_watch_remove(priv->query, priv->watches[fd], false);
-
-	FD_ZERO(&priv->rfds);
-	FD_ZERO(&priv->wfds);
-	priv->nfds = 0;
-}
-
-static void
-callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
-{
-	struct priv_dns *priv = arg;
-
-	priv->pending--;
-
-	switch (status) {
-	case ARES_EDESTRUCTION:
-		abort();
-	case ARES_SUCCESS:
-	case ARES_ENOTFOUND:
-		break;
-	default:
-		error("ares: %s", ares_strerror(status));
-		priv->failed = true;
-		return;
-	}
-
-	apply_answer(priv, abuf, alen);
-
-	check(priv);
-}
-
-#endif
-
-static void
-lookup(struct priv_dns *priv, const char *name, int type, int class)
-{
-	debug("looking up %s record for %s", ldns_rr_descript(type)->_name, name);
+	debug("Looking up %s record for %s", ldns_rr_descript(type)->_name, name);
 
 	priv->pending++;
 
 #if defined(USE_UNBOUND)
-	ub_resolve_async(priv->ctx, name, type, class, priv, callback, NULL);
+	ub_resolve_async(priv->ctx, name, type, class, srv, ubdns_callback, NULL);
 #elif defined(USE_ARES)
-	ares_query(priv->channel, name, class, type, callback, priv);
+	ares_query(priv->channel, name, class, type, aresdns_callback, srv);
+#elif defined(USE_AVAHI)
+	if (!avahi_record_browser_new(
+			priv->client,
+			AVAHI_IF_UNSPEC,
+			AVAHI_PROTO_UNSPEC,
+			srv->name,
+			class,
+			type,
+			priv->flags,
+			record_callback,
+			srv)) {
+		error("Failed to create record browser: %s\n",
+				avahi_strerror(avahi_client_errno(priv->client)));
+		netresolve_backend_failed(priv->query);
+	}
 #endif
 }
 
@@ -195,7 +167,7 @@ lookup_srv(struct priv_dns *priv)
 			netresolve_backend_get_servname(priv->query),
 			protocol_to_string(priv->protocol),
 			netresolve_backend_get_nodename(priv->query)) != -1) {
-		lookup(priv, name, LDNS_RR_TYPE_SRV, LDNS_RR_CLASS_IN);
+		lookup_dns(&priv->srv, name, LDNS_RR_TYPE_SRV, LDNS_RR_CLASS_IN);
 		free(name);
 	} else {
 		error("memory allocation failed");
@@ -204,18 +176,35 @@ lookup_srv(struct priv_dns *priv)
 }
 
 static void
-lookup_host(struct priv_dns *priv)
+lookup_host(struct priv_srv *srv)
 {
+	struct priv_dns *priv = srv->priv;
+
 	if (priv->family == AF_INET || priv->family == AF_UNSPEC)
-		lookup(priv, priv->name, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN);
+		lookup_dns(srv, srv->name, LDNS_RR_TYPE_A, LDNS_RR_CLASS_IN);
 	if (priv->family == AF_INET6 || priv->family == AF_UNSPEC)
-		lookup(priv, priv->name, LDNS_RR_TYPE_AAAA, LDNS_RR_CLASS_IN);
+		lookup_dns(srv, srv->name, LDNS_RR_TYPE_AAAA, LDNS_RR_CLASS_IN);
 }
 
 static void
 lookup_address(struct priv_dns *priv)
 {
-	/* Large enough to hold nibble format representation of an IPv4/IPv6 address  */
+#if defined(USE_AVAHI)
+	priv->pending++;
+
+	if (!avahi_address_resolver_new(
+			priv->client,
+			AVAHI_IF_UNSPEC,
+			priv->family == AVAHI_PROTO_UNSPEC,
+			&priv->address,
+			priv->flags,
+			address_callback,
+			priv)) {
+		error("Failed to create record browser: %s\n",
+				avahi_strerror(avahi_client_errno(priv->client)));
+		netresolve_backend_failed(priv->query);
+	}
+#else
 	char name[128];
 
 	switch (priv->family) {
@@ -249,47 +238,99 @@ lookup_address(struct priv_dns *priv)
 		abort();
 	}
 
-	lookup(priv, name, LDNS_RR_TYPE_PTR, LDNS_RR_CLASS_IN);
+	lookup_dns(&priv->srv, name, LDNS_RR_TYPE_PTR, LDNS_RR_CLASS_IN);
+#endif
 }
 
 static void
-lookup_dns(struct priv_dns *priv)
+apply_name(struct priv_dns *priv, const char *type, ldns_rr *rr)
 {
-	lookup(priv, priv->name, priv->type, priv->cls);
+	char *name = ldns_rdf2str(ldns_rr_rdf(rr, 0));
+	char *last = name + strlen(name) - 1;
+
+	debug("Found %s: %s", type, name);
+
+	if (*last == '.')
+		*last = '\0';
+
+	netresolve_backend_add_name_info(priv->query, name, NULL);
+
+	free(name);
 }
 
 static void
-apply_addresses(struct priv_dns *priv, const ldns_rr_list *answer)
+apply_address(struct priv_srv *srv, const char *type, int family, ldns_rr *rr)
 {
-	for (int i = 0; i < answer->_rr_count; i++) {
-		ldns_rr *rr = answer->_rrs[i];
+	debug("Found %s", type);
 
-		switch (rr->_rr_type) {
-		case LDNS_RR_TYPE_CNAME:
-			free(priv->name);
-			priv->name = ldns_rdf2str(rr->_rdata_fields[0]);
-			break;
-		case LDNS_RR_TYPE_A:
-			netresolve_backend_add_path(priv->query,
-					AF_INET, rr->_rdata_fields[0]->_data, 0,
-					0, priv->protocol, priv->port,
-					priv->priority, priv->weight, rr->_ttl);
-			break;
-		case LDNS_RR_TYPE_AAAA:
-			netresolve_backend_add_path(priv->query,
-					AF_INET6, rr->_rdata_fields[0]->_data, 0,
-					0, priv->protocol, priv->port,
-					priv->priority, priv->weight, rr->_ttl);
-			break;
-		default:
-			break;
-		}
+	netresolve_backend_add_path(srv->priv->query,
+			family, ldns_rdf_data(ldns_rr_rdf(rr, 0)), 0,
+			0, srv->priv->protocol, srv->port,
+			srv->priority, srv->weight, ldns_rr_ttl(rr));
+
+	srv->priv->answered = true;
+}
+
+static void
+apply_srv(struct priv_dns *priv, ldns_rr *rr)
+{
+	struct priv_srv *srv = calloc(1, sizeof *srv);
+
+	if (!srv) {
+		error("Memory allocation failed.");
+		netresolve_backend_failed(priv->query);
+		return;
+	}
+
+	srv->priv = priv;
+	srv->previous = priv->srv.previous;
+	srv->next = &priv->srv;
+	srv->previous->next = srv->next->previous = srv;
+
+	srv->priority = ldns_rdf2native_int16(ldns_rr_rdf(rr, 0));
+	srv->weight = ldns_rdf2native_int16(ldns_rr_rdf(rr, 1));
+	srv->port = ldns_rdf2native_int16(ldns_rr_rdf(rr, 2));
+	srv->name = ldns_rdf2str(ldns_rr_rdf(rr, 3));
+
+	debug("Found SRV: %d %d %d %s", srv->priority, srv->weight, srv->port, srv->name);
+
+	lookup_host(srv);
+}
+
+static void
+apply_record(struct priv_srv *srv, ldns_rr *rr)
+{
+	struct priv_dns *priv = srv->priv;
+
+	switch (ldns_rr_get_type(rr)) {
+	case LDNS_RR_TYPE_CNAME:
+		apply_name(priv, "CNAME", rr);
+		break;
+	case LDNS_RR_TYPE_PTR:
+		apply_name(priv, "PTR", rr);
+		priv->answered = true;
+		break;
+	case LDNS_RR_TYPE_A:
+		apply_address(srv, "A", AF_INET, rr);
+		break;
+	case LDNS_RR_TYPE_AAAA:
+		apply_address(srv, "AAAA", AF_INET6, rr);
+		break;
+	case LDNS_RR_TYPE_SRV:
+		apply_srv(priv, rr);
+		break;
+	default:
+		error("Unkown record type: %s", ldns_rr_descript(ldns_rr_get_type(rr))->_name);
+		break;
 	}
 }
 
+#if defined(USE_ARES) || defined(USE_UNBOUND)
 static void
-apply_answer(struct priv_dns *priv, uint8_t *data, size_t length)
+apply_answer(struct priv_srv *srv, const uint8_t *data, size_t length)
 {
+	struct priv_dns *priv = srv->priv;
+
 	assert(data);
 	assert(length);
 
@@ -329,11 +370,11 @@ apply_answer(struct priv_dns *priv, uint8_t *data, size_t length)
 	case 0:
 		break;
 	case LDNS_RCODE_NXDOMAIN:
-		debug("%s record not found (%d queries left)",
+		debug("%s records not found (%d queries left)",
 				ldns_rr_descript(type)->_name,
 				priv->pending);
 		if (type == LDNS_RR_TYPE_SRV)
-			lookup_host(priv);
+			lookup_host(&priv->srv);
 		else
 			priv->failed = true;
 		goto out;
@@ -343,58 +384,24 @@ apply_answer(struct priv_dns *priv, uint8_t *data, size_t length)
 		goto out;
 	}
 
-	debug("%s record found (%d queries left)",
-			ldns_rr_descript(type)->_name,
-			priv->pending);
+	for (int i = 0; i < answer->_rr_count; i++) {
+		ldns_rr *rr = answer->_rrs[i];
 
-	switch (type) {
-	case LDNS_RR_TYPE_A:
-	case LDNS_RR_TYPE_AAAA:
-		apply_addresses(priv, answer);
-		priv->answered = true;
-		break;
-	case LDNS_RR_TYPE_SRV:
-		/* FIXME: We only support one SRV record per name. */
-		priv->priority = ldns_rdf2native_int16(answer->_rrs[0]->_rdata_fields[0]);
-		priv->weight = ldns_rdf2native_int16(answer->_rrs[0]->_rdata_fields[1]);
-		priv->port = ldns_rdf2native_int16(answer->_rrs[0]->_rdata_fields[2]);
-
-		free(priv->name);
-		priv->name = ldns_rdf2str(answer->_rrs[0]->_rdata_fields[3]);
-		lookup_host(priv);
-		break;
-	case LDNS_RR_TYPE_PTR:
-		/* FIXME: We only support one PTR record. */
-		if (!answer->_rr_count) {
-			netresolve_backend_failed(priv->query);
-			break;
-		}
-		free(priv->name);
-		priv->name = ldns_rdf2str(answer->_rrs[0]->_rdata_fields[0]);
-		priv->answered = true;
-		break;
-	default:
-		abort();
+		apply_record(srv, rr);
 	}
 
 out:
 	ldns_pkt_free(pkt);
 }
+#endif
 
 static void
 check(struct priv_dns *priv)
 {
+	assert(priv->pending >= 0);
+
 	if (!priv->pending) {
 		if (priv->answered) {
-			if (priv->name) {
-				char *last = priv->name + strlen(priv->name) - 1;
-
-				if (*last == '.')
-					*last = '\0';
-
-				netresolve_backend_add_name_info(priv->query, priv->name, NULL);
-			}
-
 			if (priv->secure)
 				netresolve_backend_set_secure(priv->query);
 		}
@@ -406,29 +413,340 @@ check(struct priv_dns *priv)
 	}
 }
 
+#if defined(USE_UNBOUND)
+
+static void apply_answer(struct priv_srv *srv, const uint8_t *answer, size_t length);
+
+static void
+ubdns_callback(void *arg, int status, struct ub_result* result)
+{
+	struct priv_srv *srv = arg;
+	struct priv_dns *priv = srv->priv;
+
+	priv->pending--;
+
+	if (status) {
+		error("libunbound: %s", ub_strerror(status));
+		priv->failed = true;
+		return;
+	}
+
+	if (!result->secure)
+		priv->secure = false;
+
+	if (!result->bogus)
+		apply_answer(srv, result->answer_packet, result->answer_len);
+	else {
+		error("libunbound: received bogus result");
+		priv->secure = false;
+		priv->failed = true;
+	}
+
+	ub_resolve_free(result);
+
+	check(priv);
+}
+
 static void
 dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
 {
 	struct priv_dns *priv = netresolve_backend_get_priv(query);
 
-#if defined(USE_UNBOUND)
 	ub_process(priv->ctx);
+}
+
 #elif defined(USE_ARES)
+
+static void dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data);
+
+static void
+watch_file_descriptors(struct priv_dns *priv)
+{
+	assert(priv->nfds == 0);
+
+	priv->nfds = ares_fds(priv->channel, &priv->rfds, &priv->wfds);
+	priv->watches = realloc(priv->watches, priv->nfds * sizeof *priv->watches);
+
+	for (int fd = 0; fd < priv->nfds; fd++) {
+		if (FD_ISSET(fd, &priv->rfds))
+			priv->watches[fd] = netresolve_watch_add(priv->query, fd, POLLIN, dispatch, NULL);
+		if (FD_ISSET(fd, &priv->wfds))
+			priv->watches[fd] = netresolve_watch_add(priv->query, fd, POLLOUT, dispatch, NULL);
+	}
+}
+
+static void
+unwatch_file_descriptors(struct priv_dns *priv)
+{
+	assert(priv->nfds != 0);
+
+	for (int fd = 0; fd < priv->nfds; fd++)
+		if (FD_ISSET(fd, &priv->rfds))
+			netresolve_watch_remove(priv->query, priv->watches[fd], false);
+
+	FD_ZERO(&priv->rfds);
+	FD_ZERO(&priv->wfds);
+	priv->nfds = 0;
+}
+
+static void
+dispatch(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
+{
+	struct priv_dns *priv = netresolve_backend_get_priv(query);
+
 	unwatch_file_descriptors(priv);
 	ares_process_fd(priv->channel,
 			events & POLLIN ? fd : ARES_SOCKET_BAD,
 			events & POLLOUT ? fd : ARES_SOCKET_BAD);
 	watch_file_descriptors(priv);
-#endif
 
 	check(priv);
 }
+
+static void apply_answer(struct priv_srv *srv, const uint8_t *answer, size_t length);
+
+static void
+aresdns_callback(void *arg, int status, int timeouts, unsigned char *abuf, int alen)
+{
+	struct priv_srv *srv = arg;
+	struct priv_dns *priv = srv->priv;
+
+	priv->pending--;
+
+	switch (status) {
+	case ARES_EDESTRUCTION:
+		abort();
+	case ARES_SUCCESS:
+	case ARES_ENOTFOUND:
+		break;
+	default:
+		error("ares: %s", ares_strerror(status));
+		priv->failed = true;
+		return;
+	}
+
+	apply_answer(srv, abuf, alen);
+
+	check(priv);
+}
+
+#elif defined(USE_AVAHI)
+
+struct AvahiWatch {
+	netresolve_query_t query;
+	netresolve_watch_t watch;
+	int fd;
+	int events;
+	AvahiWatchCallback callback;
+	void *userdata;
+};
+
+struct AvahiTimeout {
+	netresolve_query_t query;
+	netresolve_timeout_t timeout;
+	int fd;
+	AvahiTimeoutCallback callback;
+	void *userdata;
+};
+
+void
+watch_callback(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
+{
+	AvahiWatch *w = data;
+
+	w->callback(w, w->fd, events, w->userdata);
+}
+
+void
+watch_update(AvahiWatch *w, AvahiWatchEvent event)
+{
+	if (w->watch) {
+		netresolve_watch_remove(w->query, w->watch, false);
+		w->watch = NULL;
+	}
+
+	/* FIXME: The event should be properly translated but so far it worked. */
+	if (event)
+		w->watch = netresolve_watch_add(w->query, w->fd, event, watch_callback, w);
+}
+
+AvahiWatch *
+watch_new(const AvahiPoll *api, int fd, AvahiWatchEvent event, AvahiWatchCallback callback, void *userdata)
+{
+	struct priv_avahi *priv = api->userdata;
+	AvahiWatch *w = calloc(1, sizeof *w);
+
+	w->query = priv->query;
+	w->fd = fd;
+	w->callback = callback;
+	w->userdata = userdata;
+
+	watch_update(w, event);
+
+	return w;
+}
+
+static void
+watch_free(AvahiWatch *w)
+{
+	watch_update(w, 0);
+
+	memset(w, 0, sizeof *w);
+	free(w);
+}
+
+void
+timeout_callback(netresolve_query_t query, netresolve_timeout_t timeout, void *data)
+{
+	AvahiTimeout *t = data;
+
+	t->callback(t, t->userdata);
+}
+
+static void
+timeout_update(AvahiTimeout *t, const struct timeval *tv)
+{
+	if (t->timeout) {
+		netresolve_timeout_remove(t->query, t->timeout);
+		t->timeout = NULL;
+	}
+
+	if (tv) {
+		long int sec = tv->tv_sec;
+		long int nsec = tv->tv_usec * 1000;
+
+		t->timeout = netresolve_timeout_add(t->query, sec, nsec, timeout_callback, t);
+	}
+}
+
+AvahiTimeout *
+timeout_new(const AvahiPoll *api, const struct timeval *tv, AvahiTimeoutCallback callback, void *userdata)
+{
+	struct priv_avahi *priv = api->userdata;
+	AvahiTimeout *t = calloc(1, sizeof *t);
+
+	t->query = priv->query;
+	t->fd = -1;
+	t->callback = callback;
+	t->userdata = userdata;
+
+	timeout_update(t, tv);
+
+	return t;
+}
+
+void
+timeout_free(AvahiTimeout *t)
+{
+	timeout_update(t, NULL);
+
+	memset(t, 0, sizeof *t);
+	free(t);
+}
+
+static void
+client_callback(AvahiClient *c, AvahiClientState state, AVAHI_GCC_UNUSED void * userdata) {
+	struct priv_avahi *priv = userdata;
+
+	if (state == AVAHI_CLIENT_FAILURE) {
+		error("Avahi connection failure: %s", avahi_strerror(avahi_client_errno(c)));
+		netresolve_backend_failed(priv->query);
+	}
+}
+
+static void
+record_callback (
+	AvahiRecordBrowser *b,
+	AvahiIfIndex interface,
+	AvahiProtocol protocol,
+	AvahiBrowserEvent event,
+	const char *name,
+	uint16_t class,
+	uint16_t type,
+	const void *rdata,
+	size_t size,
+	AvahiLookupResultFlags flags,
+	void *userdata)
+{
+	struct priv_srv *srv = userdata;
+	struct priv_avahi *priv = srv->priv;
+
+	switch (event) {
+		case AVAHI_BROWSER_ALL_FOR_NOW:
+			priv->pending--;
+			/* pass through */
+		case AVAHI_BROWSER_NEW:
+			{
+				ldns_rr *rr = ldns_rr_new();
+				ldns_rdf *rdf = ldns_rdf_new_frm_data(type, size, rdata);
+
+				ldns_rr_push_rdf(rr, rdf);
+				apply_record(srv, rr);
+
+				ldns_rr_free(rr);
+			}
+			break;
+		case AVAHI_RESOLVER_FAILURE:
+			error("Avahi resolver failed.");
+			netresolve_backend_failed(priv->query);
+			break;
+		default:
+			error("Unknown Avahi event: %d", event);
+			netresolve_backend_failed(priv->query);
+			return;
+	}
+
+	check(priv);
+}
+
+static void
+address_callback (
+	AvahiAddressResolver *r,
+	AvahiIfIndex interface,
+	AvahiProtocol protocol,
+	AvahiResolverEvent event,
+	const AvahiAddress *a,
+	const char *name,
+	AvahiLookupResultFlags flags,
+	void *userdata)
+{
+	struct priv_avahi *priv = userdata;
+
+	priv->pending--;
+
+	switch (event) {
+		case AVAHI_RESOLVER_FOUND:
+			netresolve_backend_add_name_info(priv->query, name, NULL);
+			break;
+		case AVAHI_RESOLVER_FAILURE:
+			error("Avahi resolver failed.");
+			netresolve_backend_failed(priv->query);
+			break;
+		default:
+			error("Unknown Avahi event: %d", event);
+			netresolve_backend_failed(priv->query);
+			return;
+	}
+
+	check(priv);
+}
+
+#endif
+
 static void
 cleanup(void *data)
 {
 	struct priv_dns *priv = data;
 
-	free(priv->name);
+	while (priv->srv.next != &priv->srv) {
+		struct priv_srv *srv = priv->srv.next;
+
+		priv->srv.next = srv->next;
+		srv->next->previous = &priv->srv;
+
+		free(srv->name);
+		free(srv);
+	}
 
 #if defined(USE_UNBOUND)
 	if (priv->watch)
@@ -436,10 +754,13 @@ cleanup(void *data)
 	if (priv->ctx);
 		ub_ctx_delete(priv->ctx);
 #elif defined(USE_ARES)
-	if (priv->nfds)
+		if (priv->nfds)
 		unwatch_file_descriptors(priv);
 	free(priv->watches);
 	ares_destroy(priv->channel);
+#elif defined(USE_AVAHI)
+	if (priv->client)
+		avahi_client_free(priv->client);
 #endif
 }
 
@@ -450,10 +771,15 @@ setup(netresolve_query_t query, char **settings)
 	int status;
 #if defined(USE_UNBOUND)
 	const char *server = NULL;
+#elif defined(USE_UNBOUND)
+
 #endif
 
 	if (!priv)
 		return NULL;;
+
+	priv->srv.priv = priv;
+	priv->srv.previous = priv->srv.next = &priv->srv;
 
 	for (; *settings; settings++) {
 		if (!strcmp(*settings, "trust"))
@@ -467,7 +793,7 @@ setup(netresolve_query_t query, char **settings)
 	}
 
 	const char *name = netresolve_backend_get_nodename(query);
-	priv->name = name ? strdup(name) : NULL;
+	priv->srv.name = name ? strdup(name) : NULL;
 	priv->family = netresolve_backend_get_family(query);
 
 	priv->query = query;
@@ -511,6 +837,21 @@ setup(netresolve_query_t query, char **settings)
 		error("ares channel: %s", ares_strerror(status));
 		return NULL;
 	}
+#elif defined(USE_AVAHI)
+	priv->poll_config.userdata = priv;
+	priv->poll_config.watch_new = watch_new;
+	priv->poll_config.watch_update = watch_update;
+	//priv->poll_config.watch_get_events = watch_get_events;
+	priv->poll_config.watch_free = watch_free;
+	priv->poll_config.timeout_new = timeout_new;
+	priv->poll_config.timeout_update = timeout_update;
+	priv->poll_config.timeout_free = timeout_free;
+
+	priv->client = avahi_client_new(&priv->poll_config, 0, client_callback, priv, &status);
+	if (!priv->client) {
+		error("Avahi client failure: %s", avahi_strerror(status));
+		return NULL;
+	}
 #endif
 
 	return priv;
@@ -521,7 +862,7 @@ query_forward(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv;
 
-	if (!(priv = setup(query, settings)) || !priv->name) {
+	if (!(priv = setup(query, settings)) || !priv->srv.name) {
 		netresolve_backend_failed(query);
 		return;
 	}
@@ -530,7 +871,7 @@ query_forward(netresolve_query_t query, char **settings)
 		priv->protocol = netresolve_backend_get_protocol(priv->query);
 		lookup_srv(priv);
 	} else
-		lookup_host(priv);
+		lookup_host(&priv->srv);
 
 #if defined(USE_ARES)
 	watch_file_descriptors(priv);
@@ -541,11 +882,30 @@ void
 query_reverse(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv;
+	const uint8_t *address = netresolve_backend_get_address(query);
 
-	if (!(priv = setup(query, settings)) || !(priv->address = netresolve_backend_get_address(query))) {
+	if (!(priv = setup(query, settings)) || !address) {
 		netresolve_backend_failed(query);
 		return;
 	}
+
+#if defined(USE_AVAHI)
+
+	switch (priv->family) {
+	case AF_INET:
+		priv->address.proto = AVAHI_PROTO_INET;
+		memcpy(&priv->address.data, netresolve_backend_get_address(query), sizeof priv->address.data.ipv4);
+		break;
+	case AF_INET6:
+		priv->address.proto = AVAHI_PROTO_INET6;
+		memcpy(&priv->address.data, netresolve_backend_get_address(query), sizeof priv->address.data.ipv6);
+		break;
+	default:
+		break;
+	}
+#else
+	priv->address = address;
+#endif
 
 	lookup_address(priv);
 
@@ -559,13 +919,13 @@ query_dns(netresolve_query_t query, char **settings)
 {
 	struct priv_dns *priv;
 
-	if (!(priv = setup(query, settings)) || !priv->name) {
+	if (!(priv = setup(query, settings)) || !priv->srv.name) {
 		netresolve_backend_failed(query);
 		return;
 	}
 
 	netresolve_backend_get_dns_query(query, &priv->cls, &priv->type);
-	lookup_dns(priv);
+	lookup_dns(&priv->srv, priv->srv.name, priv->type, priv->cls);
 
 #if defined(USE_ARES)
 	watch_file_descriptors(priv);
