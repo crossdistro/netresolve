@@ -253,8 +253,12 @@ service_callback(const char *name, int socktype, int protocol, int port, void *u
 void
 netresolve_backend_add_name_info(netresolve_query_t query, const char *nodename, const char *servname)
 {
-	if (query->response.nodename)
+	if (query->response.nodename) {
+		debug_query(query, "ignored name info: %s/%s", nodename, servname);
 		return;
+	}
+
+	debug_query(query, "set name info: %s/%s", nodename, servname);
 
 	query->response.nodename = nodename ? strdup(nodename) : NULL;
 

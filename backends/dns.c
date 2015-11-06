@@ -243,17 +243,27 @@ lookup_address(struct priv_dns *priv)
 }
 
 static void
-apply_name(struct priv_dns *priv, const char *type, ldns_rr *rr)
+set_name(struct priv_dns *priv, const char *name)
 {
-	char *name = ldns_rdf2str(ldns_rr_rdf(rr, 0));
-	char *last = name + strlen(name) - 1;
-
-	debug("Found %s: %s", type, name);
+	char *s = strdup(name);
+	char *last = s + strlen(s) - 1;
 
 	if (*last == '.')
 		*last = '\0';
 
-	netresolve_backend_add_name_info(priv->query, name, NULL);
+	netresolve_backend_add_name_info(priv->query, s, NULL);
+
+	free(s);
+}
+
+static void
+apply_name(struct priv_dns *priv, const char *type, ldns_rr *rr)
+{
+	char *name = ldns_rdf2str(ldns_rr_rdf(rr, 0));
+
+	debug("Found %s: %s", type, name);
+
+	set_name(priv, name);
 
 	free(name);
 }
@@ -293,6 +303,8 @@ apply_srv(struct priv_dns *priv, ldns_rr *rr)
 	srv->name = ldns_rdf2str(ldns_rr_rdf(rr, 3));
 
 	debug("Found SRV: %d %d %d %s", srv->priority, srv->weight, srv->port, srv->name);
+
+	set_name(priv, srv->name);
 
 	lookup_host(srv);
 }
