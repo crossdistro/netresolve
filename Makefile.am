@@ -70,8 +70,8 @@ libnetresolve_asyncns_la_LDFLAGS = $(AM_LDFLAGS) --export-all-symbols
 libnetresolve_asyncns_la_LIBADD = libnetresolve.la
 endif
 
-libnss_netresolve_la_SOURCES = \
-	compat/nsswitch.c
+libnss_netresolve_la_SOURCES = compat/nsswitch.c
+libnss_netresolve_la_LIBADD = libnetresolve.la
 libnss_netresolve_la_LDFLAGS = $(AM_LDFLAGS) -version-info 2:0:0
 
 lib_LTLIBRARIES += \
