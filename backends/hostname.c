@@ -32,13 +32,15 @@ add_addresses(netresolve_query_t query, struct ifaddrs *list, bool filter)
 
 	for (struct ifaddrs *item = list; item; item = item->ifa_next) {
 		struct sockaddr *sa = item->ifa_addr;
-		int family = sa->sa_family;
 		void *address = NULL;
 		int ifindex = 0;
 
-		debug("found address: dev %s family %d", item->ifa_name, family);
+		if (!sa)
+			continue;
 
-		switch (family) {
+		debug("found address: dev %s family %d", item->ifa_name, sa->sa_family);
+
+		switch (sa->sa_family) {
 		case AF_INET:
 			address = &((struct sockaddr_in *) sa)->sin_addr;
 			if (filter && !memcmp(address, &inaddr_loopback, sizeof inaddr_loopback))
@@ -58,7 +60,7 @@ add_addresses(netresolve_query_t query, struct ifaddrs *list, bool filter)
 			continue;
 		}
 
-		netresolve_backend_add_path(query, family, address, ifindex, 0, 0, 0, 0, 0, 0);
+		netresolve_backend_add_path(query, sa->sa_family, address, ifindex, 0, 0, 0, 0, 0, 0);
 		result = true;
 	}
 
