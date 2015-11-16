@@ -157,7 +157,7 @@ add_path(netresolve_query_t query, const struct netresolve_path *path)
 	memcpy(&response->paths[i], path, sizeof *path);
 	memset(&response->paths[response->pathcount], 0, sizeof *response->paths);
 
-	debug_query(query, "added path: %s", netresolve_get_path_string(query, response->pathcount - 1));
+	debug_query(query, "added path: %s", netresolve_get_path_string(query, i));
 
 	if (query->state == NETRESOLVE_STATE_WAITING)
 		netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING_MORE);
