@@ -684,21 +684,40 @@ record_callback (
 	struct priv_avahi *priv = srv->priv;
 
 	switch (event) {
-		case AVAHI_BROWSER_ALL_FOR_NOW:
-			priv->pending--;
-			/* pass through */
 		case AVAHI_BROWSER_NEW:
 			{
-				ldns_rr *rr = ldns_rr_new();
-				ldns_rdf *rdf = ldns_rdf_new_frm_data(type, size, rdata);
+				ldns_rr *rr = ldns_rr_new_frm_type(type);
+				ldns_rdf *rdf = NULL;
 
-				ldns_rr_push_rdf(rr, rdf);
+				switch (type) {
+				case LDNS_RR_TYPE_A:
+					rdf = ldns_rdf_new_frm_data(LDNS_RDF_TYPE_A, size, rdata);
+					break;
+				case LDNS_RR_TYPE_AAAA:
+					rdf = ldns_rdf_new_frm_data(LDNS_RDF_TYPE_AAAA, size, rdata);
+					break;
+				default:
+					error("Unexpected RR type: %i", type);
+					return;
+				}
+				if (rdf)
+					ldns_rr_set_rdf(rr, rdf, 0);
+
 				apply_record(srv, rr);
 
 				ldns_rr_free(rr);
 			}
 			break;
-		case AVAHI_RESOLVER_FAILURE:
+		case AVAHI_BROWSER_ALL_FOR_NOW:
+			debug("avahi: all for now");
+			priv->pending--;
+			assert(!rdata);
+			break;
+		case AVAHI_BROWSER_CACHE_EXHAUSTED:
+			debug("avahi: cache exhausted");
+			assert(!rdata);
+			break;
+		case AVAHI_BROWSER_FAILURE:
 			error("Avahi resolver failed.");
 			netresolve_backend_failed(priv->query);
 			break;
