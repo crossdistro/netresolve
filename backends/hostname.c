@@ -49,12 +49,8 @@ add_addresses(netresolve_query_t query, struct ifaddrs *list, bool filter)
 		case AF_INET6:
 			address = &((struct sockaddr_in6 *) sa)->sin6_addr;
 			ifindex = ((struct sockaddr_in6 *) sa)->sin6_scope_id;
-			if (filter) {
-				if (!memcmp(address, &in6addr_loopback, sizeof inaddr_loopback))
-					continue;
-				if (ifindex)
-					continue;
-			}
+			if (filter && !memcmp(address, &in6addr_loopback, sizeof inaddr_loopback))
+				continue;
 			break;
 		default:
 			continue;
