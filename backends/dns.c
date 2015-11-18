@@ -531,7 +531,8 @@ aresdns_callback(void *arg, int status, int timeouts, unsigned char *abuf, int a
 
 	switch (status) {
 	case ARES_EDESTRUCTION:
-		abort();
+		/* Cleaning up. */
+		return;
 	case ARES_SUCCESS:
 	case ARES_ENOTFOUND:
 		break;
