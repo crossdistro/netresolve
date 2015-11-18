@@ -418,10 +418,14 @@ check(struct priv_dns *priv)
 				netresolve_backend_set_secure(priv->query);
 		}
 
-		if (priv->failed)
-			netresolve_backend_failed(priv->query);
-		else
+#if defined(USE_AVAHI)
+		if (priv->answered)
+#else
+		if (!priv->failed)
+#endif
 			netresolve_backend_finished(priv->query);
+		else
+			netresolve_backend_failed(priv->query);
 	}
 }
 
