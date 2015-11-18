@@ -181,7 +181,7 @@ dispatch_events(netresolve_t context, int timeout)
 	int i;
 
 	debug_context(context, "epoll: waiting");
-	loop->nevents = epoll_wait(loop->fd, loop->events, EPOLL_MAXEVENTS, timeout);
+	loop->nevents = TEMP_FAILURE_RETRY(epoll_wait(loop->fd, loop->events, EPOLL_MAXEVENTS, timeout));
 
 	switch (loop->nevents) {
 	case -1:
