@@ -166,7 +166,14 @@ netresolve_set_backend_string(netresolve_t context, const char *string)
 
 	/* Default */
 	if (string == NULL)
-		string = "unix,any,loopback,numerichost,hosts,hostname,avahi,ubdns,aresdns";
+		string =
+			"unix,any,loopback,numerichost,hosts,hostname,avahi"
+#if defined(USE_ARES)
+			",aresdns"
+#elif defined(USE_UNBOUND)
+			",ubdns"
+#endif
+			;
 
 	/* Clear old backends */
 	if (context->backends) {

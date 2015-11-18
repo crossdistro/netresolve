@@ -53,7 +53,7 @@ libnetresolve_la_SOURCES = \
 	lib/service.c \
 	lib/socket.c \
 	lib/string.c
-
+libnetresolve_la_CPPFLAGS = $(AM_CPPFLAGS)
 libnetresolve_la_LDFLAGS = \
 	$(AM_LDFLAGS) $(LDNS_LIBS) \
 	-export-symbols-regex '^netresolve_'
@@ -131,12 +131,14 @@ libnetresolve_backend_aresdns_la_SOURCES = backends/dns.c
 libnetresolve_backend_aresdns_la_LIBADD = libnetresolve.la
 libnetresolve_backend_aresdns_la_LDFLAGS = $(AM_LDFLAGS) $(ARES_LIBS)
 libnetresolve_backend_aresdns_la_CPPFLAGS = $(AM_CPPFLAGS) $(ARES_CFLAGS) -DUSE_ARES=1
+libnetresolve_la_CPPFLAGS += -DUSE_ARES=1
 endif
 if BUILD_BACKEND_UBDNS
 libnetresolve_backend_ubdns_la_SOURCES = backends/dns.c
 libnetresolve_backend_ubdns_la_LIBADD = libnetresolve.la
 libnetresolve_backend_ubdns_la_LDFLAGS = $(AM_LDFLAGS) $(UNBOUND_LIBS)
 libnetresolve_backend_ubdns_la_CPPFLAGS = $(AM_CPPFLAGS) -DUSE_UNBOUND=1
+libnetresolve_la_CPPFLAGS += -DUSE_UNBOUND=1
 endif
 if BUILD_BACKEND_AVAHI
 libnetresolve_backend_avahi_la_SOURCES = backends/dns.c
