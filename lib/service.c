@@ -101,15 +101,16 @@ read_service(struct netresolve_service_list *services, char *line)
 {
 	int protocol, port;
 	const char *name, *alias;
+	char *saveptr;
 
-	if (!(name = strtok(line, " \t")))
+	if (!(name = strtok_r(line, " \t", &saveptr)))
 		return;
-	if (!(port = strtol(strtok(NULL, "/"), NULL, 10)))
+	if (!(port = strtol(strtok_r(NULL, "/", &saveptr), NULL, 10)))
 		return;
-	if (!(protocol = protocol_from_string(strtok(NULL, " \t"))))
+	if (!(protocol = protocol_from_string(strtok_r(NULL, " \t", &saveptr))))
 		return;
 	add_service(services, protocol, port, name);
-	while ((alias = strtok(NULL, " \t")))
+	while ((alias = strtok_r(NULL, " \t", &saveptr)))
 		add_service(services, protocol, port, alias);
 }
 
