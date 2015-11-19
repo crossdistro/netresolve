@@ -48,22 +48,34 @@ _nss_netresolve_getaddrinfo(const char *nodename, const char *servname,
 	return status;
 }
 
-static void *
-buffer_alloc(size_t size, char **buffer, size_t *length, int *errnop)
-{
-	void *obj = *buffer;
+struct buffer_t {
+	char *data;
+	size_t length;
+	int *errnop;
+};
 
-	if (*length < size) {
-		*errnop = ERANGE;
+static void *
+buffer_append(const void *data, size_t size, struct buffer_t *buffer)
+{
+	void *position = buffer->data;
+
+	if (data && !size)
+		size = strlen(data) + 1;
+
+	if (buffer->length < size) {
+		*buffer->errnop = ERANGE;
 		return NULL;
 	}
 
-	*buffer += size;
-	*length -= size;
+	buffer->data += size;
+	buffer->length -= size;
 
-	memset(obj, 0, size);
+	if (data)
+		memcpy(position, data, size);
+	else
+		memset(position, 0, size);
 
-	return obj;
+	return position;
 }
 
 static void
@@ -84,7 +96,7 @@ extract_address(struct addrinfo *item, void *address)
 enum nss_status
 _nss_netresolve_gethostbyname4_r(const char *nodename,
 	struct gaih_addrtuple **result,
-	char *buffer, size_t buflen, int *errnop,
+	char *bufptr, size_t buflen, int *errnop,
 	int *h_errnop, int32_t *ttlp)
 {
 	struct addrinfo hints = {
@@ -92,6 +104,7 @@ _nss_netresolve_gethostbyname4_r(const char *nodename,
 		.ai_socktype = SOCK_RAW,
 		.ai_flags = AI_CANONNAME
 	};
+	struct buffer_t buffer = { .data = bufptr, .length = buflen, .errnop = errnop };
 	int status;
 	struct addrinfo *list;
 
@@ -102,21 +115,16 @@ _nss_netresolve_gethostbyname4_r(const char *nodename,
 
 	/* addresses */
 	for (struct addrinfo *item = list; item; item = item->ai_next) {
-		if (!(*result = buffer_alloc(sizeof **result, &buffer, &buflen, errnop)))
+		if (!(*result = buffer_append(NULL, sizeof **result, &buffer)))
 			return NSS_STATUS_TRYAGAIN;
 
 		(*result)->family = item->ai_family;
 		extract_address(item, &(*result)->addr);
 
 		/* canonical name piggybacking on the first address */
-		if (item == list && list->ai_canonname) {
-			size_t size = strlen(list->ai_canonname) + 1;
-
-			if (!((*result)->name = buffer_alloc(size, &buffer, &buflen, errnop)))
+		if (item == list && list->ai_canonname)
+			if (!((*result)->name = buffer_append(list->ai_canonname, 0, &buffer)))
 				return NSS_STATUS_TRYAGAIN;
-
-			memcpy((*result)->name, list->ai_canonname, size);
-		}
 
 		result = &(*result)->next;
 	}
@@ -127,7 +135,7 @@ _nss_netresolve_gethostbyname4_r(const char *nodename,
 enum nss_status
 _nss_netresolve_gethostbyname3_r(const char *nodename, int family,
 		struct hostent *he,
-		char *buffer, size_t buflen, int *errnop,
+		char *bufptr, size_t buflen, int *errnop,
 		int *h_errnop, int32_t *ttlp, char **canonp)
 {
 	struct addrinfo hints = {
@@ -135,6 +143,7 @@ _nss_netresolve_gethostbyname3_r(const char *nodename, int family,
 		.ai_socktype = SOCK_RAW,
 		.ai_flags = AI_CANONNAME
 	};
+	struct buffer_t buffer = { .data = bufptr, .length = buflen, .errnop = errnop };
 	int status;
 	struct addrinfo *list;
 	int count;
@@ -152,7 +161,7 @@ _nss_netresolve_gethostbyname3_r(const char *nodename, int family,
 	count = 0;
 	for (struct addrinfo *item = list; item; item = item->ai_next)
 		count++;
-	if (!(he->h_addr_list = buffer_alloc((count + 1) * sizeof *he->h_addr_list, &buffer, &buflen, errnop)))
+	if (!(he->h_addr_list = buffer_append(NULL, (count + 1) * sizeof *he->h_addr_list, &buffer)))
 		return NSS_STATUS_TRYAGAIN;
 
 	/* addresses */
@@ -161,7 +170,7 @@ _nss_netresolve_gethostbyname3_r(const char *nodename, int family,
 		if (item->ai_family != family)
 			continue;
 
-		if (!(he->h_addr_list[count] = buffer_alloc(he->h_length, &buffer, &buflen, errnop)))
+		if (!(he->h_addr_list[count] = buffer_append(NULL, he->h_length, &buffer)))
 			return NSS_STATUS_TRYAGAIN;
 
 		extract_address(item, he->h_addr_list[count]);
@@ -170,14 +179,9 @@ _nss_netresolve_gethostbyname3_r(const char *nodename, int family,
 	}
 
 	/* canonical name */
-	if (list->ai_canonname) {
-		size_t size = strlen(list->ai_canonname) + 1;
-
-		if (!(he->h_name = buffer_alloc(size, &buffer, &buflen, errnop)))
+	if (list->ai_canonname)
+		if (!(he->h_name = buffer_append(list->ai_canonname, 0, &buffer)))
 			return NSS_STATUS_TRYAGAIN;
-
-		memcpy(he->h_name, list->ai_canonname, size);
-	}
 
 	return NSS_STATUS_SUCCESS;
 }
