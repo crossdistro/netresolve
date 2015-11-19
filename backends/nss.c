@@ -25,6 +25,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <dlfcn.h>
+#include <resolv.h>
 
 #define SIZE (128*1024)
 
@@ -73,7 +74,7 @@ struct priv_nss {
 	 * A getaddrinfo based API encorporating capabilities of all
 	 * gethostbyname*_r APIs and more.
 	 */
-	int (*getaddrinfo)(const char *nodename, const char *servname,
+	int (*getaddrinfo)(res_state state, const char *nodename, const char *servname,
 		const struct addrinfo *hints,
 		struct addrinfo **res,
 		int32_t *ttlp);
@@ -192,7 +193,7 @@ query_forward(netresolve_query_t query, char **settings)
 		struct addrinfo *result;
 		int32_t ttl;
 
-		status = DL_CALL_FCT(priv.getaddrinfo, (node, service, &hints, &result, &ttl));
+		status = DL_CALL_FCT(priv.getaddrinfo, (NULL, node, service, &hints, &result, &ttl));
 		netresolve_backend_apply_addrinfo(query, status, result, ttl);
 		if (status == 0)
 			freeaddrinfo(result);

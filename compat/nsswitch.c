@@ -24,14 +24,15 @@
 #include <netresolve-compat.h>
 #include <stdlib.h>
 #include <string.h>
-#include <netdb.h>
-#include <nss.h>
 #include <errno.h>
 #include <assert.h>
 #include <arpa/inet.h>
+#include <nss.h>
+#include <netdb.h>
+#include <resolv.h>
 
 int
-_nss_netresolve_getaddrinfo(const char *nodename, const char *servname,
+_nss_netresolve_getaddrinfo(res_state state, const char *nodename, const char *servname,
 		const struct addrinfo *hints,
 		struct addrinfo **result, int32_t *ttl)
 {
@@ -109,7 +110,7 @@ _nss_netresolve_gethostbyname4_r(const char *nodename,
 	int status;
 	struct addrinfo *list;
 
-	status = _nss_netresolve_getaddrinfo(nodename, NULL, &hints, &list, ttlp);
+	status = _nss_netresolve_getaddrinfo(NULL, nodename, NULL, &hints, &list, ttlp);
 
 	if (status)
 		return NSS_STATUS_UNAVAIL;
@@ -149,7 +150,7 @@ _nss_netresolve_gethostbyname3_r(const char *nodename, int family,
 	struct addrinfo *list;
 	int count;
 
-	status = _nss_netresolve_getaddrinfo(nodename, NULL, &hints, &list, ttlp);
+	status = _nss_netresolve_getaddrinfo(NULL, nodename, NULL, &hints, &list, ttlp);
 
 	if (status)
 		return NSS_STATUS_UNAVAIL;
