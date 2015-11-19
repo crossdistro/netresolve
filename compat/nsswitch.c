@@ -27,6 +27,7 @@
 #include <netdb.h>
 #include <nss.h>
 #include <errno.h>
+#include <assert.h>
 #include <arpa/inet.h>
 
 int
@@ -200,4 +201,52 @@ _nss_netresolve_gethostbyname_r(const char *nodename,
 		char *buffer, size_t buflen, int *errnop, int *h_errnop)
 {
 	return _nss_netresolve_gethostbyname2_r(nodename, AF_INET, he, buffer, buflen, errnop, h_errnop);
+}
+
+enum nss_status
+_nss_netresolve_gethostbyaddr2_r (const void *addr, socklen_t len, int type,
+		struct hostent *he, char *bufptr, size_t buflen,
+		int *errnop, int *h_errnop, int32_t *ttlp)
+{
+	netresolve_query_t query = netresolve_query_gethostbyaddr(NULL, addr, len, type, NULL, NULL);
+	struct buffer_t buffer = { .data = bufptr, .length = buflen, .errnop = errnop };
+
+	assert(he);
+
+	if (query) {
+		struct hostent *temp = netresolve_query_gethostbyaddr_done(query, &h_errno, NULL);
+		size_t naddr = 0;
+
+		for (char **item = temp->h_addr_list; *item; item++)
+			naddr++;
+
+		memcpy(he, temp, sizeof *he);
+
+		if (!(he->h_name = buffer_append(he->h_name, 0, &buffer)))
+			return NSS_STATUS_TRYAGAIN;
+		if (!(he->h_aliases = buffer_append(NULL, sizeof *he->h_aliases, &buffer)))
+			return NSS_STATUS_TRYAGAIN;
+		if (!(he->h_addr_list = buffer_append(he->h_addr_list, (naddr+1) * sizeof *he->h_addr_list, &buffer)))
+			return NSS_STATUS_TRYAGAIN;
+
+		for (char **item = he->h_addr_list; *item; item++)
+			if (!(*item = buffer_append(*item, he->h_length, &buffer)))
+				return NSS_STATUS_TRYAGAIN;
+
+		netresolve_freehostent(temp);
+
+		return NSS_STATUS_SUCCESS;
+	}
+
+	return NSS_STATUS_UNAVAIL;
+}
+
+enum nss_status
+_nss_netresolve_gethostbyaddr_r (const void *addr, socklen_t addrlen, int type,
+		struct hostent *host, char *bufptr, size_t buflen,
+		int *errnop, int *h_errnop)
+{
+	return _nss_netresolve_gethostbyaddr2_r(addr, addrlen, type,
+			host, bufptr, buflen,
+			errnop, h_errnop, NULL);
 }
