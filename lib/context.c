@@ -167,11 +167,11 @@ netresolve_set_backend_string(netresolve_t context, const char *string)
 	/* Default */
 	if (string == NULL)
 		string =
-			"unix,any,loopback,numerichost,hosts,hostname,avahi"
+			"unix|any|loopback|numerichost|hosts|hostname|avahi"
 #if defined(USE_ARES)
-			",aresdns"
+			"|aresdns"
 #elif defined(USE_UNBOUND)
-			",ubdns"
+			"|ubdns"
 #endif
 			;
 
@@ -191,13 +191,13 @@ netresolve_set_backend_string(netresolve_t context, const char *string)
 
 	/* Install new set of backends */
 	for (setup = end = string; true; end++) {
-		if (*end == ':' || *end == ',' || *end == '\0') {
+		if (*end == ' ' || *end == '|' || *end == '\0') {
 			settings = realloc(settings, (nsettings + 2) * sizeof *settings);
 			settings[nsettings++] = strndup(setup, end - setup);
 			settings[nsettings] = NULL;
 			setup = end + 1;
 		}
-		if (*end == ',' || *end == '\0') {
+		if (*end == '|' || *end == '\0') {
 			if (settings && *settings && **settings) {
 				context->backends = realloc(context->backends, (nbackends + 2) * sizeof *context->backends);
 				context->backends[nbackends] = load_backend(settings);
