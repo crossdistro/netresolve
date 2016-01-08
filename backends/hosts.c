@@ -91,18 +91,42 @@ read_item(struct hosts_list *list, char *line)
 		add_node(list, name, family, &address, ifindex);
 }
 
-#define HOSTS_FILE "/etc/hosts"
 #define BUFFER_SIZE 1024
+
+static char *
+concat(const char *a, const char *b)
+{
+	char *result = malloc(strlen(a) + strlen(b) + 1);
+
+	if (result) {
+		strcpy(result, a);
+		strcat(result, b);
+	}
+
+	return result;
+}
+
+static char *
+get_hosts_file(void)
+{
+	const char *etc = getenv("NETRESOLVE_SYSCONFDIR") ?: "/etc";
+	const char *suffix = "/hosts";
+
+	return concat(etc, suffix);
+}
 
 static void
 read_list(struct hosts_list *list)
 {
-	int fd = open(HOSTS_FILE, O_RDONLY);
+	char *hosts_file = get_hosts_file();
+	int fd = open(hosts_file, O_RDONLY);
 	char buffer[BUFFER_SIZE];
 	char *current = buffer;
 	char *end = buffer + sizeof buffer;
 	char *new;
 	size_t size;
+
+	free(hosts_file);
 
 	if (fd == -1)
 		return;
