@@ -26,6 +26,7 @@
 #include <arpa/nameser.h>
 #include <netinet/ip_icmp.h>
 #include <linux/icmpv6.h>
+#include <sys/socket.h>
 
 #ifdef USE_LDNS
 #include <ldns/ldns.h>
@@ -50,16 +51,12 @@ read_and_write(int rfd, int wfd)
 
 	rsize = read(rfd, buffer, sizeof(buffer));
 	if (rsize == -1) {
-		debug("read: %s\n", strerror(errno));
+		error("read: %s", strerror(errno));
 		abort();
 	}
 	if (rsize == 0) {
-		if (rfd == 0)
-			return;
-		else {
-			debug("end of input\n");
-			abort();
-		}
+		debug("end of input\n");
+		exit(0);
 	}
 	for (offset = 0; offset < rsize; offset += wsize) {
 		debug("%s: <<<%*s>>>\n",
@@ -74,9 +71,12 @@ read_and_write(int rfd, int wfd)
 }
 
 static void
-on_connect(netresolve_query_t context, int idx, int sock, void *user_data)
+on_socket(netresolve_query_t context, int idx, int sock, void *user_data)
 {
-	*(int *) user_data = sock;
+	int *fd = user_data;;
+
+	if (*fd == -1)
+		*fd = sock;
 }
 
 static char *
@@ -191,6 +191,7 @@ usage(void)
 			"  -T,--type -- DNS record type\n"
 			"\n"
 			"Socket API:\n"
+			"  -l,--listen -- attempt to listen on a port like netcat/socat\n"
 			"  -c,--connect -- attempt to connect to a host like netcat/socat\n"
 			"  --ping -- perform an ICMP ping"
 			"\n"
@@ -212,6 +213,7 @@ main(int argc, char **argv)
 	static const struct option longopts[] = {
 		{ "help", 0, 0, 'h' },
 		{ "verbose", 0, 0, 'v' },
+		{ "listen", 0, 0, 'l' },
 		{ "connect", 0, 0, 'c' },
 		{ "node", 1, 0, 'n' },
 		{ "host", 1, 0, 'n' },
@@ -230,7 +232,8 @@ main(int argc, char **argv)
 	};
 	static const char *opts = "hvcn::s:f:t:p:b:Sa:P:";
 	int opt, idx = 0;
-	bool connect = false;
+	bool do_connect = false;
+	bool do_listen = false;
 	bool ping = false;
 	char *nodename = NULL, *servname = NULL;
 	char *address_str = NULL, *port_str = NULL;
@@ -253,8 +256,11 @@ main(int argc, char **argv)
 		case 'v':
 			netresolve_set_log_level(NETRESOLVE_LOG_LEVEL_DEBUG);
 			break;
+		case 'l':
+			do_listen = true;
+			break;
 		case 'c':
-			connect = true;
+			do_connect = true;
 			break;
 		case 'I':
 			ping = true;
@@ -316,21 +322,43 @@ main(int argc, char **argv)
 	if (argv[optind])
 		usage();
 
-	if (connect) {
+	if (do_listen || do_connect) {
 		netresolve_query_t query;
 		int sock = -1;
 		struct pollfd fds[2];
-		
-		query = netresolve_connect(context, nodename, servname, -1, -1, -1, on_connect, &sock);
 
-		if (sock == -1) {
-			fprintf(stderr, "no connection\n");
-			return EXIT_FAILURE;
+		if (do_listen) {
+			query = netresolve_bind(context, nodename, servname, 0, 0, 0, on_socket, &sock);
+
+			if (sock == -1) {
+				error("netresolve: Socket creation failed: %s", strerror(errno));
+				return EXIT_FAILURE;
+			}
+
+			netresolve_bind_free(query);
+
+			listen(sock, 10);
+
+			debug("Listening.");
+
+			sock = accept(sock, NULL, NULL);
+
+			if (sock == -1) {
+				error("netresolve: Socket accept failed: %s", strerror(errno));
+				return EXIT_FAILURE;
+			}
+		} else {
+			query = netresolve_connect(context, nodename, servname, 0, 0, 0, on_socket, &sock);
+
+			if (sock == -1) {
+				error("netresolve: Socket connection failed: %s", strerror(errno));
+				return EXIT_FAILURE;
+			}
+
+			netresolve_connect_free(query);
 		}
 
-		netresolve_connect_free(query);
-
-		debug("Connected.\n");
+		debug("Connected.");
 
 		fds[0].fd = 0;
 		fds[0].events = POLLIN;
@@ -373,7 +401,7 @@ main(int argc, char **argv)
 		for (int i = 0; i < netresolve_query_get_count(query); i++)
 			if (run_ping(query, i))
 				goto out;
-		error("netresolve: ping failed\n");
+		error("netresolve: ping failed");
 		goto out;
 	}
 

@@ -346,8 +346,9 @@ netresolve_connect_free(netresolve_query_t query)
 
 		switch (path->socket.state) {
 		case SOCKET_STATE_SCHEDULED:
-			netresolve_watch_remove(query, path->socket.watch, true);
-			/* pass through */
+			if (path->socket.watch)
+				netresolve_watch_remove(query, path->socket.watch, true);
+			break;
 		case SOCKET_STATE_READY:
 			close(path->socket.fd);
 			break;
