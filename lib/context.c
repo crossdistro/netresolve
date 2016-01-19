@@ -56,7 +56,8 @@ netresolve_context_new(void)
 	netresolve_t context;
 
 	/* FIXME: this should probably be only called once */
-	netresolve_set_log_level(getenv_bool("NETRESOLVE_VERBOSE", false) ? NETRESOLVE_LOG_LEVEL_DEBUG : NETRESOLVE_LOG_LEVEL_QUIET);
+	if (getenv_bool("NETRESOLVE_VERBOSE", false))
+		netresolve_set_log_level(NETRESOLVE_LOG_LEVEL_DEBUG);
 
 	if (!(context = calloc(1, sizeof *context)))
 		return NULL;
