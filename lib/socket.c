@@ -34,6 +34,7 @@ struct netresolve_socket {
 	int flags;
 	netresolve_timeout_t priority_timeout;
 	bool skip_scheduled;
+	bool sequential_connect;
 };
 
 static void pickup_connected_socket(struct netresolve_socket *priv);
@@ -153,6 +154,10 @@ enable_sockets(struct netresolve_socket *priv)
 			debug_query(priv->query, "socket: resuming connection %d", i);
 			path->socket.watch = netresolve_watch_add(priv->query, path->socket.fd, POLLOUT, connection_callback, path);
 		}
+
+		/* When in sequential mode, keep only one socket scheduled. */
+		if (priv->sequential_connect)
+			break;
 	}
 
 	if (!ip4 && !ip6)
@@ -292,8 +297,12 @@ netresolve_connect(netresolve_t context,
 		netresolve_socket_callback_t callback, void *user_data)
 {
 	int flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC);
-
-	struct netresolve_socket priv = { .callback = callback, .user_data = user_data, .flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC) };
+	struct netresolve_socket priv = {
+		.callback = callback,
+		.user_data = user_data,
+		.flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC),
+		.sequential_connect = getenv_bool("NETRESOLVE_SEQUENTIAL_CONNECT", false)
+	};
 
 	return netresolve_query(context, query_callback, memdup(&priv, sizeof priv),
 			NETRESOLVE_REQUEST_FORWARD,
