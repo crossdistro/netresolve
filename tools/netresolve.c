@@ -348,7 +348,7 @@ main(int argc, char **argv)
 				return EXIT_FAILURE;
 			}
 		} else {
-			query = netresolve_connect(context, nodename, servname, 0, 0, 0, on_socket, &sock);
+			query = netresolve_connect(context, nodename, servname, -1, -1, -1, on_socket, &sock);
 
 			if (sock == -1) {
 				error("netresolve: Socket connection failed: %s", strerror(errno));

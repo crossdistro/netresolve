@@ -71,7 +71,7 @@ netresolve_request_set_options_from_va(struct netresolve_request *request, va_li
 			memcpy(request->address, va_arg(ap, const void *), sizeof (struct in6_addr));
 			break;
 		case NETRESOLVE_OPTION_PORT:
-			request->port = va_arg(ap, int);
+			copy_nonnegative(&request->port, va_arg(ap, int));
 			break;
 		case NETRESOLVE_OPTION_DNS_NAME:
 			copy_string(&request->dns_name, va_arg(ap, const char *));
