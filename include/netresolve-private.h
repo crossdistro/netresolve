@@ -108,6 +108,7 @@ struct netresolve_path {
 			struct in6_addr address6;
 		};
 		int ifindex;
+		bool reachable;
 	} node;
 	struct {
 		int socktype;

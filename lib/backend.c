@@ -130,9 +130,63 @@ family_to_length(int family)
 	}
 }
 
+static void
+check_reachability(struct netresolve_path *path)
+{
+	struct {
+		socklen_t len;
+		union {
+			struct sockaddr sa;
+			struct sockaddr_in sin;
+			struct sockaddr_in6 sin6;
+		};
+	} sa = { .sa = { .sa_family = path->node.family } };
+	int sock;
+	int status = -1;
+
+	/* Guard from obsolete errno for unexpected code paths. */
+	errno = 0;
+
+	switch (sa.sa.sa_family) {
+	case AF_INET:
+		sa.len = sizeof sa.sin;
+		memcpy(&sa.sin.sin_addr, path->node.address, sizeof sa.sin.sin_addr);
+		break;
+	case AF_INET6:
+		sa.len = sizeof sa.sin6;
+		sa.sin6.sin6_scope_id = path->node.ifindex;
+		memcpy(&sa.sin6.sin6_addr, path->node.address, sizeof sa.sin6.sin6_addr);
+		break;
+	default:
+		return;
+	}
+
+	if ((sock = socket(sa.sa.sa_family, SOCK_DGRAM, IPPROTO_UDP)) == -1)
+		return;
+
+	status = connect(sock, &sa.sa, sa.len);
+	close(sock);
+
+	if (status == 0)
+		path->node.reachable = true;
+	else
+		debug("Destination node is unreachable.");
+}
+
 static int
 path_cmp(const struct netresolve_path *p1, const struct netresolve_path *p2)
 {
+	/* Rule 1: Avoid unusable destinations.
+	 * If DB is known to be unreachable or if Source(DB) is undefined, then
+	 * prefer DA.  Similarly, if DA is known to be unreachable or if
+	 * Source(DA) is undefined, then prefer DB.
+	 */
+	if (p1->node.reachable && !p2->node.reachable)
+		return -1;
+	if (!p1->node.reachable && p2->node.reachable)
+		return 1;
+
+	/* Prefer IPv6 */
 	if (p1->node.family == AF_INET6 && p2->node.family == AF_INET)
 		return -1;
 	if (p1->node.family == AF_INET && p2->node.family == AF_INET6)
@@ -142,11 +196,22 @@ path_cmp(const struct netresolve_path *p1, const struct netresolve_path *p2)
 }
 
 static void
-add_path(netresolve_query_t query, const struct netresolve_path *path)
+add_path(netresolve_query_t query, const struct netresolve_path *orig_path)
 {
 	struct netresolve_response *response = &query->response;
+	struct netresolve_path *path = memdup(orig_path, sizeof *orig_path);
 	int i;
 
+	/* Check reachability of the destination. */
+	check_reachability(path);
+
+	/* Destination address selection inspired by but not necessarily
+	 * compliant to RFC 6724.
+	 *
+	 * FIXME: Consider full compliance
+	 *
+	 * https://tools.ietf.org/html/rfc6724#section-6
+	 */
 	for (i = 0; i < response->pathcount; i++)
 		if (path_cmp(path, &response->paths[i]) < 0)
 			break;
@@ -161,6 +226,8 @@ add_path(netresolve_query_t query, const struct netresolve_path *path)
 
 	if (query->state == NETRESOLVE_STATE_WAITING)
 		netresolve_query_set_state(query, NETRESOLVE_STATE_WAITING_MORE);
+
+	free(path);
 }
 
 struct path_data {
