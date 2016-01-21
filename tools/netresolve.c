@@ -44,7 +44,7 @@ count_argv(char **argv)
 }
 
 static void
-read_and_write(int rfd, int wfd)
+read_and_write(int rfd, int wfd, int sock)
 {
 	char buffer[1024];
 	ssize_t rsize, wsize, offset;
@@ -56,6 +56,7 @@ read_and_write(int rfd, int wfd)
 	}
 	if (rsize == 0) {
 		debug("end of input\n");
+		shutdown(sock, SHUT_RDWR);
 		exit(0);
 	}
 	for (offset = 0; offset < rsize; offset += wsize) {
@@ -378,9 +379,9 @@ main(int argc, char **argv)
 			}
 
 			if (fds[0].revents & POLLIN)
-				read_and_write(0, sock);
+				read_and_write(0, sock, sock);
 			if (fds[1].revents & POLLIN)
-				read_and_write(sock, 1);
+				read_and_write(sock, 1, sock);
 		}
 
 		return EXIT_SUCCESS;
