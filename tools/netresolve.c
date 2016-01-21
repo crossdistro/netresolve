@@ -328,6 +328,9 @@ main(int argc, char **argv)
 		int sock = -1;
 		struct pollfd fds[2];
 
+		if (!context->request.protocol)
+			context->request.protocol = IPPROTO_TCP;
+
 		if (do_listen) {
 			query = netresolve_bind(context, nodename, servname, 0, 0, 0, on_socket, &sock);
 
