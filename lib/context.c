@@ -26,30 +26,6 @@
 #include <string.h>
 #include <dlfcn.h>
 
-static bool
-getenv_bool(const char *name, bool def)
-{
-	const char *value = secure_getenv(name);
-
-	return value ? (!strcasecmp(value, "yes") || !strcasecmp(value, "true") || !strcasecmp(value, "1")) : def;
-}
-
-static int
-getenv_int(const char *name, int def)
-{
-	const char *value = secure_getenv(name);
-
-	return value ? strtoll(value, NULL, 10) : def;
-}
-
-static int
-getenv_family(const char *name, int def)
-{
-	const char *value = secure_getenv(name);
-
-	return value ? netresolve_family_from_string(value) : def;
-}
-
 netresolve_t
 netresolve_context_new(void)
 {

@@ -273,17 +273,6 @@ bind_callback(netresolve_query_t query, void *data)
 	netresolve_query_free(query);
 }
 
-static void *
-memdup(const void *source, size_t len)
-{
-	void *target = malloc(len);
-
-	if (target)
-		memcpy(target, source, len);
-
-	return target;
-}
-
 /* netresolve_connect:
  *
  * Perform name resolution and connect to a host. The callback is called

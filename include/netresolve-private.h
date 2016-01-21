@@ -256,4 +256,43 @@ bool netresolve_epoll_install(netresolve_t context,
 		bool internal);
 void netresolve_epoll_wait(netresolve_t context);
 
+__attribute__((unused))
+static void *
+memdup(const void *source, size_t len)
+{
+	void *target = malloc(len);
+
+	if (target)
+		memcpy(target, source, len);
+
+	return target;
+}
+
+__attribute__((unused))
+static bool
+getenv_bool(const char *name, bool def)
+{
+	const char *value = secure_getenv(name);
+
+	return value ? (!strcasecmp(value, "yes") || !strcasecmp(value, "true") || !strcasecmp(value, "1")) : def;
+}
+
+__attribute__((unused))
+static int
+getenv_int(const char *name, int def)
+{
+	const char *value = secure_getenv(name);
+
+	return value ? strtoll(value, NULL, 10) : def;
+}
+
+__attribute__((unused))
+static int
+getenv_family(const char *name, int def)
+{
+	const char *value = secure_getenv(name);
+
+	return value ? netresolve_family_from_string(value) : def;
+}
+
 #endif /* NETRESOLVE_PRIVATE_H */
