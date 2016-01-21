@@ -176,6 +176,9 @@ check_reachability(struct netresolve_path *path)
 static int
 path_cmp(const struct netresolve_path *p1, const struct netresolve_path *p2)
 {
+	if (!getenv_bool("NETRESOLVE_SORT_RESULTS", true))
+		return 0;
+
 	/* Rule 1: Avoid unusable destinations.
 	 * If DB is known to be unreachable or if Source(DB) is undefined, then
 	 * prefer DA.  Similarly, if DA is known to be unreachable or if
