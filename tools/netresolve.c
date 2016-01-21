@@ -350,8 +350,14 @@ main(int argc, char **argv)
 		} else {
 			query = netresolve_connect(context, nodename, servname, -1, -1, -1, on_socket, &sock);
 
-			if (sock == -1) {
+			while (sock == -1) {
 				error("netresolve: Socket connection failed: %s", strerror(errno));
+
+				if (errno == ENETUNREACH) {
+					netresolve_connect_next(query);
+					continue;
+				}
+
 				return EXIT_FAILURE;
 			}
 
