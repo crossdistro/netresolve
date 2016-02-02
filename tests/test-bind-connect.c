@@ -27,93 +27,83 @@
 #include <unistd.h>
 #include <assert.h>
 
+static const char outbuf[6] = "asdf\n";
+
+struct socket {
+	int count;
+};
 
 static void
-on_bind(netresolve_query_t query, int idx, int sock, void *user_data)
+on_connect(netresolve_query_t query, int idx, int fd, void *user_data)
 {
-	int *psock = user_data;
+	struct socket *sock = user_data;
+	int status;
 
-	if (*psock == -1)
-		*psock = sock;
-	else
-		close(sock);
-}
+	sock->count++;
 
-int
-do_bind(const char *node, const char *service, int family, int socktype, int protocol)
-{
-	netresolve_query_t query;
-	int sock = -1;
+	/* Send and close */
+	status = send(fd, outbuf, strlen(outbuf), 0);
+	assert(status == strlen(outbuf));
+	status = shutdown(fd, SHUT_RDWR);
+	assert(status == 0);
+	status = close(fd);
+	assert(status == 0);
 
-	query = netresolve_bind(NULL, node, service, family, socktype, protocol, on_bind, &sock);
-	assert(query);
-
-	return sock;
+	/* Request next connected socket */
+	netresolve_connect_next(query);
 }
 
 static void
-on_connect(netresolve_query_t query, int idx, int sock, void *user_data)
+on_accept(netresolve_query_t query, int idx, int fd, void *user_data)
 {
-	int *psock = user_data;
+	struct socket *sock = user_data;
+	int status;
+	char inbuf[16] = {0};
 
-	assert(*psock == -1);
-	*psock = sock;
+	sock->count++;
 
-	if (idx == 0) {
-		close(*psock);
-		*psock = -1;
-		netresolve_connect_next(query);
-	}
-}
+	/* Receive and close */
+	status = recv(fd, inbuf, sizeof inbuf, 0);
+	assert(status == strlen(outbuf));
+	status = shutdown(fd, SHUT_RDWR);
+	assert(status == 0);
+	status = close(fd);
+	assert(status == 0);
 
-int
-do_connect(const char *node, const char *service, int family, int socktype, int protocol)
-{
-	netresolve_query_t query;
-	int sock = -1;
+	/* Check */
+	assert(!strcmp(inbuf, outbuf));
 
-	query = netresolve_connect(NULL, node, service, family, socktype, protocol, on_connect, &sock);
-	assert(query);
-
-	return sock;
+	/* Accept only two connections */
+	if (sock->count == 2)
+		netresolve_listen_free(query);
 }
 
 int
 main(int argc, char **argv)
 {
-	int sock_server, sock_client, sock_accept;
 	const char *node = NULL;
 	const char *service = "1024";
 	int family = AF_UNSPEC;
 	int socktype = SOCK_STREAM;
 	int protocol = IPPROTO_TCP;
-	int status;
-	char outbuf[6] = "asdf\n";
-	char inbuf[6] = {0};
+	struct socket server = {};
+	struct socket client = {};
 
-	sock_server = do_bind(node, service, family, socktype, protocol);
-	assert(sock_server > 0);
-	status = listen(sock_server, 10);
-	assert(status == 0);
+	netresolve_query_t query_server, query_client;
 
-	sock_client = do_connect(node, service, family, socktype, protocol);
-	assert(sock_client > 0);
+	/* Start listening */
+	query_server = netresolve_listen(NULL, node, service, family, socktype, protocol);
+	assert(query_server);
 
-	sock_accept = accept(sock_server, NULL, 0);
-	assert(sock_accept != -1);
-	close(sock_accept);
-	sock_accept = accept(sock_server, NULL, 0);
-	assert(sock_accept != -1);
-	status = send(sock_client, outbuf, strlen(outbuf), 0);
-	assert(status == strlen(outbuf));
-	status = recv(sock_accept, inbuf, sizeof inbuf, 0);
-	assert(status == strlen(outbuf));
-	assert(!strcmp(inbuf, outbuf));
+	/* Connect */
+	query_client = netresolve_connect(NULL, node, service, family, socktype, protocol, on_connect, &client);
+	assert(query_server);
+	netresolve_connect_free(query_client);
+	assert(client.count == 2);
 
-	status = close(sock_server);
-	assert(status == 0);
-	status = close(sock_client);
-	assert(status == 0);
+	/* Accept */
+	netresolve_accept(query_server, on_accept, &server);
+	assert(server.count == 2);
 
 	return EXIT_SUCCESS;
 }

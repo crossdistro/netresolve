@@ -79,7 +79,6 @@ timeout_callback(netresolve_query_t query, netresolve_timeout_t timeout, void *d
 static void
 setup_socket(struct netresolve_socket *priv, struct netresolve_path *path)
 {
-	static const int flags = O_NONBLOCK;
 	int socktype;
 	int protocol;
 	const struct sockaddr *sa;
@@ -91,7 +90,7 @@ setup_socket(struct netresolve_socket *priv, struct netresolve_path *path)
 	sa = netresolve_query_get_sockaddr(priv->query, idx, &salen, &socktype, &protocol, NULL);
 	if (!sa)
 		goto fail;
-	path->socket.fd = socket(sa->sa_family, socktype | flags, protocol);
+	path->socket.fd = socket(sa->sa_family, socktype | O_NONBLOCK, protocol);
 	if (path->socket.fd == -1)
 		goto fail;
 
@@ -245,39 +244,6 @@ query_callback(netresolve_query_t query, void *user_data)
 	enable_sockets(priv);
 }
 
-static void
-bind_callback(netresolve_query_t query, void *data)
-{
-	struct netresolve_socket *priv = data;
-	size_t count = netresolve_query_get_count(query);
-
-	for (size_t idx = 0; idx < count; idx++) {
-		int flags = O_NONBLOCK;
-		int socktype;
-		int protocol;
-		const struct sockaddr *sa;
-		socklen_t salen;
-		int sock;
-
-		sa = netresolve_query_get_sockaddr(query, idx, &salen, &socktype, &protocol, NULL);
-		if (!sa)
-			return;
-		sock = socket(sa->sa_family, socktype | flags, protocol);
-		if (sock == -1)
-			return;
-		if (bind(sock, sa, salen) == -1) {
-			close(sock);
-			return;
-		}
-		fcntl(sock, F_SETFL, (fcntl(sock, F_GETFL, 0) & ~(SOCK_NONBLOCK | SOCK_CLOEXEC)) | priv->flags);
-
-		priv->callback(query, idx, sock, priv->user_data);
-	}
-
-	free(priv);
-	netresolve_query_free(query);
-}
-
 /* netresolve_connect:
  *
  * Perform name resolution and connect to a host. The callback is called
@@ -361,26 +327,28 @@ netresolve_connect_free(netresolve_query_t query)
 		netresolve_timeout_remove(query, priv->priority_timeout);
 
 	memset(priv, 0, sizeof *priv);
-	free(priv);
+	//free(priv);
 
 	netresolve_query_free(query);
 }
 
-/* netresolve_bind:
+static void listen_callback(netresolve_query_t query, void *user_data);
+static void accept_callback(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data);
+
+/* netresolve_listen:
  *
- * Perform name resolution, bind to all discovered addresses. Resulting
- * file descriptors are passed to the caller via a series of calls to
- * the provided callback.
+ * Perform name resolution, bind to all discovered addresses and start
+ * listening. You need to call `netresolve_accept()` to start accepting
+ * connections.
  */
 netresolve_query_t
-netresolve_bind(netresolve_t context,
+netresolve_listen(netresolve_t context,
 		const char *nodename, const char *servname,
-		int family, int socktype, int protocol,
-		netresolve_socket_callback_t callback, void *user_data)
+		int family, int socktype, int protocol)
 {
-	struct netresolve_socket priv = { .callback = callback, .user_data = user_data, .flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC) };
+	struct netresolve_socket priv = { .flags = socktype & (SOCK_NONBLOCK | SOCK_CLOEXEC) };
 
-	return netresolve_query(context, bind_callback, memdup(&priv, sizeof priv),
+	return netresolve_query(context, listen_callback, memdup(&priv, sizeof priv),
 			NETRESOLVE_REQUEST_FORWARD,
 			NETRESOLVE_OPTION_NODE_NAME, nodename,
 			NETRESOLVE_OPTION_SERVICE_NAME, servname,
@@ -391,12 +359,106 @@ netresolve_bind(netresolve_t context,
 			NULL);
 }
 
-/* netresolve_bind_free:
+static void
+listen_callback(netresolve_query_t query, void *user_data)
+{
+	for (int i = 0; i < query->response.pathcount; i++) {
+		struct netresolve_path *path = &query->response.paths[i];
+		int socktype;
+		int protocol;
+		const struct sockaddr *sa;
+		socklen_t salen;
+
+		if (!(sa = netresolve_query_get_sockaddr(query, i, &salen, &socktype, &protocol, NULL)))
+			continue;
+		if ((path->socket.fd = socket(sa->sa_family, socktype | O_NONBLOCK, protocol)) == -1)
+			continue;
+		if (bind(path->socket.fd, sa, salen) == -1 || listen(path->socket.fd, SOMAXCONN) == -1) {
+			close(path->socket.fd);
+			continue;
+		}
+
+		path->socket.state = SOCKET_STATE_SCHEDULED;
+	}
+}
+
+/* netresolve_accept:
+ *
+ * Start accepting connections. You need to call `netresolve_listen_free()` to
+ * close listening sockets and release memory.
+ */
+void
+netresolve_accept(netresolve_query_t query, netresolve_socket_callback_t on_accept, void *user_data)
+{
+	struct netresolve_socket *priv = query->user_data;
+	netresolve_t context = query->context;
+
+	priv->callback = on_accept;
+	priv->user_data = user_data;
+
+	for (int i = 0; i < query->response.pathcount; i++) {
+		struct netresolve_path *path = &query->response.paths[i];
+
+		if (path->socket.state == SOCKET_STATE_SCHEDULED && !path->socket.watch)
+			path->socket.watch = netresolve_watch_add(query, path->socket.fd, POLLIN, accept_callback, path);
+	}
+
+	/* Wait for the context in blocking mode. */
+	if (context->callbacks.user_data == &context->epoll)
+		netresolve_epoll_wait(context);
+}
+
+static void
+accept_callback(netresolve_query_t query, netresolve_watch_t watch, int event_fd, int events, void *data)
+{
+	struct netresolve_socket *priv = query->user_data;
+	struct netresolve_path *path = data;
+	int fd = accept(event_fd, NULL, NULL);
+
+	assert(fd != -1);
+
+	assert(event_fd == path->socket.fd);
+	assert(events & POLLIN);
+	assert(path->socket.state == SOCKET_STATE_SCHEDULED);
+	assert(path->socket.watch);
+
+	fcntl(fd, F_SETFL, (fcntl(fd, F_GETFL, 0) & ~(SOCK_NONBLOCK | SOCK_CLOEXEC)) | priv->flags);
+
+	if (priv->callback)
+		priv->callback(query, path - query->response.paths, fd, priv->user_data);
+}
+
+/* netresolve_listen_free:
  *
  * Destroys the query object and releases any related resources.
  */
 void
-netresolve_bind_free(netresolve_query_t query)
+netresolve_listen_free(netresolve_query_t query)
 {
+	struct netresolve_socket *priv = query->user_data;
+
+	debug("socket: cleaning up...");
+
+	for (int i = 0; i < query->response.pathcount; i++) {
+		struct netresolve_path *path = &query->response.paths[i];
+
+		switch (path->socket.state) {
+		case SOCKET_STATE_SCHEDULED:
+			if (path->socket.watch)
+				netresolve_watch_remove(query, path->socket.watch, true);
+			break;
+		case SOCKET_STATE_READY:
+			close(path->socket.fd);
+			break;
+		default:
+			break;
+		}
+
+		memset(&path->socket, 0, sizeof path->socket);
+	}
+
+	memset(priv, 0, sizeof *priv);
+	free(priv);
+
 	netresolve_query_free(query);
 }

@@ -332,25 +332,14 @@ main(int argc, char **argv)
 			context->request.protocol = IPPROTO_TCP;
 
 		if (do_listen) {
-			query = netresolve_bind(context, nodename, servname, 0, 0, 0, on_socket, &sock);
-
-			if (sock == -1) {
-				error("netresolve: Socket creation failed: %s", strerror(errno));
+			if (!(query = netresolve_listen(context, nodename, servname, 0, 0, 0))) {
+				error("netresolve: Cannot create listening socket: %s", strerror(errno));
 				return EXIT_FAILURE;
 			}
 
-			netresolve_bind_free(query);
+			netresolve_accept(query, on_socket, &sock);
 
-			listen(sock, 10);
-
-			debug("Listening.");
-
-			sock = accept(sock, NULL, NULL);
-
-			if (sock == -1) {
-				error("netresolve: Socket accept failed: %s", strerror(errno));
-				return EXIT_FAILURE;
-			}
+			netresolve_listen_free(query);
 		} else {
 			query = netresolve_connect(context, nodename, servname, -1, -1, -1, on_socket, &sock);
 

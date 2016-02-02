@@ -334,7 +334,7 @@ The `wrapresolve` command also pulls in `libnetresolve-asyncns.so` which impleme
 
 Two non-blocking APIs wrapping name resolution together with the `socket()`, `bind()`, `listen()` and `connect()` calls are available.
 
-The simpler one is `netresolve_bind()` that creates listening sockets for all available addresses and passes them back via a series of calls of the provided callback. You can easily learn when the last socket is passed by checking `netresolve_query_get_count()` and free the structures using `netresolve_bind_free()`.
+The simpler one is `netresolve_listen()` that creates listening sockets for all available addresses and passes back sockets for accepted connections. You can stop the listening sockets and free the structures using `netresolve_listen_free()`.
 
 The more sophisticated one is `netresolve_connect()` that uses the list of addresses to get a single connected socket, maintaining address preference by family and other characteristics, and using a short timeout to bypass the preference when it would take too much time. A function called `netresolve_connect_next()` can be used to overcome application level issues with one of the addresses and to get a new connection using the next available address. Once happy with the connected socket or to abort the process, run `netresolve_connect_free()`.
 

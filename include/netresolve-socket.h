@@ -35,10 +35,10 @@ netresolve_query_t netresolve_connect(netresolve_t context,
 void netresolve_connect_next(netresolve_query_t query);
 void netresolve_connect_free(netresolve_query_t query);
 
-netresolve_query_t netresolve_bind(netresolve_t context,
+netresolve_query_t netresolve_listen(netresolve_t context,
 		const char *nodename, const char *servname,
-		int family, int socktype, int protocol,
-		netresolve_socket_callback_t callback, void *user_data);
-void netresolve_bind_free(netresolve_query_t query);
+		int family, int socktype, int protocol);
+void netresolve_accept(netresolve_query_t query, netresolve_socket_callback_t on_accept, void *user_data);
+void netresolve_listen_free(netresolve_query_t query);
 
 #endif /* NETRESOLVE_SOCKET_H */
