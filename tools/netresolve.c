@@ -328,11 +328,18 @@ main(int argc, char **argv)
 		int sock = -1;
 		struct pollfd fds[2];
 
-		if (!context->request.protocol)
+		/* Linux: I found an interesting inconsistency where zero socktype
+		 * is supported by the kernel but not when combined with
+		 * `SOCK_NONBLOCK` which is internally used by netresolve
+		 * socket API implementation.
+		 */
+		if (!context->request.socktype && !context->request.protocol) {
+			context->request.socktype = SOCK_STREAM;
 			context->request.protocol = IPPROTO_TCP;
+		}
 
 		if (do_listen) {
-			if (!(query = netresolve_listen(context, nodename, servname, 0, 0, 0))) {
+			if (!(query = netresolve_listen(context, nodename, servname, -1, -1, -1))) {
 				error("netresolve: Cannot create listening socket: %s", strerror(errno));
 				return EXIT_FAILURE;
 			}
