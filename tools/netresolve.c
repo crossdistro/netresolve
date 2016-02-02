@@ -72,12 +72,20 @@ read_and_write(int rfd, int wfd, int sock)
 }
 
 static void
-on_socket(netresolve_query_t context, int idx, int sock, void *user_data)
+on_socket(netresolve_query_t query, int idx, int sock, void *user_data)
 {
 	int *fd = user_data;;
 
 	if (*fd == -1)
 		*fd = sock;
+}
+
+static void
+on_accept(netresolve_query_t query, int idx, int sock, void *user_data)
+{
+	on_socket(query, idx, sock, user_data);
+
+	netresolve_listen_free(query);
 }
 
 static char *
@@ -344,9 +352,7 @@ main(int argc, char **argv)
 				return EXIT_FAILURE;
 			}
 
-			netresolve_accept(query, on_socket, &sock);
-
-			netresolve_listen_free(query);
+			netresolve_accept(query, on_accept, &sock);
 		} else {
 			query = netresolve_connect(context, nodename, servname, -1, -1, -1, on_socket, &sock);
 
