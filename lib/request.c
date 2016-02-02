@@ -31,9 +31,9 @@ copy_string(char **target, const char *source)
 }
 
 static void
-copy_nonnegative(int *target, int source)
+copy_positive(int *target, int source)
 {
-	if (source >= 0)
+	if (source > 0)
 		*target = source;
 }
 
@@ -51,16 +51,16 @@ netresolve_request_set_options_from_va(struct netresolve_request *request, va_li
 			copy_string(&request->servname, va_arg(ap, const char *));
 			break;
 		case NETRESOLVE_OPTION_FAMILY:
-			copy_nonnegative(&request->family, va_arg(ap, int));
+			copy_positive(&request->family, va_arg(ap, int));
 			break;
 		case NETRESOLVE_OPTION_SOCKTYPE:
-			copy_nonnegative(&request->socktype, va_arg(ap, int));
+			copy_positive(&request->socktype, va_arg(ap, int));
 			break;
 		case NETRESOLVE_OPTION_PROTOCOL:
-			copy_nonnegative(&request->protocol, va_arg(ap, int));
+			copy_positive(&request->protocol, va_arg(ap, int));
 			break;
 		case NETRESOLVE_OPTION_IFINDEX:
-			copy_nonnegative(&request->ifindex, va_arg(ap, int));
+			copy_positive(&request->ifindex, va_arg(ap, int));
 			break;
 		case NETRESOLVE_OPTION_IP4_ADDRESS:
 			request->family = AF_INET;
@@ -71,7 +71,7 @@ netresolve_request_set_options_from_va(struct netresolve_request *request, va_li
 			memcpy(request->address, va_arg(ap, const void *), sizeof (struct in6_addr));
 			break;
 		case NETRESOLVE_OPTION_PORT:
-			copy_nonnegative(&request->port, va_arg(ap, int));
+			copy_positive(&request->port, va_arg(ap, int));
 			break;
 		case NETRESOLVE_OPTION_DNS_NAME:
 			copy_string(&request->dns_name, va_arg(ap, const char *));

@@ -347,14 +347,14 @@ main(int argc, char **argv)
 		}
 
 		if (do_listen) {
-			if (!(query = netresolve_listen(context, nodename, servname, -1, -1, -1))) {
+			if (!(query = netresolve_listen(context, nodename, servname, 0, 0, 0))) {
 				error("netresolve: Cannot create listening socket: %s", strerror(errno));
 				return EXIT_FAILURE;
 			}
 
 			netresolve_accept(query, on_accept, &sock);
 		} else {
-			query = netresolve_connect(context, nodename, servname, -1, -1, -1, on_socket, &sock);
+			query = netresolve_connect(context, nodename, servname, 0, 0, 0, on_socket, &sock);
 
 			while (sock == -1) {
 				error("netresolve: Socket connection failed: %s", strerror(errno));
