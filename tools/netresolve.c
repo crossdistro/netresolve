@@ -383,7 +383,7 @@ main(int argc, char **argv)
 				break;
 			}
 
-			if (fds[0].revents & POLLIN)
+			if (fds[0].revents & (POLLIN | POLLHUP))
 				read_and_write(0, sock, sock);
 			if (fds[1].revents & POLLIN)
 				read_and_write(sock, 1, sock);
