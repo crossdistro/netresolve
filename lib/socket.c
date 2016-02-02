@@ -368,10 +368,15 @@ listen_callback(netresolve_query_t query, void *user_data)
 		int protocol;
 		const struct sockaddr *sa;
 		socklen_t salen;
+		static const socklen_t one = 1;
 
 		if (!(sa = netresolve_query_get_sockaddr(query, i, &salen, &socktype, &protocol, NULL)))
 			continue;
 		if ((path->socket.fd = socket(sa->sa_family, socktype | O_NONBLOCK, protocol)) == -1)
+			continue;
+		if (setsockopt(path->socket.fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one) == -1)
+			continue;
+		if (sa->sa_family == AF_INET6 && setsockopt(path->socket.fd, SOL_IPV6, IPV6_V6ONLY, &one, sizeof one) == -1)
 			continue;
 		if (bind(path->socket.fd, sa, salen) == -1 || listen(path->socket.fd, SOMAXCONN) == -1) {
 			close(path->socket.fd);
