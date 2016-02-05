@@ -787,7 +787,7 @@ cleanup(void *data)
 #if defined(USE_UNBOUND)
 	if (priv->watch)
 		netresolve_watch_remove(priv->query, priv->watch, false);
-	if (priv->ctx);
+	if (priv->ctx)
 		ub_ctx_delete(priv->ctx);
 #elif defined(USE_ARES)
 		if (priv->nfds)
