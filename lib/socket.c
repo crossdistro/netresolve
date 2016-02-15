@@ -25,6 +25,7 @@
 
 #include "netresolve-private.h"
 
+#define CONNECT_TIMEOUT 15
 #define PRIORITY_TIMEOUT 1
 
 struct netresolve_socket {
@@ -32,12 +33,14 @@ struct netresolve_socket {
 	netresolve_socket_callback_t callback;
 	void *user_data;
 	int flags;
+	netresolve_timeout_t connect_timeout;
 	netresolve_timeout_t priority_timeout;
 	bool skip_scheduled;
 	bool sequential_connect;
 };
 
 static void pickup_connected_socket(struct netresolve_socket *priv);
+static void enable_sockets(struct netresolve_socket *priv);
 
 static void
 connection_callback(netresolve_query_t query, netresolve_watch_t watch, int fd, int events, void *data)
@@ -59,13 +62,37 @@ connection_callback(netresolve_query_t query, netresolve_watch_t watch, int fd, 
 
 	path->socket.state = errno ? SOCKET_STATE_DONE : SOCKET_STATE_READY;
 	path->socket.watch = NULL;
+	if (errno)
+		path->socket.fd = -1;
 
 	/* See whether we can pass back a ready connection. */
 	pickup_connected_socket(priv);
 }
 
 void
-timeout_callback(netresolve_query_t query, netresolve_timeout_t timeout, void *data)
+connect_timeout_callback(netresolve_query_t query, netresolve_timeout_t timeout, void *data)
+{
+	struct netresolve_socket *priv = data;
+	struct netresolve_path *paths = query->response.paths;
+	struct netresolve_path *path;
+
+	/* Find first scheduled socket. */
+	for (path = paths; path->node.family; path++) {
+		if (path->socket.state == SOCKET_STATE_SCHEDULED) {
+			if (path->socket.watch) {
+				netresolve_watch_remove(query, path->socket.watch, true);
+				path->socket.watch = NULL;
+				path->socket.fd = -1;
+			}
+			path->socket.state = SOCKET_STATE_DONE;
+		}
+	}
+
+	enable_sockets(priv);
+}
+
+void
+priority_timeout_callback(netresolve_query_t query, netresolve_timeout_t timeout, void *data)
 {
 	struct netresolve_socket *priv = data;
 
@@ -147,6 +174,10 @@ enable_sockets(struct netresolve_socket *priv)
 		if (path->node.family == AF_INET6 && ip6++)
 			continue;
 
+		/* Will start or resume connection process, set up the connection timeout. */
+		if (!priv->connect_timeout)
+			priv->connect_timeout = netresolve_timeout_add(priv->query, CONNECT_TIMEOUT, 0, connect_timeout_callback, priv);
+
 		if (path->socket.state == SOCKET_STATE_NONE)
 			setup_socket(priv, path);
 		else if (path->socket.state == SOCKET_STATE_SCHEDULED && !path->socket.watch) {
@@ -159,8 +190,13 @@ enable_sockets(struct netresolve_socket *priv)
 			break;
 	}
 
-	if (!ip4 && !ip6)
+	if (!ip4 && !ip6) {
 		error("socket: no connection paths available");
+		if (priv->connect_timeout)
+			netresolve_timeout_remove(query, priv->connect_timeout);
+		if (priv->priority_timeout)
+			netresolve_timeout_remove(query, priv->priority_timeout);
+	}
 }
 
 static void
@@ -198,7 +234,11 @@ pickup_connected_socket(struct netresolve_socket *priv)
 			}
 		}
 
-		/* Reset priority timeout. */
+		/* Reset timeouts. */
+		if (priv->connect_timeout) {
+			netresolve_timeout_remove(priv->query, priv->connect_timeout);
+			priv->connect_timeout = NULL;
+		}
 		if (priv->priority_timeout) {
 			netresolve_timeout_remove(priv->query, priv->priority_timeout);
 			priv->priority_timeout = NULL;
@@ -221,7 +261,7 @@ pickup_connected_socket(struct netresolve_socket *priv)
 					debug_query(priv->query, "socket: priority timeout already set");
 				else {
 					debug_query(priv->query, "socket: setting up priority timeout of %d seconds", PRIORITY_TIMEOUT);
-					priv->priority_timeout = netresolve_timeout_add(priv->query, PRIORITY_TIMEOUT, 0, timeout_callback, priv);
+					priv->priority_timeout = netresolve_timeout_add(priv->query, PRIORITY_TIMEOUT, 0, priority_timeout_callback, priv);
 				}
 				break;
 			}
@@ -323,6 +363,8 @@ netresolve_connect_free(netresolve_query_t query)
 		memset(&path->socket, 0, sizeof path->socket);
 	}
 
+	if (priv->connect_timeout)
+		netresolve_timeout_remove(query, priv->connect_timeout);
 	if (priv->priority_timeout)
 		netresolve_timeout_remove(query, priv->priority_timeout);
 
