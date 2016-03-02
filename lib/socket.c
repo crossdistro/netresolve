@@ -175,6 +175,8 @@ connect_timeout(netresolve_query_t query, netresolve_timeout_t timeout, void *da
 
 	debug_query(query, "socket: connection timeout occured");
 
+	clear_timeouts(priv);
+
 	/* Kill all waited connections. */
 	for (struct netresolve_path *path = paths; path->node.family; path++)
 		if (path->socket.state == SOCKET_STATE_SCHEDULED)
