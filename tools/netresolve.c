@@ -57,6 +57,7 @@ read_and_write(int rfd, int wfd, int sock)
 	if (rsize == 0) {
 		debug("end of input\n");
 		shutdown(sock, SHUT_RDWR);
+		close(sock);
 		exit(0);
 	}
 	for (offset = 0; offset < rsize; offset += wsize) {
