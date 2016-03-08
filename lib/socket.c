@@ -25,9 +25,6 @@
 
 #include "netresolve-private.h"
 
-#define CONNECT_TIMEOUT 15
-#define PRIORITY_TIMEOUT 1
-
 struct netresolve_socket {
 	netresolve_query_t query;
 	netresolve_socket_callback_t callback;
@@ -203,6 +200,7 @@ enable_sockets(struct netresolve_socket *priv)
 	netresolve_query_t query = priv->query;
 	struct netresolve_path *paths = query->response.paths;
 	int ip4 = 0, ip6 = 0;
+	int timeout = getenv_int("NETRESOLVE_CONNECT_TIMEOUT", 15);
 
 	/* Attempt to connect to one IPv4 and one IPv6 address in parallel. It is a
 	 * „happy eyeballs“ style optimization that removes a delay when packets
@@ -222,7 +220,7 @@ enable_sockets(struct netresolve_socket *priv)
 
 		/* Will start or resume connection process, set up the connection timeout. */
 		if (!priv->timeout)
-			priv->timeout = netresolve_timeout_add(priv->query, CONNECT_TIMEOUT, 0, connect_timeout, priv);
+			priv->timeout = netresolve_timeout_add(priv->query, timeout, 0, connect_timeout, priv);
 
 		if (path->socket.state == SOCKET_STATE_NONE)
 			connect_start(priv, path);
@@ -292,8 +290,10 @@ pickup_connected_socket(struct netresolve_socket *priv)
 			if (priv->priority_timeout)
 				debug_query(priv->query, "socket: priority timeout already set");
 			else {
-				debug_query(priv->query, "socket: setting up priority timeout of %d seconds", PRIORITY_TIMEOUT);
-				priv->priority_timeout = netresolve_timeout_add(priv->query, PRIORITY_TIMEOUT, 0, connect_priority_timeout, priv);
+				int priority_timeout = getenv_int("NETRESOLVE_CONNECT_PRIORITY_TIMEOUT", 1);
+
+				debug_query(priv->query, "socket: setting up priority timeout of %d seconds", priority_timeout);
+				priv->priority_timeout = netresolve_timeout_add(priv->query, priority_timeout, 0, connect_priority_timeout, priv);
 			}
 		}
 	}
