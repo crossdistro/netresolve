@@ -3,7 +3,7 @@
 # Compatibility wrapper for netresolve that runs a program with libc functions
 # replaced by netresolve based implementations.
 
-export LD_PRELOAD="libnetresolve-libc.so libnetresolve-asyncns.so"
+export LD_PRELOAD="libnetresolve-libc.so.0 libnetresolve-asyncns.so.0"
 
 while [ $# -gt 0 ]; do
     case "$1" in

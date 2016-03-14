@@ -116,7 +116,7 @@ load_backend(char **take_settings)
 	}
 
 	backend->settings = take_settings;
-	snprintf(filename, sizeof filename, "libnetresolve-backend-%s.so", name);
+	snprintf(filename, sizeof filename, "libnetresolve-backend-%s.so.0", name);
 	backend->dl_handle = dlopen(filename, RTLD_NOW);
 	if (!backend->dl_handle) {
 		error("%s", dlerror());
