@@ -131,7 +131,7 @@ connect_ready(netresolve_query_t query, netresolve_watch_t watch, int fd, int ev
 	socklen_t len = sizeof(errno);
 
 	assert(fd == path->socket.fd);
-	assert(events == POLLOUT);
+	assert(events & POLLOUT);
 	assert(path->socket.state == SOCKET_STATE_SCHEDULED);
 	assert(path->socket.watch);
 
