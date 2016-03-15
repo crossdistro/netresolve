@@ -161,7 +161,7 @@ run_ping(netresolve_query_t query, size_t idx)
 			return false;
 		fprintf(stderr, "echo request\n");
 
-		if (poll(&sock, 1, 0) != 1)
+		if (poll(&sock, 1, -1) != 1)
 			return false;
 		if (recvfrom(sock.fd, buffer, sizeof buffer, 0, (struct sockaddr *) &sender, &salen) == -1)
 			return false;
@@ -377,7 +377,7 @@ main(int argc, char **argv)
 		fds[1].events = POLLIN;
 
 		while (true) {
-			if (poll(fds, 2, 0) == -1) {
+			if (poll(fds, 2, -1) == -1) {
 				fprintf(stderr, "poll: %s\n", strerror(errno));
 				break;
 			}
