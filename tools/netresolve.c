@@ -140,7 +140,6 @@ run_ping(netresolve_query_t query, size_t idx)
 	socklen_t salen;
 	struct icmphdr data4 = { .type = ICMP_ECHO };
 	struct icmp6hdr data6 = { .icmp6_type = ICMPV6_ECHO_REQUEST };
-	int status;
 	char buffer[4096];
 	struct sockaddr_storage sender;
 
@@ -155,19 +154,16 @@ run_ping(netresolve_query_t query, size_t idx)
 		return false;
 
 	while (true) {
-		if (sa->sa_family == AF_INET)
-			status = sendto(sock.fd, &data4, sizeof data4, 0, sa, salen);
-		else
-			status = sendto(sock.fd, &data6, sizeof data6, 0, sa, salen);
-		if (status == -1)
+		const void *data = (sa->sa_family == AF_INET) ? (void *) &data4 : (void *) &data6;
+		socklen_t length = (sa->sa_family == AF_INET) ? sizeof data4 : sizeof data6;
+
+		if (sendto(sock.fd, data, length, 0, sa, salen) == -1)
 			return false;
 		fprintf(stderr, "echo request\n");
 
-		status = poll(&sock, 1, 0);
-		if (status != 1)
+		if (poll(&sock, 1, 0) != 1)
 			return false;
-		status = recvfrom(sock.fd, buffer, sizeof buffer, 0, (struct sockaddr *) &sender, &salen);
-		if (status == -1)
+		if (recvfrom(sock.fd, buffer, sizeof buffer, 0, (struct sockaddr *) &sender, &salen) == -1)
 			return false;
 		query = netresolve_query_getnameinfo(NULL, (struct sockaddr *) &sender, salen, 0, NULL, NULL);
 		if (!query)
