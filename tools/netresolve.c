@@ -149,6 +149,8 @@ run_ping(netresolve_query_t query, size_t idx)
 		return false;
 
 	sock.fd = socket(sa->sa_family, SOCK_DGRAM, sa->sa_family == AF_INET ? IPPROTO_ICMP : IPPROTO_ICMPV6);
+	if (sock.fd == -1 && errno != EAFNOSUPPORT)
+		sock.fd = socket(sa->sa_family, SOCK_RAW, sa->sa_family == AF_INET ? IPPROTO_ICMP : IPPROTO_ICMPV6);
 	if (sock.fd == -1)
 		return false;
 
