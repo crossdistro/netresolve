@@ -306,9 +306,12 @@ static void
 connect_prepare(netresolve_query_t query, void *user_data)
 {
 	struct netresolve_socket *priv = user_data;
+	struct netresolve_path *paths = query->response.paths;
 
 	debug_query(query, "socket: name resolution done, will attempt to connect");
 
+	for (struct netresolve_path *path = paths; path->node.family; path++)
+		path->socket.fd = -1;
 	priv->query = query;
 
 	enable_sockets(priv);
