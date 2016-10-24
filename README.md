@@ -1,4 +1,4 @@
-# netresolve library and tools
+# Non-blocking network name resolution library and tools
 
 Netresolve is a package for nonblocking network name resolution via backends
 intended as a replacement for name service switch based name resolution in
