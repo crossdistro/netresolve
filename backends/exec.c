@@ -58,12 +58,14 @@ start_subprocess(char *const command[], int *pid, int *infd, int *outfd)
 		goto err_fork;
 
 	if (*pid) {
+		/* Parent process. */
 		*infd = p1[1];
 		*outfd = p2[0];
 		close(p1[0]);
 		close(p2[1]);
 		return true;
 	} else {
+		/* Child process. */
 		dup2(p1[0], 0);
 		dup2(p2[1], 1);
 		close(p1[0]);
@@ -71,7 +73,7 @@ start_subprocess(char *const command[], int *pid, int *infd, int *outfd)
 		close(p2[0]);
 		close(p2[1]);
 		execvp(*command, command);
-		/* Subprocess error occured. */
+		/* Error occured. */
 		fprintf(stderr, "error running %s: %s", *command, strerror(errno));
 		abort();
 	}
