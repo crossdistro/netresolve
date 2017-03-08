@@ -23,6 +23,16 @@
  */
 #include "compat.h"
 
+static int
+print_usage()
+{
+	return fprintf(stderr,
+			"-h,--help -- help\n"
+			"-n,--node <nodename> -- node name\n"
+			"-4,--ipv4 -- IPv4 only query\n"
+			"-6,--ipv6 -- IPv6 only query\n");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -43,11 +53,7 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, opts, longopts, &idx)) != -1) {
 		switch (opt) {
 		case 'h':
-			fprintf(stderr,
-					"-h,--help -- help\n"
-					"-n,--node <nodename> -- node name\n"
-					"-4,--ipv4 -- IPv4 only query\n"
-					"-6,--ipv6 -- IPv6 only query\n");
+			print_usage();
 			exit(EXIT_SUCCESS);
 		case 'n':
 			nodename = optarg;
@@ -70,16 +76,16 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
+	if (!nodename) {
+		print_usage();
+		exit(1);
+	}
+
 	printf("query:\n");
 	printf("  api = %s\n", family ? "gethostbyname2" : "gethostbyname");
 	if (family)
 		printf(" family = %d\n", family);
 	printf("  nodename = %s\n", nodename);
-
-	if (!nodename) {
-		fprintf(stderr, "Cannot query an empty nodename\n");
-		exit(1);
-	}
 
 	struct hostent *result = family ? gethostbyname2(nodename, family) : gethostbyname(nodename);
 

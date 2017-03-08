@@ -5,6 +5,24 @@
 
 export LD_PRELOAD="libnetresolve-libc.so.0 libnetresolve-asyncns.so.0"
 
+usage()
+{
+	cat <<EOF
+Usage: ${0} [-b <backend>] [-4|-6] [-v] command ...
+	-b <backend> comma-separated list of backedns
+	-4           IPv4 only query
+	-6           IPv6 only query
+	-v           show more verbose output
+	-h           print help
+EOF
+}
+
+if [ "$#" = 0 ]
+then
+    usage
+    exit 0
+fi
+
 while [ $# -gt 0 ]; do
     case "$1" in
         (-v|--verbose)
@@ -19,6 +37,10 @@ while [ $# -gt 0 ]; do
             ;;
         (-6)
             export NETRESOLVE_FORCE_FAMILY=ip6
+            ;;
+	(-h)
+            usage
+            exit 0
             ;;
         (-*)
             echo "unknown option: $1" >&2

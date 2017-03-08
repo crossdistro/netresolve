@@ -23,6 +23,14 @@
  */
 #include "compat.h"
 
+static int
+print_usage()
+{
+	return fprintf(stderr,
+			"-h,--help -- help\n"
+			"-a,--address <address> -- node name\n");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -42,9 +50,7 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, opts, longopts, &idx)) != -1) {
 		switch (opt) {
 		case 'h':
-			fprintf(stderr,
-					"-h,--help -- help\n"
-					"-a,--address <address> -- node name\n");
+			print_usage();
 			exit(EXIT_SUCCESS);
 		case 'a':
 			address_str = optarg;
@@ -61,13 +67,14 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	printf("query:\n");
-	printf("  address = %s\n", address_str);
-
 	if (!address_str) {
 		fprintf(stderr, "Cannot query an empty address.\n");
+		print_usage();
 		exit(1);
 	}
+
+	printf("query:\n");
+	printf("  address = %s\n", address_str);
 
 	parse_address(address_str, &address, &family, &ifindex);
 

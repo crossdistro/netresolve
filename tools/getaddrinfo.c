@@ -29,6 +29,26 @@
 
 #include "compat.h"
 
+static int
+print_usage(FILE *out)
+{
+	return fprintf(out,
+			"Get address(es) of service"
+			"-h,--help -- help\n"
+			"-n,--node <nodename> -- node name\n"
+			"-s,--service <servname> -- service name\n"
+			"-4,--ipv4 -- IPv4 only query\n"
+			"-6,--ipv6 -- IPv6 only query\n"
+			"--raw -- raw socket type (SOCK_RAW)\n"
+			"--stream -- stream socket type (SOCK_STREAM)\n"
+			"--dgram -- datagram socket type (SOCK_DGRAM)\n"
+			"--tcp -- TCP protocol (IPPROTO_TCP)\n"
+			"--udp -- UDP protocol (IPPROTO_UDP)\n"
+			"--passive -- AI_PASSIVE\n"
+			"--addrconfig -- AI_ADDRCONFIG\n"
+			"--canonname -- AI_CANONNAME\n");
+}
+
 int
 main(int argc, char **argv)
 {
@@ -60,20 +80,7 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, opts, longopts, &idx)) != -1) {
 		switch (opt) {
 		case 'h':
-			fprintf(stderr,
-					"-h,--help -- help\n"
-					"-n,--node <nodename> -- node name\n"
-					"-s,--service <servname> -- service name\n"
-					"-4,--ipv4 -- IPv4 only query\n"
-					"-6,--ipv6 -- IPv6 only query\n"
-					"--raw -- raw socket type (SOCK_RAW)\n"
-					"--stream -- stream socket type (SOCK_STREAM)\n"
-					"--dgram -- datagram socket type (SOCK_DGRAM)\n"
-					"--tcp -- TCP protocol (IPPROTO_TCP)\n"
-					"--udp -- UDP protocol (IPPROTO_UDP)\n"
-					"--passive -- AI_PASSIVE\n"
-					"--addrconfig -- AI_ADDRCONFIG\n"
-					"--canonname -- AI_CANONNAME\n");
+			print_usage(stderr);
 			exit(EXIT_SUCCESS);
 		case 'n':
 			nodename = optarg;
@@ -122,6 +129,11 @@ main(int argc, char **argv)
 		servname = argv[optind++];
 	if (argv[optind]) {
 		fprintf(stderr, "Too many arguments.");
+		exit(1);
+	}
+
+	if (!nodename && !servname) {
+		print_usage(stderr);
 		exit(1);
 	}
 
