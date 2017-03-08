@@ -37,6 +37,19 @@
 
 #define SIZE 8192
 
+static int
+print_usage(FILE *out)
+{
+	return fprintf(out,
+			"Resolve DNS query\n"
+			"-h,--help -- help\n"
+			"-s,--search <servname> -- service name\n"
+			"-n,--dname <name> -- domain name\n"
+			"-c,--class <class> -- class\n"
+			"-t,--type <type> -- type\n");
+
+}
+
 int
 main(int argc, char **argv)
 {
@@ -61,12 +74,7 @@ main(int argc, char **argv)
 	while ((opt = getopt_long(argc, argv, opts, longopts, &idx)) != -1) {
 		switch (opt) {
 		case 'h':
-			fprintf(stderr,
-					"-h,--help -- help\n"
-					"-s,--search <servname> -- service name\n"
-					"-n,--dname <name> -- domain name\n"
-					"-c,--class <class> -- class\n"
-					"-t,--type <type> -- type\n");
+			print_usage(stderr);
 			exit(EXIT_SUCCESS);
 		case 's':
 			search = true;
@@ -90,16 +98,17 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
+	if (!dname) {
+		fprintf(stderr, "Cannot query NULL dname.\n");
+		print_usage(stderr);
+		exit(EXIT_FAILURE);
+	}
+
 	printf("query:\n");
 	printf("  search = %s\n", search ? "yes" : "no");
 	printf("  dname = %s\n", dname);
 	printf("  class = %d\n", class);
 	printf("  type = %d\n", type);
-
-	if (!dname) {
-		fprintf(stderr, "Cannot query NULL dname.\n");
-		exit(EXIT_FAILURE);
-	}
 
 	length = (search ? res_search : res_query)(dname, class, type, answer, sizeof answer);
 
