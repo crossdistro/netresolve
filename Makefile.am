@@ -3,11 +3,6 @@ AM_MAKEFLAGS = --no-print-directory
 
 rpmdir = $(realpath $(builddir))
 
-rpm: dist
-	rpmbuild \
-	    -D "_sourcedir $(rpmdir)" -D "_rpmdir $(builddir)" -D "_rpmdir $(builddir)" \
-	    -ba contrib/rpm/netresolve.spec
-
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-DSYSCONFDIR=\""$(sysconfdir)"\" \

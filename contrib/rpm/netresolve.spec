@@ -7,6 +7,8 @@ Group:          Development/Libraries/C
 Url:            https://github.com/crossdistro/netresolve
 Source:         %{name}-%{version}.tar.xz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
+BuildRequires:  autoconf
+BuildRequires:  automake
 
 %description
 Netresolve is a package for nonblocking network name resolution via
@@ -17,7 +19,7 @@ backends intended as a replacement for name service switch based name
 %setup -q
 
 %build
-%configure
+./autogen.sh
 make %{?_smp_mflags}
 
 %install
