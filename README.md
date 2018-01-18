@@ -7,9 +7,21 @@ glibc.
 ## Contact
 
 Pavel Šimerda
-psimerda at redhat.com
 pavlix at pavlix.net (mail and jabber)
 pavlix at IRC Freenode
+
+## Build
+
+The classic way:
+
+    ./autogen.sh
+    make
+    make install
+
+Build RPM package:
+
+    ./autogen.sh
+    make rpm
 
 ## Core features
 

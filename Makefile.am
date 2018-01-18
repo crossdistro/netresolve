@@ -1,6 +1,13 @@
 ACLOCAL_AMFLAGS = -I m4 ${ACLOCAL_FLAGS}
 AM_MAKEFLAGS = --no-print-directory
 
+rpmdir = $(realpath $(builddir))
+
+rpm: dist
+	rpmbuild \
+	    -D "_sourcedir $(rpmdir)" -D "_rpmdir $(builddir)" -D "_rpmdir $(builddir)" \
+	    -ba contrib/rpm/netresolve.spec
+
 AM_CPPFLAGS = \
 	-include $(top_builddir)/config.h \
 	-DSYSCONFDIR=\""$(sysconfdir)"\" \
@@ -39,8 +46,8 @@ lib_LTLIBRARIES = \
 
 libnetresolve_la_SOURCES = \
 	include/netresolve-backend.h \
-	include/netresolve-cli.h \
 	include/netresolve-private.h \
+	include/netresolve-socket.h \
 	lib/backend.c \
 	lib/compat.c \
 	lib/context.c \
