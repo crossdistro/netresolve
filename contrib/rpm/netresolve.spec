@@ -5,13 +5,13 @@ Summary:        Non-blocking network name resolution library and tools
 License:        BSD
 Group:          Development/Libraries/C
 Url:            https://github.com/crossdistro/netresolve
-Source:         netresolve-%{version}.tar.xz
+Source:         %{name}-%{version}.tar.xz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 
 %description
 Netresolve is a package for nonblocking network name resolution via
 backends intended as a replacement for name service switch based name
-resolution in glibc.
+ resolution in glibc2
 
 %prep
 %setup -q
