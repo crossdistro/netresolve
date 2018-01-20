@@ -5,7 +5,7 @@ Summary: Generic name resolution library
 Group: System Environment/Libraries
 License: BSD
 URL: https://sourceware.org/%{name}/
-Source0: %{name}-0.0.1.tar.xz
+Source: %{name}-%{version}.tar.xz
 BuildRequires: ldns-devel
 BuildRequires: pkgconfig(libcares)
 BuildRequires: unbound-devel
