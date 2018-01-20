@@ -9,11 +9,12 @@ Source:         %{name}-%{version}.tar.xz
 BuildRoot:      %{_tmppath}/%{name}-%{version}-build
 BuildRequires:  autoconf
 BuildRequires:  automake
+BuildRequires:  libtool
 
 %description
 Netresolve is a package for nonblocking network name resolution via
 backends intended as a replacement for name service switch based name
- resolution in glibc2
+resolution in glibc.
 
 %prep
 %setup -q
