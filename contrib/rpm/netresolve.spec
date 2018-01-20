@@ -109,7 +109,7 @@ make %{?_smp_mflags}
 %make_install
 find %{buildroot} -name '*.la' -delete
 
-%check
+#%check
 # Checks don't seem to work in different environments
 #export NETRESOLVE_TEST_COMMAND="libtool execute valgrind --leak-check=full --error-exitcode=1 ./netresolve"
 #make check || { cat ./test-suite.log; false; }
