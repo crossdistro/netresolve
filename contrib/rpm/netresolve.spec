@@ -137,7 +137,7 @@ find %{buildroot} -name '*.la' -delete
 
 %files core
 %license COPYING
-%doc README TODO NEWS
+%doc README.md
 %{_libdir}/libnetresolve-backend-any.so.0
 %{_libdir}/libnetresolve-backend-any.so.0.0.0
 %{_libdir}/libnetresolve-backend-exec.so.0
@@ -224,28 +224,3 @@ find %{buildroot} -name '*.la' -delete
 %{_libdir}/libnetresolve-libc.so
 %{_libdir}/libnetresolve.so
 %{_libdir}/libnss_netresolve.so
-
-%changelog
-* Tue Nov 24 2015 Pavel Šimerda <psimerda@redhat.com> - 0.0.1-0.8.20151111git
-- applied feedback
-
-* Mon Nov 09 2015 Pavel Šimerda <psimerda@redhat.com> - 0.0.1-0.7.20151109git
-- updated live source, incorporated feedback
-
-* Thu Oct 15 2015 Pavel Šimerda <psimerda@redhat.com> - 0.0.1-0.6.20151015git
-- updated live source, incorporated feedback
-
-* Thu Sep 17 2015 Pavel Šimerda <psimerda@redhat.com> - 0.0.1-0.5.20150923git
-- lots of changes upstream since the last time
-
-* Sun Nov 02 2014 Pavel Šimerda <psimerda@redhat.com> - 0.0.1-0.4.20141102git
-- rebuilt
-
-* Wed May 21 2014 Pavel Šimerda <psimerda@redhat.com> - 0.0.1-0.3.20140422git
-- avoid running the tests
-
-* Thu Apr 24 2014 Pavel Šimerda <psimerda@redhat.com> - 0.0.1-0.2.20140422git
-- incorporate review feedback
-
-* Wed Apr 23 2014 Pavel Šimerda <psimerda@redhat.com> - 0.0.1-0.1.20140422git
-- initial build
