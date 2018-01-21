@@ -20,7 +20,7 @@ Requires: %{name}-core%{?_isa} = %{version}-%{release}
 Requires: %{name}-tools%{?_isa} = %{version}-%{release}
 Requires: %{name}-compat%{?_isa} = %{version}-%{release}
 Requires: %{name}-backends-compat%{?_isa} = %{version}-%{release}
-Requires: %{name}-backends-aresdns%{?_isa} = %{version}-%{release}
+Requires: %{name}-backends-aresdns0%{?_isa} = %{version}-%{release}
 Requires: %{name}-backends-avahi%{?_isa} = %{version}-%{release}
 %description
 Netresolve is a package for non-blocking network name resolution via backends
@@ -58,27 +58,27 @@ Group: Development/Libraries
 This package provides backends for querying libc, glibc nsswitch backends,
 asyncns and other existing name resolution libraries.
 
-%package backends-aresdns
+%package backends-aresdns0
 Summary: DNS backend for netresolve based on aresdns
 Group: Development/Libraries
 Requires: %{name}-core%{?_isa} = %{version}-%{release}
-%description backends-aresdns
+%description backends-aresdns0
 This package provides DNS capabilities including learning DNSSEC validity
 from the AD flag for netresolve using c-ares.
 
-%package backends-avahi
+%package backends-avahi0
 Summary: Multicast DNS backend for netresolve based on libavahi
 Group: Development/Libraries
 Requires: %{name}-core%{?_isa} = %{version}-%{release}
-%description backends-avahi
+%description backends-avahi0
 This package provides Multicast DNS capabilities using Avahi daemon and
 libraries.
 
-%package backends-ubdns
+%package backends-ubdns0
 Summary: DNS backend for netresolve based on libunbound
 Group: Development/Libraries
 Requires: %{name}-core%{?_isa} = %{version}-%{release}
-%description backends-ubdns
+%description backends-ubdns0
 This package provides DNS capabilities including DNSSEC validation to
 netresolve using libunbound.
 
@@ -126,14 +126,14 @@ find %{buildroot} -name '*.la' -delete
 %post backends-compat -p /sbin/ldconfig
 %postun backends-compat -p /sbin/ldconfig
 
-%post backends-aresdns -p /sbin/ldconfig
-%postun backends-aresdns -p /sbin/ldconfig
+%post backends-aresdns0 -p /sbin/ldconfig
+%postun backends-aresdns0 -p /sbin/ldconfig
 
-%post backends-ubdns -p /sbin/ldconfig
-%postun backends-ubdns -p /sbin/ldconfig
+%post backends-ubdns0 -p /sbin/ldconfig
+%postun backends-ubdns0 -p /sbin/ldconfig
 
-%post backends-avahi -p /sbin/ldconfig
-%postun backends-avahi -p /sbin/ldconfig
+%post backends-avahi0 -p /sbin/ldconfig
+%postun backends-avahi0 -p /sbin/ldconfig
 
 %files core
 %license COPYING
@@ -181,15 +181,15 @@ find %{buildroot} -name '*.la' -delete
 %{_libdir}/libnetresolve-backend-nss.so.0.0.0
 
 
-%files backends-aresdns
+%files backends-aresdns0
 %{_libdir}/libnetresolve-backend-aresdns.so.0
 %{_libdir}/libnetresolve-backend-aresdns.so.0.0.0
 
-%files backends-avahi
+%files backends-avahi0
 %{_libdir}/libnetresolve-backend-avahi.so.0
 %{_libdir}/libnetresolve-backend-avahi.so.0.0.0
 
-%files backends-ubdns
+%files backends-ubdns0
 %{_libdir}/libnetresolve-backend-ubdns.so.0
 %{_libdir}/libnetresolve-backend-ubdns.so.0.0.0
 
