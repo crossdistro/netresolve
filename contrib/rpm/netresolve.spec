@@ -182,15 +182,15 @@ find %{buildroot} -name '*.la' -delete
 %{_libdir}/libnetresolve-backend-nss.so.0.0.0
 
 
-%files backends-aresdns0
+%files backends-aresdns
 %{_libdir}/libnetresolve-backend-aresdns.so.0
 %{_libdir}/libnetresolve-backend-aresdns.so.0.0.0
 
-%files backends-avahi0
+%files backends-avahi
 %{_libdir}/libnetresolve-backend-avahi.so.0
 %{_libdir}/libnetresolve-backend-avahi.so.0.0.0
 
-%files backends-ubdns0
+%files backends-ubdns
 %{_libdir}/libnetresolve-backend-ubdns.so.0
 %{_libdir}/libnetresolve-backend-ubdns.so.0.0.0
 
