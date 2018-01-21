@@ -6,6 +6,7 @@ Group: System Environment/Libraries
 License: BSD
 URL: https://sourceware.org/%{name}/
 Source: %{name}-%{version}.tar.xz
+Source1: %{name}-rpmlintrc
 BuildRequires: ldns-devel
 BuildRequires: pkgconfig(libcares)
 BuildRequires: unbound-devel
@@ -20,7 +21,7 @@ Requires: %{name}-core%{?_isa} = %{version}-%{release}
 Requires: %{name}-tools%{?_isa} = %{version}-%{release}
 Requires: %{name}-compat%{?_isa} = %{version}-%{release}
 Requires: %{name}-backends-compat%{?_isa} = %{version}-%{release}
-Requires: %{name}-backends-aresdns0%{?_isa} = %{version}-%{release}
+Requires: %{name}-backends-aresdns%{?_isa} = %{version}-%{release}
 Requires: %{name}-backends-avahi%{?_isa} = %{version}-%{release}
 %description
 Netresolve is a package for non-blocking network name resolution via backends
@@ -58,27 +59,27 @@ Group: Development/Libraries
 This package provides backends for querying libc, glibc nsswitch backends,
 asyncns and other existing name resolution libraries.
 
-%package backends-aresdns0
+%package backends-aresdns
 Summary: DNS backend for netresolve based on aresdns
 Group: Development/Libraries
 Requires: %{name}-core%{?_isa} = %{version}-%{release}
-%description backends-aresdns0
+%description backends-aresdns
 This package provides DNS capabilities including learning DNSSEC validity
 from the AD flag for netresolve using c-ares.
 
-%package backends-avahi0
+%package backends-avahi
 Summary: Multicast DNS backend for netresolve based on libavahi
 Group: Development/Libraries
 Requires: %{name}-core%{?_isa} = %{version}-%{release}
-%description backends-avahi0
+%description backends-avahi
 This package provides Multicast DNS capabilities using Avahi daemon and
 libraries.
 
-%package backends-ubdns0
+%package backends-ubdns
 Summary: DNS backend for netresolve based on libunbound
 Group: Development/Libraries
 Requires: %{name}-core%{?_isa} = %{version}-%{release}
-%description backends-ubdns0
+%description backends-ubdns
 This package provides DNS capabilities including DNSSEC validation to
 netresolve using libunbound.
 
@@ -126,14 +127,14 @@ find %{buildroot} -name '*.la' -delete
 %post backends-compat -p /sbin/ldconfig
 %postun backends-compat -p /sbin/ldconfig
 
-%post backends-aresdns0 -p /sbin/ldconfig
-%postun backends-aresdns0 -p /sbin/ldconfig
+%post backends-aresdns -p /sbin/ldconfig
+%postun backends-aresdns -p /sbin/ldconfig
 
-%post backends-ubdns0 -p /sbin/ldconfig
-%postun backends-ubdns0 -p /sbin/ldconfig
+%post backends-ubdns -p /sbin/ldconfig
+%postun backends-ubdns -p /sbin/ldconfig
 
-%post backends-avahi0 -p /sbin/ldconfig
-%postun backends-avahi0 -p /sbin/ldconfig
+%post backends-avahi -p /sbin/ldconfig
+%postun backends-avahi -p /sbin/ldconfig
 
 %files core
 %license COPYING
