@@ -287,8 +287,10 @@ netresolve_backend_add_path(netresolve_query_t query,
 
 	if (length)
 		memcpy(path.node.address, address, length);
-	else
-		strncpy(path.node.address, address, sizeof path.node.address);
+	else {
+		path.node.address[sizeof(path.node.address)-1] = 0;
+		strncpy(path.node.address, address, sizeof(path.node.address)-1);
+	}
 
 	if (query->request.servname && (!socktype || !protocol || !port)) {
 		struct path_data data = { .query = query, .path = &path };
