@@ -160,7 +160,8 @@ read_list(struct hosts_list *list)
 				new = buffer - 1;
 			}
 		}
-		
+
+		read_item(list, buffer);
 	}
 out:
 	close(fd);
