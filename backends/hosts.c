@@ -126,12 +126,12 @@ read_list(struct hosts_list *list)
 	char *new;
 	size_t size;
 
-	free(hosts_file);
 
 	if (fd == -1) {
 		error("Cannot read hosts file '%s': %s", hosts_file, strerror(errno));
 		goto fail_open;
 	}
+
 
 	while (true) {
 		if (current == end)
@@ -166,6 +166,7 @@ read_list(struct hosts_list *list)
 out:
 	close(fd);
 fail_open:
+	free(hosts_file);
 	add_node(list, NULL, 0, NULL, 0);
 	list->reserved = list->count;
 	list->items = realloc(list->items, list->reserved * sizeof *list->items);
