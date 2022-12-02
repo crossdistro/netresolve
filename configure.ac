@@ -1,5 +1,5 @@
 AC_PREREQ(2.60)
-AC_INIT([netresolve], [0.0.1], [psimerda@redhat.com], [netresolve], [])
+AC_INIT([netresolve], [0.0.1], [https://github.com/crossdistro/netresolve], [netresolve], [])
 AC_CONFIG_SRCDIR([tools/netresolve.c])
 AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([check-news foreign 1.11 -Wall -Wno-portability silent-rules tar-pax no-dist-gzip dist-xz subdir-objects])
