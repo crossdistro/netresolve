@@ -5,7 +5,7 @@ AC_CONFIG_AUX_DIR([build-aux])
 AM_INIT_AUTOMAKE([check-news foreign 1.11 -Wall -Wno-portability silent-rules tar-pax no-dist-gzip dist-xz subdir-objects])
 AC_USE_SYSTEM_EXTENSIONS
 LT_INIT([disable-static pic-only dlopen])
-AC_PROG_CC_STDC
+AC_PROG_CC
 AC_CHECK_FUNC(__secure_getenv,
 	AC_DEFINE(secure_getenv, __secure_getenv, [A prefixed version of secure_getenv found.]))
 AC_SYS_LARGEFILE
