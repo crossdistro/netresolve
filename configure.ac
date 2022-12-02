@@ -60,10 +60,11 @@ AM_CONDITIONAL(BUILD_FRONTEND_ASYNCNS, [test $build_asyncns = yes])
 AM_CONDITIONAL(BUILD_BACKEND_ASYNCNS, [test $build_asyncns = yes])
 
 AC_ARG_ENABLE(tests, AS_HELP_STRING([--enable-tests|--disable-tests], [Build tests using additional dependencies (Default: no)]))
-AS_IF([test "$enable_tests" = yes],
+AS_IF([test "$enable_tests" = yes], [
 	PKG_CHECK_MODULES([GLIB], [glib-2.0])
 	AC_CHECK_LIB([event], [event_base_new], [EVENT_LIBS=-levent])
-	AC_SUBST(EVENT_LIBS))
+	AC_SUBST(EVENT_LIBS)
+])
 AM_CONDITIONAL(BUILD_ALL_TESTS, [test "$enable_tests" = yes])
 
 AC_CONFIG_HEADERS([config.h])
